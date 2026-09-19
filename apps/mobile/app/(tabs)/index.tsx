@@ -1,7 +1,6 @@
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Pressable,
@@ -10,12 +9,17 @@ import {
   Text,
   View,
 } from "react-native";
-
-import { PantryItemForm } from "@/components/PantryItemForm";
-import { useServerSettings } from "@/contexts/ServerSettingsContext";
-import { apiFetch, apiJson } from "@/lib/api";
 import { z } from "zod";
 
+import { PantryItemForm } from "@/components/PantryItemForm";
+import { AppButton } from "@/components/ui/AppButton";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Screen } from "@/components/ui/Screen";
+import { spacing, typography } from "@/constants/theme";
+import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useAppTheme } from "@/hooks/useAppTheme";
+import { apiFetch, apiJson } from "@/lib/api";
 import {
   ingredientSchema,
   quantityUnitsSchema,
@@ -31,6 +35,7 @@ const defaultUnits: Record<QuantityKind, string[]> = {
 };
 
 export default function PantryScreen() {
+  const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
   const [items, setItems] = useState<Ingredient[]>([]);
   const [unitsByKind, setUnitsByKind] = useState(defaultUnits);
@@ -43,7 +48,7 @@ export default function PantryScreen() {
     try {
       const raw = await apiJson<unknown>("/meta/quantity-units", { baseUrl: serverUrl });
       const parsed = quantityUnitsSchema.parse(raw);
-      setUnitsByKind(parsed.kinds);
+      setUnitsByKind({ ...defaultUnits, ...parsed.kinds });
     } catch {
       setUnitsByKind(defaultUnits);
     }
@@ -68,7 +73,9 @@ export default function PantryScreen() {
   }, [loadInventory, loadUnits]);
 
   useEffect(() => {
-    void refresh();
+    queueMicrotask(() => {
+      void refresh();
+    });
   }, [refresh]);
 
   const saveItem = async (payload: IngredientCreate) => {
@@ -112,17 +119,13 @@ export default function PantryScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <Screen loading />;
   }
 
   if (showForm || editing) {
     return (
       <PantryItemForm
-        initial={editing ?? undefined}
+        {...(editing ? { initial: editing } : {})}
         unitsByKind={unitsByKind}
         onSubmit={saveItem}
         onCancel={() => {
@@ -134,53 +137,67 @@ export default function PantryScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <Screen padded={false}>
       <View style={styles.toolbar}>
-        <Pressable style={styles.btn} onPress={() => setShowForm(true)}>
-          <Text style={styles.btnText}>+ Manual</Text>
-        </Pressable>
-        <Link href="/scan" asChild>
-          <Pressable style={styles.btn}>
-            <Text style={styles.btnText}>Scan</Text>
-          </Pressable>
-        </Link>
+        <AppButton label="+ Manual" compact onPress={() => setShowForm(true)} style={styles.toolbarBtn} />
+        <AppButton
+          label="Scan barcode"
+          variant="accent"
+          compact
+          style={styles.toolbarBtn}
+          onPress={() => router.push("/scan")}
+        />
       </View>
 
       <FlatList
         data={items}
         keyExtractor={(item) => String(item.id)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
-        ListEmptyComponent={<Text style={styles.empty}>No items yet. Add manually or scan.</Text>}
+        contentContainerStyle={items.length === 0 ? styles.listEmpty : styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+        }
+        ListEmptyComponent={
+          <EmptyState
+            title="Your pantry is empty"
+            subtitle="Add items manually or scan a barcode to get started."
+          />
+        }
         renderItem={({ item }) => (
           <Pressable
-            style={styles.row}
             onPress={() => setEditing(item)}
             onLongPress={() => deleteItem(item)}
+            style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}
           >
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.meta}>
-              {formatQty(item)} · {item.location ?? "no location"}
-            </Text>
+            <Card style={styles.row}>
+              <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
+              <Text style={[styles.meta, { color: colors.textMuted }]}>
+                {formatQty(item)}
+                {item.location ? ` · ${item.location}` : ""}
+              </Text>
+            </Card>
           </Pressable>
         )}
       />
-    </View>
+    </Screen>
   );
 }
 
 function formatQty(item: Ingredient): string {
-  if (item.quantity == null) return "—";
+  if (item.quantity == null) return "No quantity set";
   return `${item.quantity} ${item.unit ?? ""}`.trim();
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  toolbar: { flexDirection: "row", gap: 8, padding: 12 },
-  btn: { backgroundColor: "#2563eb", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  btnText: { color: "#fff", fontWeight: "600" },
-  row: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderColor: "#eee" },
-  name: { fontSize: 16, fontWeight: "600" },
-  meta: { color: "#555", marginTop: 4 },
-  empty: { textAlign: "center", marginTop: 40, color: "#666" },
+  toolbar: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  toolbarBtn: { flex: 1 },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
+  listEmpty: { flexGrow: 1 },
+  row: { marginBottom: spacing.sm },
+  name: typography.headline,
+  meta: { ...typography.caption, marginTop: 2 },
 });

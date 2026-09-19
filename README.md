@@ -247,7 +247,7 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 - [x] README + architecture (no vision)
 - [x] FastAPI: inventory, barcodes, recipes, shopping, quantity kinds, saved recipes
 - [x] Open Food Facts import script + manual product / inventory entry
-- [ ] Expo mobile app — **in progress** on `phase-3-mobile` (see `apps/mobile/README.md`)
+- [x] Expo mobile app — pantry, recipes, shopping, settings, scan (see `apps/mobile/README.md`)
 
 ## Environment variables
 

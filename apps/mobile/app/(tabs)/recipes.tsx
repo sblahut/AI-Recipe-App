@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, FlatList, StyleSheet, Text } from "react-native";
 import { z } from "zod";
 
+import { AppButton } from "@/components/ui/AppButton";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Screen } from "@/components/ui/Screen";
+import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import {
   recipeGenerateResponseSchema,
@@ -21,6 +18,7 @@ import {
 } from "@/lib/schemas";
 
 export default function RecipesScreen() {
+  const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
@@ -32,7 +30,9 @@ export default function RecipesScreen() {
   }, [serverUrl]);
 
   useEffect(() => {
-    void loadSaved().catch(() => undefined);
+    queueMicrotask(() => {
+      void loadSaved().catch(() => undefined);
+    });
   }, [loadSaved]);
 
   const generate = async () => {
@@ -63,64 +63,68 @@ export default function RecipesScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Pressable style={styles.btn} onPress={() => void generate()} disabled={loading}>
-        <Text style={styles.btnText}>{loading ? "Generating…" : "Generate from pantry"}</Text>
-      </Pressable>
+    <Screen scroll contentContainerStyle={styles.scroll}>
+      <Text style={[styles.lead, { color: colors.textMuted }]}>
+        Uses what is in your pantry and your home Ollama server.
+      </Text>
+
+      <AppButton
+        label={loading ? "Generating…" : "Generate from pantry"}
+        loading={loading}
+        onPress={() => void generate()}
+      />
 
       {generated.map((recipe) => (
-        <View key={recipe.title} style={styles.card}>
-          <Text style={styles.title}>{recipe.title}</Text>
-          <Text style={styles.meta}>
+        <Card key={recipe.title}>
+          <Text style={[styles.title, { color: colors.text }]}>{recipe.title}</Text>
+          <Text style={[styles.meta, { color: colors.textMuted }]}>
             {recipe.prep_minutes ?? "?"} min · serves {recipe.servings ?? "?"}
           </Text>
           {recipe.steps.slice(0, 3).map((step, i) => (
-            <Text key={`${recipe.title}-step-${i}`} style={styles.step}>
+            <Text key={`${recipe.title}-step-${i}`} style={[styles.step, { color: colors.textSecondary }]}>
               {i + 1}. {step}
             </Text>
           ))}
-          <Pressable style={styles.saveBtn} onPress={() => void saveRecipe(recipe)}>
-            <Text style={styles.saveBtnText}>Save recipe</Text>
-          </Pressable>
-        </View>
+          <AppButton
+            label="Save recipe"
+            variant="secondary"
+            compact
+            onPress={() => void saveRecipe(recipe)}
+            style={styles.saveBtn}
+          />
+        </Card>
       ))}
 
-      <Text style={styles.section}>Saved recipes</Text>
+      <Text style={[styles.section, { color: colors.text }]}>Saved recipes</Text>
       {saved.length === 0 ? (
-        <Text style={styles.empty}>No saved recipes yet.</Text>
+        <EmptyState title="No saved recipes yet" subtitle="Generate ideas above, then save your favorites." />
       ) : (
         <FlatList
           data={saved}
           scrollEnabled={false}
           keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.savedList}
           renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.meta}>{new Date(item.created_at).toLocaleDateString()}</Text>
-            </View>
+            <Card>
+              <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+              <Text style={[styles.meta, { color: colors.textMuted }]}>
+                {new Date(item.created_at).toLocaleDateString()}
+              </Text>
+            </Card>
           )}
         />
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 12, paddingBottom: 40 },
-  btn: { backgroundColor: "#2563eb", padding: 14, borderRadius: 8, alignItems: "center" },
-  btnText: { color: "#fff", fontWeight: "600" },
-  section: { fontSize: 18, fontWeight: "700", marginTop: 16 },
-  card: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    padding: 12,
-    gap: 6,
-  },
-  title: { fontSize: 17, fontWeight: "600" },
-  meta: { color: "#555" },
-  step: { color: "#333" },
-  saveBtn: { marginTop: 8, alignSelf: "flex-start" },
-  saveBtnText: { color: "#2563eb", fontWeight: "600" },
-  empty: { color: "#666" },
+  scroll: { gap: spacing.md },
+  lead: { ...typography.caption, lineHeight: 20 },
+  section: { ...typography.title, marginTop: spacing.md },
+  title: typography.headline,
+  meta: typography.caption,
+  step: { ...typography.caption, lineHeight: 20 },
+  saveBtn: { alignSelf: "flex-start", marginTop: spacing.sm },
+  savedList: { gap: spacing.sm },
 });

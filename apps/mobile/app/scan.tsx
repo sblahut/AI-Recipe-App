@@ -1,9 +1,14 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
+import { AppButton } from "@/components/ui/AppButton";
+import { AppTextField } from "@/components/ui/AppTextField";
+import { Card } from "@/components/ui/Card";
+import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiJson } from "@/lib/api";
 import { barcodeScanResponseSchema } from "@/lib/schemas";
 
@@ -13,6 +18,7 @@ type ScanParams = {
 };
 
 export default function ScanScreen() {
+  const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
   const params = useLocalSearchParams<ScanParams>();
   const target = params.target === "shopping_list" ? "shopping_list" : "inventory";
@@ -65,19 +71,19 @@ export default function ScanScreen() {
 
   if (!permission) {
     return (
-      <View style={styles.center}>
-        <Text>Requesting camera permission…</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.textSecondary }}>Requesting camera permission…</Text>
       </View>
     );
   }
 
   if (!permission.granted) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.message}>Camera access is required to scan barcodes.</Text>
-        <Pressable style={styles.btn} onPress={() => void requestPermission()}>
-          <Text style={styles.btnText}>Allow camera</Text>
-        </Pressable>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.message, { color: colors.textSecondary }]}>
+          Camera access is required to scan barcodes.
+        </Text>
+        <AppButton label="Allow camera" onPress={() => void requestPermission()} />
       </View>
     );
   }
@@ -97,26 +103,33 @@ export default function ScanScreen() {
               }
         }
       />
+      <View style={[styles.frameHint, { borderColor: colors.primary }]} pointerEvents="none" />
       {lastBarcode ? (
-        <View style={styles.manualBox}>
-          <Text>Unknown: {lastBarcode}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Product name"
-            value={manualName}
-            onChangeText={setManualName}
-          />
-          <Pressable
-            style={styles.btn}
-            onPress={() => {
-              if (!manualName.trim()) return;
-              void submitBarcode(lastBarcode, manualName.trim());
-            }}
-          >
-            <Text style={styles.btnText}>Add & save to catalog</Text>
-          </Pressable>
+        <View style={styles.manualWrap}>
+          <Card>
+            <Text style={[styles.manualTitle, { color: colors.text }]}>Unknown barcode</Text>
+            <Text style={[styles.manualCode, { color: colors.textMuted }]}>{lastBarcode}</Text>
+            <AppTextField
+              placeholder="Product name"
+              value={manualName}
+              onChangeText={setManualName}
+            />
+            <AppButton
+              label="Add & save to catalog"
+              onPress={() => {
+                if (!manualName.trim()) return;
+                void submitBarcode(lastBarcode, manualName.trim());
+              }}
+            />
+          </Card>
         </View>
-      ) : null}
+      ) : (
+        <View style={styles.hintBar}>
+          <Text style={[styles.hintText, { color: colors.text }]}>
+            {busy ? "Adding…" : "Point at a barcode inside the frame"}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -124,16 +137,36 @@ export default function ScanScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   camera: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16, gap: 12 },
-  message: { textAlign: "center" },
-  manualBox: { padding: 12, gap: 8, backgroundColor: "#fff" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg, gap: spacing.md },
+  message: { textAlign: "center", ...typography.body },
+  frameHint: {
+    position: "absolute",
+    top: "28%",
+    alignSelf: "center",
+    width: "72%",
+    height: 120,
+    borderWidth: 2,
+    borderRadius: radius.lg,
+    borderStyle: "dashed",
   },
-  btn: { backgroundColor: "#2563eb", padding: 12, borderRadius: 8, alignItems: "center" },
-  btnText: { color: "#fff", fontWeight: "600" },
+  hintBar: {
+    position: "absolute",
+    bottom: spacing.xl,
+    left: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  hintText: { textAlign: "center", ...typography.label },
+  manualWrap: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: spacing.lg,
+    backgroundColor: "rgba(247, 245, 240, 0.96)",
+  },
+  manualTitle: typography.headline,
+  manualCode: { ...typography.caption, fontFamily: "monospace" },
 });

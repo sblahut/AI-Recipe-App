@@ -1,6 +1,12 @@
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 
+import { AppButton } from "@/components/ui/AppButton";
+import { AppTextField } from "@/components/ui/AppTextField";
+import { Chip } from "@/components/ui/Chip";
+import { Screen } from "@/components/ui/Screen";
+import { spacing, typography } from "@/constants/theme";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import type { Ingredient, IngredientCreate, QuantityKind } from "@/lib/schemas";
 
 type Props = {
@@ -11,6 +17,7 @@ type Props = {
 };
 
 export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel }: Props) {
+  const { colors } = useAppTheme();
   const [name, setName] = useState(initial?.name ?? "");
   const [quantityKind, setQuantityKind] = useState<QuantityKind>(
     initial?.quantity_kind ?? "count",
@@ -20,12 +27,13 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel }: Pro
   const [location, setLocation] = useState(initial?.location ?? "");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const units = unitsByKind[quantityKind];
-    if (units.length > 0 && !units.includes(unit)) {
+  const selectKind = (kind: QuantityKind) => {
+    setQuantityKind(kind);
+    const units = unitsByKind[kind];
+    if (units.length > 0) {
       setUnit(units[0] ?? "each");
     }
-  }, [quantityKind, unit, unitsByKind]);
+  };
 
   const submit = async () => {
     setSaving(true);
@@ -44,80 +52,66 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel }: Pro
   };
 
   return (
-    <View style={styles.box}>
-      <Text style={styles.label}>Name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} />
+    <Screen scroll>
+      <Text style={[styles.heading, { color: colors.text }]}>
+        {initial ? "Edit item" : "Add to pantry"}
+      </Text>
 
-      <Text style={styles.label}>Kind</Text>
-      <View style={styles.row}>
+      <AppTextField label="Name" value={name} onChangeText={setName} autoFocus={!initial} />
+
+      <Text style={[styles.label, { color: colors.text }]}>Kind</Text>
+      <View style={styles.chipRow}>
         {(["count", "weight", "volume"] as const).map((kind) => (
-          <Pressable
+          <Chip
             key={kind}
-            style={[styles.chip, quantityKind === kind && styles.chipActive]}
-            onPress={() => setQuantityKind(kind)}
-          >
-            <Text>{kind}</Text>
-          </Pressable>
+            label={kind}
+            selected={quantityKind === kind}
+            onPress={() => selectKind(kind)}
+          />
         ))}
       </View>
 
-      <Text style={styles.label}>Quantity</Text>
-      <TextInput
-        style={styles.input}
+      <AppTextField
+        label="Quantity"
         value={quantity}
         onChangeText={setQuantity}
         keyboardType="decimal-pad"
+        placeholder="Optional"
       />
 
-      <Text style={styles.label}>Unit</Text>
-      <View style={styles.rowWrap}>
+      <Text style={[styles.label, { color: colors.text }]}>Unit</Text>
+      <View style={styles.chipRowWrap}>
         {unitsByKind[quantityKind].map((u) => (
-          <Pressable
-            key={u}
-            style={[styles.chip, unit === u && styles.chipActive]}
-            onPress={() => setUnit(u)}
-          >
-            <Text>{u}</Text>
-          </Pressable>
+          <Chip key={u} label={u} selected={unit === u} onPress={() => setUnit(u)} />
         ))}
       </View>
 
-      <Text style={styles.label}>Location</Text>
-      <TextInput style={styles.input} value={location} onChangeText={setLocation} />
+      <AppTextField
+        label="Location"
+        value={location}
+        onChangeText={setLocation}
+        placeholder="Pantry, fridge, freezer…"
+      />
 
       <View style={styles.actions}>
-        <Pressable style={styles.btnSecondary} onPress={onCancel}>
-          <Text>Cancel</Text>
-        </Pressable>
-        <Pressable style={styles.btnPrimary} onPress={() => void submit()} disabled={saving}>
-          <Text style={styles.btnPrimaryText}>{saving ? "Saving…" : "Save"}</Text>
-        </Pressable>
+        <AppButton label="Cancel" variant="ghost" onPress={onCancel} />
+        <AppButton label="Save" loading={saving} onPress={() => void submit()} style={styles.saveBtn} />
       </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  box: { gap: 8, padding: 16 },
-  label: { fontWeight: "600" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  heading: { ...typography.title, marginBottom: spacing.sm },
+  label: { ...typography.label, marginTop: spacing.xs },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  chipRowWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  actions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
-  row: { flexDirection: "row", gap: 8 },
-  rowWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "#eee",
-  },
-  chipActive: { backgroundColor: "#cde8ff" },
-  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 8 },
-  btnSecondary: { padding: 10 },
-  btnPrimary: { backgroundColor: "#2563eb", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  btnPrimaryText: { color: "#fff", fontWeight: "600" },
+  saveBtn: { minWidth: 120 },
 });

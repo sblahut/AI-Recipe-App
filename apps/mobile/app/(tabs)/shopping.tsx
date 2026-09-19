@@ -1,18 +1,16 @@
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
+import { AppButton } from "@/components/ui/AppButton";
+import { AppTextField } from "@/components/ui/AppTextField";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Screen } from "@/components/ui/Screen";
+import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import {
   shoppingListDetailSchema,
@@ -22,6 +20,7 @@ import {
 } from "@/lib/schemas";
 
 export default function ShoppingScreen() {
+  const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -44,31 +43,36 @@ export default function ShoppingScreen() {
   );
 
   useEffect(() => {
-    void (async () => {
-      try {
-        await loadLists();
-      } finally {
-        setLoading(false);
-      }
-    })();
+    queueMicrotask(() => {
+      void (async () => {
+        try {
+          await loadLists();
+        } finally {
+          setLoading(false);
+        }
+      })();
+    });
   }, [loadLists]);
 
-  useEffect(() => {
-    if (selectedId != null) {
-      void loadDetail(selectedId);
-    }
-  }, [selectedId, loadDetail]);
+  const selectList = (id: number) => {
+    setSelectedId(id);
+    void loadDetail(id);
+  };
 
   const createList = async () => {
     const name = newListName.trim();
     if (!name) return;
-    await apiFetch("/shopping/lists", {
-      baseUrl: serverUrl,
-      method: "POST",
-      body: JSON.stringify({ name }),
-    });
-    setNewListName("");
-    await loadLists();
+    try {
+      await apiFetch("/shopping/lists", {
+        baseUrl: serverUrl,
+        method: "POST",
+        body: JSON.stringify({ name }),
+      });
+      setNewListName("");
+      await loadLists();
+    } catch (e) {
+      Alert.alert("Could not create list", e instanceof Error ? e.message : "Unknown error");
+    }
   };
 
   const addItem = async () => {
@@ -94,102 +98,146 @@ export default function ShoppingScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-      </View>
-    );
+    return <Screen loading />;
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.row}>
-        <TextInput
-          style={[styles.input, { flex: 1 }]}
-          placeholder="New list name"
-          value={newListName}
-          onChangeText={setNewListName}
-        />
-        <Pressable style={styles.btn} onPress={() => void createList()}>
-          <Text style={styles.btnText}>Add</Text>
-        </Pressable>
+    <Screen padded={false}>
+      <View style={styles.sectionPad}>
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <AppTextField
+              placeholder="New list name"
+              value={newListName}
+              onChangeText={setNewListName}
+              onSubmitEditing={() => void createList()}
+            />
+          </View>
+          <AppButton label="Add" compact onPress={() => void createList()} />
+        </View>
       </View>
 
       <FlatList
         horizontal
+        showsHorizontalScrollIndicator={false}
         data={lists}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listRow}
-        renderItem={({ item }) => (
-          <Pressable
-            style={[styles.listChip, selectedId === item.id && styles.listChipActive]}
-            onPress={() => setSelectedId(item.id)}
-          >
-            <Text>{item.name}</Text>
-          </Pressable>
-        )}
+        contentContainerStyle={styles.listChips}
+        renderItem={({ item }) => {
+          const active = selectedId === item.id;
+          return (
+            <Pressable
+              onPress={() => selectList(item.id)}
+              style={({ pressed }) => [
+                styles.chip,
+                {
+                  backgroundColor: active ? colors.primaryMuted : colors.surface,
+                  borderColor: active ? colors.primary : colors.border,
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: active ? colors.primary : colors.textSecondary },
+                ]}
+              >
+                {item.name}
+              </Text>
+            </Pressable>
+          );
+        }}
       />
 
       {selectedId != null ? (
         <>
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Add item manually"
-              value={newItemName}
-              onChangeText={setNewItemName}
+          <View style={[styles.sectionPad, styles.row, styles.itemToolbar]}>
+            <View style={styles.flex}>
+              <AppTextField
+                placeholder="Add item"
+                value={newItemName}
+                onChangeText={setNewItemName}
+                onSubmitEditing={() => void addItem()}
+              />
+            </View>
+            <AppButton label="Add" compact onPress={() => void addItem()} />
+            <AppButton
+              label="Scan"
+              variant="accent"
+              compact
+              onPress={() =>
+                router.push({
+                  pathname: "/scan",
+                  params: { target: "shopping_list", listId: String(selectedId) },
+                })
+              }
             />
-            <Pressable style={styles.btn} onPress={() => void addItem()}>
-              <Text style={styles.btnText}>Item</Text>
-            </Pressable>
-            <Link
-              href={{ pathname: "/scan", params: { target: "shopping_list", listId: String(selectedId) } }}
-              asChild
-            >
-              <Pressable style={styles.btn}>
-                <Text style={styles.btnText}>Scan</Text>
-              </Pressable>
-            </Link>
           </View>
 
           <FlatList
             data={detail?.items ?? []}
             keyExtractor={(item) => String(item.id)}
-            ListEmptyComponent={<Text style={styles.empty}>No items in this list.</Text>}
+            contentContainerStyle={styles.itemsList}
+            ListEmptyComponent={
+              <EmptyState title="Nothing on this list yet" subtitle="Add items or scan barcodes." />
+            }
             renderItem={({ item }) => (
-              <Pressable style={styles.itemRow} onPress={() => void toggleItem(item.id, item.checked)}>
-                <Text style={[styles.itemText, item.checked && styles.checked]}>
-                  {item.checked ? "☑" : "☐"} {item.name}
-                </Text>
+              <Pressable onPress={() => void toggleItem(item.id, item.checked)}>
+                <Card style={styles.itemCard}>
+                  <View style={styles.checkRow}>
+                    <View
+                      style={[
+                        styles.checkbox,
+                        {
+                          borderColor: item.checked ? colors.primary : colors.border,
+                          backgroundColor: item.checked ? colors.primary : colors.surface,
+                        },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.itemText,
+                        { color: colors.text },
+                        item.checked && { color: colors.textMuted, textDecorationLine: "line-through" },
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                  </View>
+                </Card>
               </Pressable>
             )}
           />
         </>
       ) : (
-        <Text style={styles.empty}>Select or create a shopping list.</Text>
+        <EmptyState title="Select or create a list" subtitle="Lists help you track what to buy on your next trip." />
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 12, gap: 10 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  row: { flexDirection: "row", gap: 8, alignItems: "center" },
-  input: {
+  sectionPad: { paddingHorizontal: spacing.lg },
+  row: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-end" },
+  flex: { flex: 1 },
+  listChips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
   },
-  btn: { backgroundColor: "#2563eb", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8 },
-  btnText: { color: "#fff", fontWeight: "600" },
-  listRow: { gap: 8, paddingVertical: 4 },
-  listChip: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: "#eee", borderRadius: 16 },
-  listChipActive: { backgroundColor: "#cde8ff" },
-  itemRow: { paddingVertical: 10, borderBottomWidth: 1, borderColor: "#eee" },
-  itemText: { fontSize: 16 },
-  checked: { textDecorationLine: "line-through", color: "#888" },
-  empty: { color: "#666", textAlign: "center", marginTop: 24 },
+  chipText: { ...typography.caption, fontWeight: "600" },
+  itemToolbar: { marginBottom: spacing.sm },
+  itemsList: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
+  itemCard: { marginBottom: spacing.xs },
+  checkRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+  },
+  itemText: typography.body,
 });
