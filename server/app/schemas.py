@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from app.models import SavedRecipe
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.units import QuantityKind, default_unit, validate_unit_for_kind
 
@@ -119,6 +119,19 @@ class RecipeGenerateRequest(BaseModel):
 class RecipeIngredient(BaseModel):
     name: str
     quantity: str | None = None
+
+    @field_validator("quantity", mode="before")
+    @classmethod
+    def coerce_quantity_to_string(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if isinstance(value, bool):
+            raise ValueError("quantity must be a string or number")
+        if isinstance(value, (int, float)):
+            return str(value)
+        return str(value)
 
 
 class GeneratedRecipe(BaseModel):
