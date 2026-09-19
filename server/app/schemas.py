@@ -114,6 +114,10 @@ class RecipeGenerateRequest(BaseModel):
     count: int = Field(default=3, ge=1, le=10)
     constraints: str | None = None
     prioritize_expiring: bool = True
+    persist_generated: bool | None = Field(
+        default=None,
+        description="When true, save each generated recipe (non-favorite). When omitted, uses server default.",
+    )
 
 
 class RecipeIngredient(BaseModel):
@@ -145,6 +149,7 @@ class GeneratedRecipe(BaseModel):
 
 class RecipeGenerateResponse(BaseModel):
     recipes: list[GeneratedRecipe]
+    saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
 
 
 class SavedRecipeCreate(BaseModel):
@@ -211,3 +216,25 @@ class ShoppingListItemRead(ShoppingListItemCreate):
 
 class ShoppingListDetail(ShoppingListRead):
     items: list[ShoppingListItemRead]
+
+
+class ShoppingFromRecipeRequest(BaseModel):
+    list_id: int
+    recipe: GeneratedRecipe | None = None
+    saved_recipe_id: int | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_recipe_source(self) -> "ShoppingFromRecipeRequest":
+        has_recipe = self.recipe is not None
+        has_id = self.saved_recipe_id is not None
+        if has_recipe == has_id:
+            raise ValueError("Provide exactly one of recipe or saved_recipe_id")
+        return self
+
+
+class ShoppingFromRecipeResponse(BaseModel):
+    added: list[ShoppingListItemRead]
+    skipped_in_pantry: list[str]
+
+
+RecipeGenerateResponse.model_rebuild()

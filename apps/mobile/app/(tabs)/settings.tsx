@@ -26,7 +26,14 @@ const emptyStore: StoreDraft = { name: "", address: "", chain: "Other" };
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
   const { serverUrl, setServerUrl, loading, testConnection } = useServerSettings();
-  const { preferences, setUsername, addStore, updateStore, deleteStore } = useUserPreferences();
+  const {
+    preferences,
+    setUsername,
+    addStore,
+    updateStore,
+    deleteStore,
+    setAutoPersistGeneratedRecipes,
+  } = useUserPreferences();
   const [draft, setDraft] = useState(serverUrl);
   const [usernameDraft, setUsernameDraft] = useState(preferences.username);
   const [testing, setTesting] = useState(false);
@@ -139,6 +146,25 @@ export default function SettingsScreen() {
         {usernameSaved ? (
           <Text style={[styles.result, { color: colors.success }]}>{usernameSaved}</Text>
         ) : null}
+      </Card>
+
+      <Card>
+        <Text style={[styles.section, { color: colors.text }]}>Recipes</Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          When enabled, each generate run saves recipes on the server (not favorites). You can still
+          star favorites separately.
+        </Text>
+        <AppButton
+          label={
+            preferences.autoPersistGeneratedRecipes
+              ? "Auto-save generated recipes: On"
+              : "Auto-save generated recipes: Off"
+          }
+          variant={preferences.autoPersistGeneratedRecipes ? "primary" : "secondary"}
+          onPress={() => {
+            void setAutoPersistGeneratedRecipes(!preferences.autoPersistGeneratedRecipes);
+          }}
+        />
       </Card>
 
       <Card>

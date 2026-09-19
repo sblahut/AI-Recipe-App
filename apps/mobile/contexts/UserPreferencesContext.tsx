@@ -29,6 +29,7 @@ type UserPreferencesContextValue = {
   addStore: (store: Omit<GroceryStore, "id">) => Promise<void>;
   updateStore: (store: GroceryStore) => Promise<void>;
   deleteStore: (id: string) => Promise<void>;
+  setAutoPersistGeneratedRecipes: (enabled: boolean) => Promise<void>;
 };
 
 const UserPreferencesContext = createContext<UserPreferencesContextValue | null>(null);
@@ -117,6 +118,13 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     [persist, preferences],
   );
 
+  const setAutoPersistGeneratedRecipes = useCallback(
+    async (enabled: boolean) => {
+      await persist({ ...preferences, autoPersistGeneratedRecipes: enabled });
+    },
+    [persist, preferences],
+  );
+
   const value = useMemo(
     () => ({
       preferences,
@@ -127,8 +135,19 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       addStore,
       updateStore,
       deleteStore,
+      setAutoPersistGeneratedRecipes,
     }),
-    [preferences, loading, setUsername, addZone, removeZone, addStore, updateStore, deleteStore],
+    [
+      preferences,
+      loading,
+      setUsername,
+      addZone,
+      removeZone,
+      addStore,
+      updateStore,
+      deleteStore,
+      setAutoPersistGeneratedRecipes,
+    ],
   );
 
   return <UserPreferencesContext.Provider value={value}>{children}</UserPreferencesContext.Provider>;

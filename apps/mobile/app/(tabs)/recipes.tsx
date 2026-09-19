@@ -11,6 +11,7 @@ import { Screen } from "@/components/ui/Screen";
 import type { ThemeColors } from "@/constants/theme";
 import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { pickStorageLocation } from "@/lib/pickStorageLocation";
@@ -23,6 +24,7 @@ import {
   ingredientSchema,
   recipeGenerateResponseSchema,
   savedRecipeReadSchema,
+  shoppingFromRecipeResponseSchema,
   shoppingListSchema,
   type GeneratedRecipe,
   type SavedRecipe,
@@ -57,6 +59,7 @@ function findFavoriteMatch(
 export default function RecipesScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
+  const { preferences } = useUserPreferences();
   const [favorites, setFavorites] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
@@ -140,10 +143,17 @@ export default function RecipesScreen() {
       const raw = await apiJson<unknown>("/recipes/generate", {
         baseUrl: serverUrl,
         method: "POST",
-        body: JSON.stringify({ use_all: true, count: 3 }),
+        body: JSON.stringify({
+          use_all: true,
+          count: 3,
+          persist_generated: preferences.autoPersistGeneratedRecipes,
+        }),
       });
       const parsed = recipeGenerateResponseSchema.parse(raw);
       setGenerated(parsed.recipes);
+      if (parsed.saved_recipes.length > 0) {
+        await loadFavorites();
+      }
     } catch (e) {
       Alert.alert("Generate failed", e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -209,19 +219,19 @@ export default function RecipesScreen() {
           onPress: () => {
             void (async () => {
               try {
-                for (const line of recipe.ingredients) {
-                  await apiFetch(`/shopping/lists/${list.id}/items`, {
-                    baseUrl: serverUrl,
-                    method: "POST",
-                    body: JSON.stringify({
-                      name: line.name,
-                      quantity_kind: "count",
-                      quantity: 1,
-                      unit: "each",
-                    }),
-                  });
-                }
-                Alert.alert("Added", `${recipe.ingredients.length} items added to ${list.name}.`);
+                const raw = await apiJson<unknown>("/shopping/from-recipe", {
+                  baseUrl: serverUrl,
+                  method: "POST",
+                  body: JSON.stringify({ list_id: list.id, recipe }),
+                });
+                const result = shoppingFromRecipeResponseSchema.parse(raw);
+                const skipped = result.skipped_in_pantry.length;
+                const added = result.added.length;
+                const detail =
+                  skipped > 0
+                    ? `${added} added to ${list.name}. ${skipped} already in your pantry.`
+                    : `${added} items added to ${list.name}.`;
+                Alert.alert(added > 0 ? "Added" : "Nothing to buy", detail);
               } catch (e) {
                 Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
               }

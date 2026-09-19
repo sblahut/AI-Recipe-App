@@ -19,6 +19,7 @@ export const userPreferencesSchema = z.object({
   username: z.string(),
   customZones: z.array(z.string()),
   stores: z.array(groceryStoreSchema),
+  autoPersistGeneratedRecipes: z.boolean().optional().default(false),
 });
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
@@ -26,6 +27,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   username: "",
   customZones: [],
   stores: [],
+  autoPersistGeneratedRecipes: false,
 };
 
 export const RESERVED_ZONE_NAMES = [

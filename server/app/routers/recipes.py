@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models import Ingredient, SavedRecipe
 from app.schemas import (
@@ -56,7 +57,25 @@ async def generate_recipes(
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
-    return RecipeGenerateResponse(recipes=recipes)
+    persist = (
+        body.persist_generated
+        if body.persist_generated is not None
+        else settings.default_persist_generated_recipes
+    )
+    saved_reads: list[SavedRecipeRead] = []
+    if persist:
+        for recipe in recipes:
+            row = SavedRecipe(
+                title=recipe.title,
+                payload_json=recipe.model_dump_json(),
+                favorite=False,
+            )
+            db.add(row)
+            db.flush()
+            saved_reads.append(SavedRecipeRead.from_orm_row(row))
+        db.commit()
+
+    return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
 
 
 @router.get("/saved", response_model=list[SavedRecipeRead])

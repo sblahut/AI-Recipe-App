@@ -1,15 +1,21 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import ShoppingList, ShoppingListItem
+from app.models import SavedRecipe, ShoppingList, ShoppingListItem
 from app.schemas import (
+    GeneratedRecipe,
+    ShoppingFromRecipeRequest,
+    ShoppingFromRecipeResponse,
     ShoppingListCreate,
     ShoppingListDetail,
     ShoppingListItemCreate,
     ShoppingListItemRead,
     ShoppingListRead,
 )
+from app.services.shopping_from_recipe import add_recipe_to_shopping_list
 
 router = APIRouter(prefix="/shopping", tags=["shopping"])
 
@@ -39,6 +45,28 @@ def get_shopping_list(list_id: int, db: Session = Depends(get_db)) -> ShoppingLi
     if not row:
         raise HTTPException(status_code=404, detail="Shopping list not found")
     return row
+
+
+@router.post("/from-recipe", response_model=ShoppingFromRecipeResponse)
+def shopping_from_recipe(
+    body: ShoppingFromRecipeRequest, db: Session = Depends(get_db)
+) -> ShoppingFromRecipeResponse:
+    if not db.get(ShoppingList, body.list_id):
+        raise HTTPException(status_code=404, detail="Shopping list not found")
+
+    recipe: GeneratedRecipe
+    if body.saved_recipe_id is not None:
+        row = db.get(SavedRecipe, body.saved_recipe_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        recipe = GeneratedRecipe.model_validate(json.loads(row.payload_json))
+    elif body.recipe is not None:
+        recipe = body.recipe
+    else:
+        raise HTTPException(status_code=400, detail="Provide recipe or saved_recipe_id")
+
+    added, skipped = add_recipe_to_shopping_list(db, list_id=body.list_id, recipe=recipe)
+    return ShoppingFromRecipeResponse(added=added, skipped_in_pantry=skipped)
 
 
 @router.post("/lists/{list_id}/items", response_model=ShoppingListItemRead, status_code=201)

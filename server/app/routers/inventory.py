@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Ingredient
 from app.schemas import IngredientBulkCreate, IngredientCreate, IngredientRead, IngredientUpdate
+from app.services.inventory_merge import upsert_ingredient, upsert_ingredients_bulk
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -15,21 +16,12 @@ def list_inventory(db: Session = Depends(get_db)) -> list[Ingredient]:
 
 @router.post("", response_model=IngredientRead, status_code=201)
 def create_ingredient(body: IngredientCreate, db: Session = Depends(get_db)) -> Ingredient:
-    row = Ingredient(**body.model_dump())
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return row
+    return upsert_ingredient(db, body)
 
 
 @router.post("/bulk", response_model=list[IngredientRead], status_code=201)
 def bulk_create(body: IngredientBulkCreate, db: Session = Depends(get_db)) -> list[Ingredient]:
-    rows = [Ingredient(**item.model_dump()) for item in body.items]
-    db.add_all(rows)
-    db.commit()
-    for row in rows:
-        db.refresh(row)
-    return rows
+    return upsert_ingredients_bulk(db, body.items)
 
 
 @router.patch("/{ingredient_id}", response_model=IngredientRead)
