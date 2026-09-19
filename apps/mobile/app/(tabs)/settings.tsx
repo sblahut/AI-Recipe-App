@@ -10,7 +10,8 @@ import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { openAddressInMaps } from "@/lib/openMaps";
+import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
+import { weeklyAdUrlForStore } from "@/lib/storeChains";
 import { STORE_CHAINS, type GroceryStore, type StoreChain } from "@/lib/userPreferences";
 
 type StoreDraft = {
@@ -79,6 +80,17 @@ export default function SettingsScreen() {
     } catch (e) {
       Alert.alert("Store", e instanceof Error ? e.message : "Could not save store");
     }
+  };
+
+  const openStoreWeeklyAd = (store: GroceryStore) => {
+    const url = weeklyAdUrlForStore(store);
+    if (!url) {
+      Alert.alert("Weekly ad", `No weekly ad link is set for ${store.chain}.`);
+      return;
+    }
+    void openExternalUrl(url).catch((e: unknown) => {
+      Alert.alert("Weekly ad", e instanceof Error ? e.message : "Could not open the weekly ad");
+    });
   };
 
   const confirmDeleteStore = (store: GroceryStore) => {
@@ -210,6 +222,12 @@ export default function SettingsScreen() {
                 compact
                 onPress={() => setStoreDraft(store)}
               />
+              <AppButton
+                label="Weekly ad"
+                variant="secondary"
+                compact
+                onPress={() => openStoreWeeklyAd(store)}
+              />
               <AppButton label="Delete" variant="ghost" compact onPress={() => confirmDeleteStore(store)} />
             </View>
           </View>
@@ -237,6 +255,7 @@ export default function SettingsScreen() {
                   key={chain}
                   label={chain}
                   selected={storeDraft.chain === chain}
+                  capitalize={false}
                   onPress={() => setStoreDraft({ ...storeDraft, chain })}
                 />
               ))}

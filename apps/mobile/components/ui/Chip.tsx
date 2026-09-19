@@ -7,9 +7,10 @@ type Props = {
   label: string;
   selected?: boolean;
   onPress: () => void;
+  capitalize?: boolean;
 };
 
-export function Chip({ label, selected = false, onPress }: Props) {
+export function Chip({ label, selected = false, onPress, capitalize = true }: Props) {
   const { colors } = useAppTheme();
 
   return (
@@ -28,6 +29,7 @@ export function Chip({ label, selected = false, onPress }: Props) {
         style={[
           styles.text,
           { color: selected ? colors.primary : colors.textSecondary },
+          capitalize && styles.capitalize,
         ]}
       >
         {label}
@@ -46,6 +48,8 @@ const styles = StyleSheet.create({
   text: {
     ...typography.caption,
     fontWeight: "600",
+  },
+  capitalize: {
     textTransform: "capitalize",
   },
 });

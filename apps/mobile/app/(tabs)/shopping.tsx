@@ -11,7 +11,7 @@ import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
-import { radius, spacing, typography } from "@/constants/theme";
+import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -19,6 +19,7 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
 import { formatShoppingListShare, shareText } from "@/lib/shareContent";
 import { stockFromShoppingList } from "@/lib/stockFromShoppingList";
+import { PUBLIX_WEEKLY_AD } from "@/lib/storeChains";
 import {
   shoppingListDetailSchema,
   shoppingListSchema,
@@ -26,8 +27,6 @@ import {
   type ShoppingListDetail,
   type ShoppingListItem,
 } from "@/lib/schemas";
-
-const PUBLIX_WEEKLY_AD = "https://www.publix.com/savings/weekly-ad";
 
 type ItemFilter = "All" | "To buy" | "In cart";
 
@@ -145,13 +144,17 @@ export default function ShoppingScreen() {
     }
   };
 
-  const toggleItem = async (itemId: number, checked: boolean) => {
-    if (selectedId == null) return;
-    await apiFetch(
-      `/shopping/lists/${selectedId}/items/${itemId}?checked=${checked ? "false" : "true"}`,
-      { baseUrl: serverUrl, method: "PATCH" },
-    );
-    await loadDetail(selectedId);
+  const setItemInCart = async (item: ShoppingListItem, inCart: boolean) => {
+    if (selectedId == null || item.checked === inCart) return;
+    try {
+      await apiFetch(
+        `/shopping/lists/${selectedId}/items/${item.id}?checked=${inCart ? "true" : "false"}`,
+        { baseUrl: serverUrl, method: "PATCH" },
+      );
+      await loadDetail(selectedId);
+    } catch (e) {
+      Alert.alert("Update failed", e instanceof Error ? e.message : "Unknown error");
+    }
   };
 
   const deleteItem = (item: ShoppingListItem) => {
@@ -225,39 +228,19 @@ export default function ShoppingScreen() {
         </View>
       </View>
 
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={lists}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listChips}
-        renderItem={({ item }) => {
-          const active = selectedId === item.id;
-          return (
-            <Pressable
-              onPress={() => selectList(item.id)}
-              onLongPress={() => deleteList(item)}
-              style={({ pressed }) => [
-                styles.chip,
-                {
-                  backgroundColor: active ? colors.primaryMuted : colors.surface,
-                  borderColor: active ? colors.primary : colors.border,
-                  opacity: pressed ? 0.9 : 1,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  { color: active ? colors.primary : colors.textSecondary },
-                ]}
-              >
-                {item.name}
-              </Text>
-            </Pressable>
-          );
-        }}
-      />
+      <View style={styles.filterSection}>
+        <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Your lists</Text>
+        {lists.map((list) => (
+          <StorageFilterOption
+            key={list.id}
+            label={list.name}
+            icon="list-outline"
+            selected={selectedId === list.id}
+            onPress={() => selectList(list.id)}
+            onLongPress={() => deleteList(list)}
+          />
+        ))}
+      </View>
 
       {selectedId != null ? (
         <>
@@ -312,10 +295,6 @@ export default function ShoppingScreen() {
           <View style={styles.sectionPad}>
             <Card>
               <Text style={[styles.dealTitle, { color: colors.text }]}>Publix weekly BOGOs</Text>
-              <Text style={[styles.dealBody, { color: colors.textMuted }]}>
-                Publix does not offer a public deals API. Open this week’s official ad, then add
-                BOGO items to your list here.
-              </Text>
               <AppButton label="Open Publix weekly ad" compact onPress={openPublixAd} />
               {publixStores.map((store) => (
                 <AppButton
@@ -361,10 +340,7 @@ export default function ShoppingScreen() {
             renderItem={({ item }) => (
               <SwipeableRow onDelete={() => deleteItem(item)} label="Remove">
                 <Card style={styles.rowCard}>
-                  <Pressable
-                    onPress={() => void toggleItem(item.id, item.checked)}
-                    style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
-                  >
+                  <View style={styles.rowMain}>
                     <Text
                       style={[
                         styles.name,
@@ -377,7 +353,13 @@ export default function ShoppingScreen() {
                     <Text style={[styles.meta, { color: colors.textMuted }]}>
                       {formatShoppingQty(item)} · {item.checked ? "In cart" : "Still to buy"}
                     </Text>
-                  </Pressable>
+                  </View>
+                  <AppButton
+                    label={item.checked ? "Still to buy" : "Add to cart"}
+                    variant={item.checked ? "secondary" : "accent"}
+                    compact
+                    onPress={() => void setItemInCart(item, !item.checked)}
+                  />
                   {Platform.OS === "web" ? (
                     <Pressable
                       accessibilityLabel={`Remove ${item.name}`}
@@ -394,7 +376,7 @@ export default function ShoppingScreen() {
           />
         </>
       ) : (
-        <EmptyState title="Select or create a list" subtitle="Long-press a list chip to delete it." />
+        <EmptyState title="Select or create a list" subtitle="Long-press a list to delete it." />
       )}
     </Screen>
   );
@@ -409,14 +391,6 @@ const styles = StyleSheet.create({
   sectionPad: { paddingHorizontal: spacing.lg },
   row: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-end" },
   flex: { flex: 1 },
-  listChips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  chipText: { ...typography.caption, fontWeight: "600" },
   listHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -428,7 +402,6 @@ const styles = StyleSheet.create({
   itemToolbar: { marginBottom: spacing.sm },
   actionsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
   dealTitle: typography.headline,
-  dealBody: { ...typography.caption, lineHeight: 18 },
   filterSection: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,

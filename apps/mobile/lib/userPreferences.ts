@@ -1,10 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
 
-export const USER_PREFS_KEY = "@ai_recipe/user_prefs";
+import { STORE_CHAINS } from "@/lib/storeChains";
 
-export const STORE_CHAINS = ["Publix", "Other"] as const;
-export type StoreChain = (typeof STORE_CHAINS)[number];
+export { STORE_CHAINS, type StoreChain } from "@/lib/storeChains";
+
+export const USER_PREFS_KEY = "@ai_recipe/user_prefs";
 
 export const groceryStoreSchema = z.object({
   id: z.string(),
