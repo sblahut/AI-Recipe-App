@@ -192,9 +192,21 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 | Stack | Config | Run locally |
 |-------|--------|-------------|
 | **Python** (`server/`) | `server/pyproject.toml` (Ruff) | `pip install -r requirements-dev.txt` then `ruff check app` and `ruff format app` |
-| **TypeScript** (`apps/mobile/`) | `apps/mobile/.eslintrc.yml` | After Expo scaffold: `npm run lint` |
+| **TypeScript** (`apps/mobile/`) | `apps/mobile/.eslintrc.yml` | `cd apps/mobile && npm install && npm run lint` |
 | **CI** | `.github/workflows/lint.yml` | [Actions tab](https://github.com/sblahut/AI-Recipe-App/actions) — Ruff on push/PR; ESLint when `apps/mobile/package.json` exists |
 | **Optional hooks** | `.pre-commit-config.yaml` | `pip install pre-commit && pre-commit install` |
+
+## Mobile app (Phase 3)
+
+Expo app in `apps/mobile/` — pantry, recipes, shopping, settings, barcode scan. Requires Node.js; point **Settings** at your PC API URL on the same Wi‑Fi.
+
+```powershell
+cd apps/mobile
+npm install
+npx expo start
+```
+
+Details: [apps/mobile/README.md](apps/mobile/README.md).
 
 ## Barcode catalog (Phase 2)
 
@@ -235,7 +247,7 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 - [x] README + architecture (no vision)
 - [x] FastAPI: inventory, barcodes, recipes, shopping, quantity kinds, saved recipes
 - [x] Open Food Facts import script + manual product / inventory entry
-- [ ] Expo mobile app
+- [ ] Expo mobile app — **in progress** on `phase-3-mobile` (see `apps/mobile/README.md`)
 
 ## Environment variables
 
