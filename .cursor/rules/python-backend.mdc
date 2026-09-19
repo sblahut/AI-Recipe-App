@@ -1,0 +1,30 @@
+---
+description: FastAPI and Python backend conventions
+globs: server/**/*.py
+alwaysApply: false
+---
+
+# Python backend (`server/`)
+
+## Structure
+
+- **Routers**: HTTP only — parse request, call service/DB, map errors to status codes.
+- **schemas.py**: Pydantic request/response models; **models.py**: SQLAlchemy tables.
+- **services/**: Ollama and other external I/O; no FastAPI imports in services.
+
+## Style
+
+- Type hints on public functions. Use `| None` not implicit optional.
+- Validate quantities via existing **`units.py`** helpers — do not duplicate unit lists.
+- Raise **`HTTPException`** in routers; custom exceptions in services converted at the edge.
+
+## SOLID in practice
+
+- One router per resource area (inventory, recipes, shopping).
+- Extend behavior with new functions or small classes, not god-modules.
+- Depend on **`Settings`** and session factories, not global mutable state.
+
+## AI changes
+
+- Keep SQLite migrations lightweight in `init_db()` or document manual DB reset for dev.
+- Recipe and inventory shapes must stay compatible with mobile clients and `/docs` OpenAPI.
