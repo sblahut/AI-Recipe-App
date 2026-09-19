@@ -142,51 +142,6 @@ export default function SettingsScreen() {
       </Card>
 
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Home server</Text>
-        <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Recipe API on port 8000 (not Metro on 8081). Same Wi‑Fi as this phone.
-        </Text>
-        <AppTextField
-          label="Home server URL"
-          hint="Example: http://192.168.1.45:8000"
-          value={draft}
-          onChangeText={setDraft}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-        />
-
-        <AppButton
-          label="Save"
-          onPress={() => {
-            void (async () => {
-              await setServerUrl(draft);
-              setResult("Saved.");
-            })();
-          }}
-        />
-
-        <AppButton
-          label={testing ? "Testing…" : "Test connection"}
-          variant="secondary"
-          loading={testing}
-          onPress={() => {
-            void (async () => {
-              setTesting(true);
-              setResult(null);
-              const out = await testConnection();
-              setResult(out.ok ? `✓ ${out.message}` : `✗ ${out.message}`);
-              setTesting(false);
-            })();
-          }}
-        />
-
-        {result ? (
-          <Text style={[styles.result, { color: resultColor }]}>{result}</Text>
-        ) : null}
-      </Card>
-
-      <Card>
         <Text style={[styles.section, { color: colors.text }]}>Favorite grocery stores</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Save stores you shop at. Open an address in your phone’s default maps app.
@@ -272,6 +227,51 @@ export default function SettingsScreen() {
             onPress={() => setStoreDraft(emptyStore)}
           />
         )}
+      </Card>
+
+      <Card>
+        <Text style={[styles.section, { color: colors.text }]}>Home server</Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Recipe API on port 8000 (not Metro on 8081). Same Wi‑Fi as this phone.
+        </Text>
+        <AppTextField
+          label="Home server URL"
+          hint="Example: http://192.168.1.45:8000"
+          value={draft}
+          onChangeText={setDraft}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+        />
+
+        <AppButton
+          label="Save"
+          onPress={() => {
+            void (async () => {
+              await setServerUrl(draft);
+              setResult("Saved.");
+            })();
+          }}
+        />
+
+        <AppButton
+          label={testing ? "Testing…" : "Test connection"}
+          variant="secondary"
+          loading={testing}
+          onPress={() => {
+            void (async () => {
+              setTesting(true);
+              setResult(null);
+              const out = await testConnection();
+              setResult(out.ok ? `✓ ${out.message}` : `✗ ${out.message}`);
+              setTesting(false);
+            })();
+          }}
+        />
+
+        {result ? (
+          <Text style={[styles.result, { color: resultColor }]}>{result}</Text>
+        ) : null}
       </Card>
     </Screen>
   );
