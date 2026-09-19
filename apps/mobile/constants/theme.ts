@@ -9,8 +9,10 @@ export type ThemeColors = {
   textMuted: string;
   primary: string;
   primaryMuted: string;
+  onPrimary: string;
   accent: string;
   accentMuted: string;
+  onAccent: string;
   danger: string;
   success: string;
   tabBar: string;
@@ -26,10 +28,12 @@ export const lightColors: ThemeColors = {
   text: "#1C1917",
   textSecondary: "#44403C",
   textMuted: "#78716C",
-  primary: "#166534",
-  primaryMuted: "#DCFCE7",
-  accent: "#C2410C",
-  accentMuted: "#FFEDD5",
+  primary: "#7C3AED",
+  primaryMuted: "#EDE9FE",
+  onPrimary: "#FFFFFF",
+  accent: "#FFA726",
+  accentMuted: "#FFF3E0",
+  onAccent: "#1C1917",
   danger: "#DC2626",
   success: "#15803D",
   tabBar: "#FFFFFF",
@@ -45,12 +49,14 @@ export const darkColors: ThemeColors = {
   text: "#FAFAF9",
   textSecondary: "#D6D3D1",
   textMuted: "#A8A29E",
-  primary: "#4ADE80",
-  primaryMuted: "#14532D",
-  accent: "#FB923C",
-  accentMuted: "#431407",
+  primary: "#A855F7",
+  primaryMuted: "#4C1D95",
+  onPrimary: "#FFFFFF",
+  accent: "#FFA726",
+  accentMuted: "#7C2D12",
+  onAccent: "#1C1917",
   danger: "#F87171",
-  success: "#4ADE80",
+  success: "#22C55E",
   tabBar: "#292524",
   tabBarBorder: "#44403C",
   tabInactive: "#78716C",

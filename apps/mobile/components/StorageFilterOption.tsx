@@ -12,15 +12,24 @@ type Props = {
   icon: IoniconName;
   selected: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
   count?: number;
 };
 
-export function StorageFilterOption({ label, icon, selected, onPress, count }: Props) {
+export function StorageFilterOption({
+  label,
+  icon,
+  selected,
+  onPress,
+  onLongPress,
+  count,
+}: Props) {
   const { colors } = useAppTheme();
 
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [
         styles.row,
         {

@@ -1,17 +1,18 @@
 import { Alert } from "react-native";
 
-import { INVENTORY_LOCATIONS } from "@/constants/inventoryLocations";
-
-const STOCK_PRESETS = INVENTORY_LOCATIONS.filter((loc) => loc !== "Other");
+import { BUILTIN_ZONES } from "@/constants/inventoryLocations";
+import { getUserPreferences } from "@/lib/userPreferences";
 
 /** Ask where scanned or bulk items should be stored. */
-export function pickStorageLocation(title = "Storage location"): Promise<string | null> {
+export async function pickStorageLocation(title = "Storage location"): Promise<string | null> {
+  const prefs = await getUserPreferences();
+  const locations = [...BUILTIN_ZONES, ...prefs.customZones];
   return new Promise((resolve) => {
     Alert.alert(
       title,
       "Choose where these items go.",
       [
-        ...STOCK_PRESETS.map((loc) => ({
+        ...locations.map((loc) => ({
           text: loc,
           onPress: () => {
             resolve(loc);

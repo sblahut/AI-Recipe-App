@@ -37,11 +37,13 @@ export function AppButton({
           : "transparent";
 
   const textColor =
-    variant === "primary" || variant === "accent"
-      ? "#FFFFFF"
-      : variant === "secondary"
-        ? colors.text
-        : colors.primary;
+    variant === "primary"
+      ? colors.onPrimary
+      : variant === "accent"
+        ? colors.onAccent
+        : variant === "secondary"
+          ? colors.text
+          : colors.primary;
 
   return (
     <Pressable

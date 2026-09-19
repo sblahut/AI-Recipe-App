@@ -1,22 +1,36 @@
-import type { InventoryLocationPreset } from "@/constants/inventoryLocations";
+import type { ComponentProps } from "react";
 
-export type StorageFilterId = "All" | "Unassigned" | InventoryLocationPreset;
+import type { Ionicons } from "@expo/vector-icons";
 
-export const STORAGE_FILTERS: {
+export type StorageFilterId = string;
+
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
+
+export type StorageFilter = {
   id: StorageFilterId;
   label: string;
-  icon:
-    | "layers-outline"
-    | "thermometer-outline"
-    | "file-tray-stacked-outline"
-    | "snow-outline"
-    | "ellipsis-horizontal-circle-outline"
-    | "help-circle-outline";
-}[] = [
-  { id: "All", label: "All ingredients", icon: "layers-outline" },
-  { id: "Fridge", label: "Fridge", icon: "thermometer-outline" },
-  { id: "Pantry", label: "Pantry", icon: "file-tray-stacked-outline" },
-  { id: "Freezer", label: "Freezer", icon: "snow-outline" },
-  { id: "Other", label: "Other storage", icon: "ellipsis-horizontal-circle-outline" },
-  { id: "Unassigned", label: "No location set", icon: "help-circle-outline" },
+  icon: IoniconName;
+  kind: "system" | "builtin" | "custom";
+};
+
+const SYSTEM_FILTERS: StorageFilter[] = [
+  { id: "All", label: "All ingredients", icon: "layers-outline", kind: "system" },
+  { id: "Fridge", label: "Fridge", icon: "thermometer-outline", kind: "builtin" },
+  { id: "Pantry", label: "Pantry", icon: "file-tray-stacked-outline", kind: "builtin" },
+  { id: "Freezer", label: "Freezer", icon: "snow-outline", kind: "builtin" },
 ];
+
+const TRAILING_FILTERS: StorageFilter[] = [
+  { id: "Other", label: "Other storage", icon: "ellipsis-horizontal-circle-outline", kind: "system" },
+  { id: "Unassigned", label: "No location set", icon: "help-circle-outline", kind: "system" },
+];
+
+export function buildStorageFilters(customZones: readonly string[]): StorageFilter[] {
+  const custom: StorageFilter[] = customZones.map((zone) => ({
+    id: zone,
+    label: zone,
+    icon: "cube-outline",
+    kind: "custom",
+  }));
+  return [...SYSTEM_FILTERS, ...custom, ...TRAILING_FILTERS];
+}

@@ -6,16 +6,19 @@ import { AppButton } from "@/components/ui/AppButton";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
-import { INVENTORY_LOCATIONS } from "@/constants/inventoryLocations";
 import type { ThemeColors } from "@/constants/theme";
 import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
+import { pickStorageLocation } from "@/lib/pickStorageLocation";
 import { recipeToIngredientCreates } from "@/lib/recipeIngredients";
+import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
 import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
 import {
+  healthSchema,
+  ingredientSchema,
   recipeGenerateResponseSchema,
   savedRecipeReadSchema,
   shoppingListSchema,
@@ -24,6 +27,12 @@ import {
   type ShoppingList,
 } from "@/lib/schemas";
 
+type GenerateReady = {
+  serverOk: boolean;
+  ollamaOk: boolean | null;
+  ingredientCount: number;
+};
+
 export default function RecipesScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
@@ -31,6 +40,11 @@ export default function RecipesScreen() {
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [lists, setLists] = useState<ShoppingList[]>([]);
+  const [ready, setReady] = useState<GenerateReady>({
+    serverOk: false,
+    ollamaOk: null,
+    ingredientCount: 0,
+  });
 
   const loadSaved = useCallback(async () => {
     const raw = await apiJson<unknown>("/recipes/saved", { baseUrl: serverUrl });
@@ -42,14 +56,52 @@ export default function RecipesScreen() {
     setLists(z.array(shoppingListSchema).parse(raw));
   }, [serverUrl]);
 
+  const loadReady = useCallback(async () => {
+    try {
+      const [healthRaw, inventoryRaw] = await Promise.all([
+        apiJson<unknown>("/health", { baseUrl: serverUrl }),
+        apiJson<unknown>("/inventory", { baseUrl: serverUrl }),
+      ]);
+      const health = healthSchema.parse(healthRaw);
+      const inventory = z.array(ingredientSchema).parse(inventoryRaw);
+      setReady({
+        serverOk: health.status === "ok",
+        ollamaOk: health.ollama,
+        ingredientCount: inventory.length,
+      });
+    } catch {
+      setReady({ serverOk: false, ollamaOk: null, ingredientCount: 0 });
+    }
+  }, [serverUrl]);
+
   useEffect(() => {
     queueMicrotask(() => {
       void loadSaved().catch(() => undefined);
       void loadLists().catch(() => undefined);
+      void loadReady();
     });
-  }, [loadSaved, loadLists]);
+  }, [loadSaved, loadLists, loadReady]);
 
   const generate = async () => {
+    if (!ready.serverOk) {
+      Alert.alert(
+        "Server offline",
+        "Start the recipe API (server/run.ps1) and set the home server URL in Settings. Use port 8000, not Metro 8081.",
+      );
+      return;
+    }
+    if (ready.ingredientCount === 0) {
+      Alert.alert("No ingredients", "Add items on the Ingredients tab first. Generation uses what you have at home.");
+      return;
+    }
+    if (ready.ollamaOk === false) {
+      Alert.alert(
+        "Ollama offline",
+        "Start Ollama on the same PC as the API and pull the configured model (default mistral:7b).",
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const raw = await apiJson<unknown>("/recipes/generate", {
@@ -63,6 +115,7 @@ export default function RecipesScreen() {
       Alert.alert("Generate failed", e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
+      void loadReady();
     }
   };
 
@@ -76,26 +129,8 @@ export default function RecipesScreen() {
     Alert.alert("Saved", recipe.title);
   };
 
-  const pickStorageLocation = (): Promise<string | null> =>
-    new Promise((resolve) => {
-      const presets = INVENTORY_LOCATIONS.filter((loc) => loc !== "Other");
-      Alert.alert(
-        "Add to ingredients",
-        "Choose where these items are stored.",
-        [
-          ...presets.map((loc) => ({
-            text: loc,
-            onPress: () => {
-              resolve(loc);
-            },
-          })),
-          { text: "Cancel", style: "cancel" as const, onPress: () => resolve(null) },
-        ],
-      );
-    });
-
   const addRecipeToIngredients = async (recipe: GeneratedRecipe) => {
-    const location = await pickStorageLocation();
+    const location = await pickStorageLocation("Add to ingredients");
     if (!location) {
       return;
     }
@@ -160,6 +195,35 @@ export default function RecipesScreen() {
         Uses ingredients at home and your Ollama server. Add a recipe’s lines to ingredients or a shopping list.
       </Text>
 
+      <Card>
+        <Text style={[styles.readyTitle, { color: colors.text }]}>Needed to generate</Text>
+        <ReadyLine
+          ok={ready.serverOk}
+          colors={colors}
+          label={ready.serverOk ? "Home server is reachable" : "Home server offline — check Settings"}
+        />
+        <ReadyLine
+          ok={ready.ollamaOk === true}
+          colors={colors}
+          label={
+            ready.ollamaOk === true
+              ? "Ollama is running"
+              : ready.ollamaOk === false
+                ? "Ollama is offline on the PC"
+                : "Ollama status unknown"
+          }
+        />
+        <ReadyLine
+          ok={ready.ingredientCount > 0}
+          colors={colors}
+          label={
+            ready.ingredientCount > 0
+              ? `${ready.ingredientCount} ingredient${ready.ingredientCount === 1 ? "" : "s"} at home`
+              : "Add ingredients on the Ingredients tab"
+          }
+        />
+      </Card>
+
       <AppButton
         label={loading ? "Generating…" : "Generate from ingredients"}
         loading={loading}
@@ -175,6 +239,7 @@ export default function RecipesScreen() {
           onAddIngredients={() => void addRecipeToIngredients(recipe)}
           onAddShopping={() => void addRecipeToShoppingList(recipe)}
           onStock={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
+          onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
         />
       ))}
 
@@ -197,12 +262,21 @@ export default function RecipesScreen() {
               onAddIngredients={() => void addRecipeToIngredients(item.recipe)}
               onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
               onStock={() => void stockFromSavedRecipe(item.id, serverUrl)}
+              onShare={() => void shareText(item.title, formatRecipeShare(item.recipe))}
               saveLabel="Save again"
             />
           )}
         />
       )}
     </Screen>
+  );
+}
+
+function ReadyLine({ ok, label, colors }: { ok: boolean; label: string; colors: ThemeColors }) {
+  return (
+    <Text style={[styles.readyLine, { color: ok ? colors.success : colors.textMuted }]}>
+      {ok ? "✓" : "○"} {label}
+    </Text>
   );
 }
 
@@ -215,6 +289,7 @@ type RecipeCardProps = {
   onAddIngredients: () => void;
   onAddShopping: () => void;
   onStock: () => void;
+  onShare: () => void;
   saveLabel?: string;
 };
 
@@ -227,6 +302,7 @@ function RecipeCard({
   onAddIngredients,
   onAddShopping,
   onStock,
+  onShare,
   saveLabel = "Save recipe",
 }: RecipeCardProps) {
   const title = titleOverride ?? recipe.title;
@@ -245,6 +321,7 @@ function RecipeCard({
       ))}
       <View style={styles.actions}>
         <AppButton label={saveLabel} variant="secondary" compact onPress={onSave} />
+        <AppButton label="Share" variant="secondary" compact onPress={onShare} />
         <AppButton label="→ Ingredients" compact onPress={onAddIngredients} />
         <AppButton label="→ Shopping" variant="accent" compact onPress={onAddShopping} />
         <AppButton label="Stock + scan" variant="secondary" compact onPress={onStock} />
@@ -256,6 +333,8 @@ function RecipeCard({
 const styles = StyleSheet.create({
   scroll: { gap: spacing.md },
   lead: { ...typography.caption, lineHeight: 20 },
+  readyTitle: typography.headline,
+  readyLine: { ...typography.caption, lineHeight: 20 },
   section: { ...typography.title, marginTop: spacing.md },
   title: typography.headline,
   meta: typography.caption,

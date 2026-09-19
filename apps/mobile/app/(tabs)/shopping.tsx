@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
+import { StorageFilterOption } from "@/components/StorageFilterOption";
+import { SwipeableRow } from "@/components/SwipeableRow";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
@@ -11,8 +13,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
+import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
+import { formatShoppingListShare, shareText } from "@/lib/shareContent";
 import { stockFromShoppingList } from "@/lib/stockFromShoppingList";
 import {
   shoppingListDetailSchema,
@@ -22,15 +27,35 @@ import {
   type ShoppingListItem,
 } from "@/lib/schemas";
 
+const PUBLIX_WEEKLY_AD = "https://www.publix.com/savings/weekly-ad";
+
+type ItemFilter = "All" | "To buy" | "In cart";
+
+const ITEM_FILTERS: { id: ItemFilter; label: string; icon: "layers-outline" | "cart-outline" | "checkmark-circle-outline" }[] = [
+  { id: "All", label: "All items", icon: "layers-outline" },
+  { id: "To buy", label: "Still to buy", icon: "cart-outline" },
+  { id: "In cart", label: "In cart", icon: "checkmark-circle-outline" },
+];
+
 export default function ShoppingScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
+  const { preferences } = useUserPreferences();
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<ShoppingListDetail | null>(null);
   const [newListName, setNewListName] = useState("");
   const [newItemName, setNewItemName] = useState("");
+  const [itemFilter, setItemFilter] = useState<ItemFilter>("All");
   const [loading, setLoading] = useState(true);
+
+  const publixStores = useMemo(
+    () =>
+      preferences.stores.filter(
+        (store) => store.chain === "Publix" || /publix/i.test(store.name),
+      ),
+    [preferences.stores],
+  );
 
   const loadLists = useCallback(async () => {
     const raw = await apiJson<unknown>("/shopping/lists", { baseUrl: serverUrl });
@@ -59,6 +84,7 @@ export default function ShoppingScreen() {
 
   const selectList = (id: number) => {
     setSelectedId(id);
+    setItemFilter("All");
     void loadDetail(id);
   };
 
@@ -106,13 +132,17 @@ export default function ShoppingScreen() {
     if (selectedId == null) return;
     const name = newItemName.trim();
     if (!name) return;
-    await apiFetch(`/shopping/lists/${selectedId}/items`, {
-      baseUrl: serverUrl,
-      method: "POST",
-      body: JSON.stringify({ name, quantity_kind: "count", quantity: 1, unit: "each" }),
-    });
-    setNewItemName("");
-    await loadDetail(selectedId);
+    try {
+      await apiFetch(`/shopping/lists/${selectedId}/items`, {
+        baseUrl: serverUrl,
+        method: "POST",
+        body: JSON.stringify({ name, quantity_kind: "count", quantity: 1, unit: "each" }),
+      });
+      setNewItemName("");
+      await loadDetail(selectedId);
+    } catch (e) {
+      Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
+    }
   };
 
   const toggleItem = async (itemId: number, checked: boolean) => {
@@ -148,7 +178,32 @@ export default function ShoppingScreen() {
     ]);
   };
 
+  const shareList = async () => {
+    if (!detail) {
+      Alert.alert("Nothing to share", "Select a list first.");
+      return;
+    }
+    await shareText(detail.name, formatShoppingListShare(detail));
+  };
+
+  const openPublixAd = () => {
+    void openExternalUrl(PUBLIX_WEEKLY_AD).catch((e: unknown) => {
+      Alert.alert("Could not open Publix", e instanceof Error ? e.message : "Unknown error");
+    });
+  };
+
   const selectedList = lists.find((list) => list.id === selectedId);
+  const items = detail?.items ?? [];
+  const filteredItems = items.filter((item) => {
+    if (itemFilter === "To buy") return !item.checked;
+    if (itemFilter === "In cart") return item.checked;
+    return true;
+  });
+  const countByFilter = {
+    All: items.length,
+    "To buy": items.filter((item) => !item.checked).length,
+    "In cart": items.filter((item) => item.checked).length,
+  };
 
   if (loading) {
     return <Screen loading />;
@@ -238,54 +293,103 @@ export default function ShoppingScreen() {
             />
           </View>
 
-          <View style={styles.sectionPad}>
+          <View style={[styles.sectionPad, styles.actionsRow]}>
             <AppButton
-              label="Stock list into ingredients"
+              label="Share list"
+              variant="secondary"
+              compact
+              style={styles.flex}
+              onPress={() => void shareList()}
+            />
+            <AppButton
+              label="Stock into ingredients"
+              compact
+              style={styles.flex}
               onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
             />
           </View>
 
+          <View style={styles.sectionPad}>
+            <Card>
+              <Text style={[styles.dealTitle, { color: colors.text }]}>Publix weekly BOGOs</Text>
+              <Text style={[styles.dealBody, { color: colors.textMuted }]}>
+                Publix does not offer a public deals API. Open this week’s official ad, then add
+                BOGO items to your list here.
+              </Text>
+              <AppButton label="Open Publix weekly ad" compact onPress={openPublixAd} />
+              {publixStores.map((store) => (
+                <AppButton
+                  key={store.id}
+                  label={store.address ? `Directions to ${store.name}` : store.name}
+                  variant="secondary"
+                  compact
+                  onPress={() => {
+                    void openAddressInMaps(store.address || store.name).catch((e: unknown) => {
+                      Alert.alert("Maps", e instanceof Error ? e.message : "Could not open maps");
+                    });
+                  }}
+                />
+              ))}
+            </Card>
+          </View>
+
+          <View style={styles.filterSection}>
+            <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse items</Text>
+            {ITEM_FILTERS.map((filter) => (
+              <StorageFilterOption
+                key={filter.id}
+                label={filter.label}
+                icon={filter.icon}
+                selected={itemFilter === filter.id}
+                count={countByFilter[filter.id]}
+                onPress={() => setItemFilter(filter.id)}
+              />
+            ))}
+          </View>
+
           <FlatList
-            data={detail?.items ?? []}
+            style={styles.flex}
+            data={filteredItems}
             keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={styles.itemsList}
+            contentContainerStyle={filteredItems.length === 0 ? styles.listEmpty : styles.itemsList}
             ListEmptyComponent={
-              <EmptyState title="Nothing on this list yet" subtitle="Add items or scan barcodes." />
+              <EmptyState
+                title={itemFilter === "All" ? "Nothing on this list yet" : "Nothing in this filter"}
+                subtitle="Add items, scan barcodes, or pick another filter."
+              />
             }
             renderItem={({ item }) => (
-              <Card style={styles.itemCard}>
-                <Pressable
-                  onPress={() => void toggleItem(item.id, item.checked)}
-                  style={styles.checkRow}
-                >
-                  <View
-                    style={[
-                      styles.checkbox,
-                      {
-                        borderColor: item.checked ? colors.primary : colors.border,
-                        backgroundColor: item.checked ? colors.primary : colors.surface,
-                      },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.itemText,
-                      { color: colors.text },
-                      item.checked && { color: colors.textMuted, textDecorationLine: "line-through" },
-                    ]}
+              <SwipeableRow onDelete={() => deleteItem(item)} label="Remove">
+                <Card style={styles.rowCard}>
+                  <Pressable
+                    onPress={() => void toggleItem(item.id, item.checked)}
+                    style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
                   >
-                    {item.name}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityLabel={`Remove ${item.name}`}
-                  onPress={() => deleteItem(item)}
-                  hitSlop={8}
-                  style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-                >
-                  <Ionicons name="close-circle-outline" size={22} color={colors.textMuted} />
-                </Pressable>
-              </Card>
+                    <Text
+                      style={[
+                        styles.name,
+                        { color: colors.text },
+                        item.checked && { color: colors.textMuted, textDecorationLine: "line-through" },
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text style={[styles.meta, { color: colors.textMuted }]}>
+                      {formatShoppingQty(item)} · {item.checked ? "In cart" : "Still to buy"}
+                    </Text>
+                  </Pressable>
+                  {Platform.OS === "web" ? (
+                    <Pressable
+                      accessibilityLabel={`Remove ${item.name}`}
+                      onPress={() => deleteItem(item)}
+                      hitSlop={8}
+                      style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
+                    >
+                      <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                    </Pressable>
+                  ) : null}
+                </Card>
+              </SwipeableRow>
             )}
           />
         </>
@@ -294,6 +398,11 @@ export default function ShoppingScreen() {
       )}
     </Screen>
   );
+}
+
+function formatShoppingQty(item: ShoppingListItem): string {
+  if (item.quantity == null) return "No quantity set";
+  return `${item.quantity} ${item.unit ?? ""}`.trim();
 }
 
 const styles = StyleSheet.create({
@@ -317,19 +426,32 @@ const styles = StyleSheet.create({
   listTitle: typography.headline,
   deleteList: { ...typography.caption, fontWeight: "600" },
   itemToolbar: { marginBottom: spacing.sm },
-  itemsList: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
-  itemCard: {
+  actionsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
+  dealTitle: typography.headline,
+  dealBody: { ...typography.caption, lineHeight: 18 },
+  filterSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    gap: 2,
+  },
+  filterHeading: {
+    ...typography.caption,
+    fontWeight: "600",
     marginBottom: spacing.xs,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  itemsList: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  listEmpty: { flexGrow: 1 },
+  rowCard: {
+    marginBottom: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
   },
-  checkRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-  },
-  itemText: typography.body,
+  rowMain: { flex: 1 },
+  deleteIcon: { padding: spacing.sm },
+  name: typography.headline,
+  meta: { ...typography.caption, marginTop: 2 },
 });

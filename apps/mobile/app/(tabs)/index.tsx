@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -13,14 +14,17 @@ import { z } from "zod";
 
 import { PantryItemForm } from "@/components/PantryItemForm";
 import { StorageFilterOption } from "@/components/StorageFilterOption";
+import { SwipeableRow } from "@/components/SwipeableRow";
 import { AppButton } from "@/components/ui/AppButton";
+import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
-import { formatLocationLabel } from "@/constants/inventoryLocations";
-import { STORAGE_FILTERS, type StorageFilterId } from "@/constants/storageFilters";
+import { formatLocationLabel, isKnownZone } from "@/constants/inventoryLocations";
+import { buildStorageFilters, type StorageFilterId } from "@/constants/storageFilters";
 import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { startIngredientScan } from "@/lib/startIngredientScan";
@@ -41,6 +45,7 @@ const defaultUnits: Record<QuantityKind, string[]> = {
 export default function IngredientsScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
+  const { preferences, addZone, removeZone } = useUserPreferences();
   const [items, setItems] = useState<Ingredient[]>([]);
   const [unitsByKind, setUnitsByKind] = useState(defaultUnits);
   const [loading, setLoading] = useState(true);
@@ -48,6 +53,13 @@ export default function IngredientsScreen() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [locationFilter, setLocationFilter] = useState<StorageFilterId>("All");
+  const [addingZone, setAddingZone] = useState(false);
+  const [newZoneName, setNewZoneName] = useState("");
+
+  const storageFilters = useMemo(
+    () => buildStorageFilters(preferences.customZones),
+    [preferences.customZones],
+  );
 
   const loadUnits = useCallback(async () => {
     try {
@@ -85,7 +97,7 @@ export default function IngredientsScreen() {
 
   const countByFilter = useMemo(() => {
     const counts = new Map<StorageFilterId, number>();
-    for (const filter of STORAGE_FILTERS) {
+    for (const filter of storageFilters) {
       counts.set(filter.id, 0);
     }
     for (const item of items) {
@@ -95,14 +107,14 @@ export default function IngredientsScreen() {
         counts.set("Unassigned", (counts.get("Unassigned") ?? 0) + 1);
         continue;
       }
-      if (loc === "Fridge" || loc === "Pantry" || loc === "Freezer") {
+      if (isKnownZone(loc, preferences.customZones)) {
         counts.set(loc, (counts.get(loc) ?? 0) + 1);
       } else {
         counts.set("Other", (counts.get("Other") ?? 0) + 1);
       }
     }
     return counts;
-  }, [items]);
+  }, [items, preferences.customZones, storageFilters]);
 
   const filteredItems = useMemo(() => {
     if (locationFilter === "All") {
@@ -114,11 +126,11 @@ export default function IngredientsScreen() {
     return items.filter((item) => {
       const loc = item.location?.trim() ?? "";
       if (locationFilter === "Other") {
-        return loc.length > 0 && loc !== "Fridge" && loc !== "Pantry" && loc !== "Freezer";
+        return loc.length > 0 && !isKnownZone(loc, preferences.customZones);
       }
       return loc === locationFilter;
     });
-  }, [items, locationFilter]);
+  }, [items, locationFilter, preferences.customZones]);
 
   const saveItem = async (payload: IngredientCreate) => {
     try {
@@ -168,6 +180,40 @@ export default function IngredientsScreen() {
     ]);
   };
 
+  const submitZone = async () => {
+    try {
+      const name = newZoneName.trim();
+      await addZone(name);
+      setLocationFilter(name);
+      setNewZoneName("");
+      setAddingZone(false);
+    } catch (e) {
+      Alert.alert("Could not add zone", e instanceof Error ? e.message : "Unknown error");
+    }
+  };
+
+  const confirmRemoveZone = (zone: string) => {
+    Alert.alert(
+      "Remove area",
+      `Remove "${zone}" from your storage list? Ingredients already in this area stay where they are.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              await removeZone(zone);
+              if (locationFilter === zone) {
+                setLocationFilter("All");
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   if (loading) {
     return <Screen loading />;
   }
@@ -202,7 +248,7 @@ export default function IngredientsScreen() {
 
       <View style={styles.filterSection}>
         <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
-        {STORAGE_FILTERS.map((filter) => (
+        {storageFilters.map((filter) => (
           <StorageFilterOption
             key={filter.id}
             label={filter.label}
@@ -210,8 +256,42 @@ export default function IngredientsScreen() {
             selected={locationFilter === filter.id}
             count={countByFilter.get(filter.id) ?? 0}
             onPress={() => setLocationFilter(filter.id)}
+            {...(filter.kind === "custom"
+              ? { onLongPress: () => confirmRemoveZone(filter.id) }
+              : {})}
           />
         ))}
+        {addingZone ? (
+          <View style={styles.zoneForm}>
+            <View style={styles.flex}>
+              <AppTextField
+                placeholder="Garage, spice rack, basement…"
+                value={newZoneName}
+                onChangeText={setNewZoneName}
+                onSubmitEditing={() => void submitZone()}
+                autoFocus
+              />
+            </View>
+            <AppButton label="Save" compact onPress={() => void submitZone()} />
+            <AppButton
+              label="Cancel"
+              variant="ghost"
+              compact
+              onPress={() => {
+                setAddingZone(false);
+                setNewZoneName("");
+              }}
+            />
+          </View>
+        ) : (
+          <AppButton
+            label="+ Add area / zone"
+            variant="secondary"
+            compact
+            style={styles.addZoneBtn}
+            onPress={() => setAddingZone(true)}
+          />
+        )}
       </View>
 
       <FlatList
@@ -228,25 +308,29 @@ export default function IngredientsScreen() {
           />
         }
         renderItem={({ item }) => (
-          <Card style={styles.row}>
-            <Pressable
-              onPress={() => setEditing(item)}
-              style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
-            >
-              <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
-              <Text style={[styles.meta, { color: colors.textMuted }]}>
-                {formatQty(item)} · {formatLocationLabel(item.location)}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityLabel={`Delete ${item.name}`}
-              hitSlop={8}
-              onPress={() => deleteItem(item)}
-              style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
-            >
-              <Ionicons name="trash-outline" size={20} color={colors.danger} />
-            </Pressable>
-          </Card>
+          <SwipeableRow onDelete={() => deleteItem(item)}>
+            <Card style={styles.row}>
+              <Pressable
+                onPress={() => setEditing(item)}
+                style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
+              >
+                <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
+                <Text style={[styles.meta, { color: colors.textMuted }]}>
+                  {formatQty(item)} · {formatLocationLabel(item.location)}
+                </Text>
+              </Pressable>
+              {Platform.OS === "web" ? (
+                <Pressable
+                  accessibilityLabel={`Delete ${item.name}`}
+                  hitSlop={8}
+                  onPress={() => deleteItem(item)}
+                  style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                </Pressable>
+              ) : null}
+            </Card>
+          </SwipeableRow>
         )}
       />
     </Screen>
@@ -278,7 +362,15 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
+  addZoneBtn: { alignSelf: "flex-start", marginTop: spacing.sm },
+  zoneForm: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  flex: { flex: 1 },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   listEmpty: { flexGrow: 1 },
   row: {
     marginBottom: spacing.sm,

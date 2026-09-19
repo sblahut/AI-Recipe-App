@@ -5,8 +5,9 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Chip } from "@/components/ui/Chip";
 import { Screen } from "@/components/ui/Screen";
-import { INVENTORY_LOCATIONS, type InventoryLocationPreset } from "@/constants/inventoryLocations";
+import { INVENTORY_LOCATIONS } from "@/constants/inventoryLocations";
 import { spacing, typography } from "@/constants/theme";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { Ingredient, IngredientCreate, QuantityKind } from "@/lib/schemas";
 
@@ -18,12 +19,18 @@ type Props = {
   onDelete?: () => void;
 };
 
-function initialLocationState(location: string | null | undefined): {
-  preset: InventoryLocationPreset | "None";
+function initialLocationState(
+  location: string | null | undefined,
+  customZones: readonly string[],
+): {
+  preset: string;
   custom: string;
 } {
   if (!location?.trim()) {
     return { preset: "Pantry", custom: "" };
+  }
+  if (customZones.includes(location)) {
+    return { preset: location, custom: "" };
   }
   const match = INVENTORY_LOCATIONS.find((loc) => loc === location);
   if (match && match !== "Other") {
@@ -37,16 +44,18 @@ function initialLocationState(location: string | null | undefined): {
 
 export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDelete }: Props) {
   const { colors } = useAppTheme();
-  const locInit = useMemo(() => initialLocationState(initial?.location), [initial?.location]);
+  const { preferences } = useUserPreferences();
+  const locInit = useMemo(
+    () => initialLocationState(initial?.location, preferences.customZones),
+    [initial?.location, preferences.customZones],
+  );
   const [name, setName] = useState(initial?.name ?? "");
   const [quantityKind, setQuantityKind] = useState<QuantityKind>(
     initial?.quantity_kind ?? "count",
   );
   const [unit, setUnit] = useState(initial?.unit ?? unitsByKind.count[0] ?? "each");
   const [quantity, setQuantity] = useState(initial?.quantity?.toString() ?? "");
-  const [locationPreset, setLocationPreset] = useState<InventoryLocationPreset | "None">(
-    locInit.preset === "Other" ? "Other" : locInit.preset,
-  );
+  const [locationPreset, setLocationPreset] = useState(locInit.preset);
   const [customLocation, setCustomLocation] = useState(locInit.custom);
   const [saving, setSaving] = useState(false);
 
@@ -99,7 +108,7 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDel
           selected={locationPreset === "None"}
           onPress={() => setLocationPreset("None")}
         />
-        {INVENTORY_LOCATIONS.map((loc) => (
+        {INVENTORY_LOCATIONS.filter((loc) => loc !== "Other").map((loc) => (
           <Chip
             key={loc}
             label={loc}
@@ -107,6 +116,19 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDel
             onPress={() => setLocationPreset(loc)}
           />
         ))}
+        {preferences.customZones.map((zone) => (
+          <Chip
+            key={zone}
+            label={zone}
+            selected={locationPreset === zone}
+            onPress={() => setLocationPreset(zone)}
+          />
+        ))}
+        <Chip
+          label="Other"
+          selected={locationPreset === "Other"}
+          onPress={() => setLocationPreset("Other")}
+        />
       </View>
       {locationPreset === "Other" ? (
         <AppTextField
