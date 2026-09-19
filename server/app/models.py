@@ -60,7 +60,9 @@ class ShoppingListItem(Base):
     __tablename__ = "shopping_list_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    shopping_list_id: Mapped[int] = mapped_column(ForeignKey("shopping_lists.id", ondelete="CASCADE"))
+    shopping_list_id: Mapped[int] = mapped_column(
+        ForeignKey("shopping_lists.id", ondelete="CASCADE")
+    )
     name: Mapped[str] = mapped_column(String(256))
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     quantity_kind: Mapped[str] = mapped_column(String(16), default="count", server_default="count")

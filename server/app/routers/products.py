@@ -59,7 +59,9 @@ def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> Bar
         )
 
     if body.shopping_list_id is None:
-        raise HTTPException(status_code=400, detail="shopping_list_id required for shopping_list target")
+        raise HTTPException(
+            status_code=400, detail="shopping_list_id required for shopping_list target"
+        )
     shopping_list = db.get(ShoppingList, body.shopping_list_id)
     if not shopping_list:
         raise HTTPException(status_code=404, detail="Shopping list not found")

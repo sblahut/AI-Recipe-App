@@ -1,6 +1,9 @@
 import json
 from datetime import datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from app.models import SavedRecipe
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -130,15 +133,15 @@ class SavedRecipeRead(BaseModel):
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_orm_row(cls, row: object) -> "SavedRecipeRead":
-        payload = json.loads(getattr(row, "payload_json"))
+    def from_orm_row(cls, row: "SavedRecipe") -> "SavedRecipeRead":
+        payload = json.loads(row.payload_json)
         recipe = GeneratedRecipe.model_validate(payload)
         return cls(
-            id=getattr(row, "id"),
-            title=getattr(row, "title"),
+            id=row.id,
+            title=row.title,
             recipe=recipe,
-            favorite=getattr(row, "favorite"),
-            created_at=getattr(row, "created_at"),
+            favorite=row.favorite,
+            created_at=row.created_at,
         )
 
 

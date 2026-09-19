@@ -31,7 +31,11 @@ def _apply_sqlite_migrations() -> None:
     if not settings.database_url.startswith("sqlite"):
         return
     patches = [
-        ("ingredients", "quantity_kind", "ALTER TABLE ingredients ADD COLUMN quantity_kind VARCHAR(16) DEFAULT 'count'"),
+        (
+            "ingredients",
+            "quantity_kind",
+            "ALTER TABLE ingredients ADD COLUMN quantity_kind VARCHAR(16) DEFAULT 'count'",
+        ),
         (
             "shopping_list_items",
             "quantity_kind",

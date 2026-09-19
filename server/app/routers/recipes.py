@@ -26,7 +26,9 @@ def _format_line(row: Ingredient) -> str:
 
 
 @router.post("/generate", response_model=RecipeGenerateResponse)
-async def generate_recipes(body: RecipeGenerateRequest, db: Session = Depends(get_db)) -> RecipeGenerateResponse:
+async def generate_recipes(
+    body: RecipeGenerateRequest, db: Session = Depends(get_db)
+) -> RecipeGenerateResponse:
     if body.use_all:
         rows = db.query(Ingredient).order_by(Ingredient.name).all()
     elif body.ingredient_ids:
