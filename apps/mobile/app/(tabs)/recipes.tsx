@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
 import { AppButton } from "@/components/ui/AppButton";
+import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
@@ -33,22 +35,43 @@ type GenerateReady = {
   ingredientCount: number;
 };
 
+function recipeMatchesSearch(recipe: GeneratedRecipe, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return true;
+  }
+  if (recipe.title.toLowerCase().includes(q)) {
+    return true;
+  }
+  return recipe.ingredients.some((line) => line.name.toLowerCase().includes(q));
+}
+
+function findFavoriteMatch(
+  favorites: SavedRecipe[],
+  recipe: GeneratedRecipe,
+): SavedRecipe | undefined {
+  const title = recipe.title.trim().toLowerCase();
+  return favorites.find((row) => row.recipe.title.trim().toLowerCase() === title);
+}
+
 export default function RecipesScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
-  const [saved, setSaved] = useState<SavedRecipe[]>([]);
+  const [favorites, setFavorites] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [lists, setLists] = useState<ShoppingList[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [ready, setReady] = useState<GenerateReady>({
     serverOk: false,
     ollamaOk: null,
     ingredientCount: 0,
   });
 
-  const loadSaved = useCallback(async () => {
+  const loadFavorites = useCallback(async () => {
     const raw = await apiJson<unknown>("/recipes/saved", { baseUrl: serverUrl });
-    setSaved(z.array(savedRecipeReadSchema).parse(raw));
+    const all = z.array(savedRecipeReadSchema).parse(raw);
+    setFavorites(all.filter((row) => row.favorite));
   }, [serverUrl]);
 
   const loadLists = useCallback(async () => {
@@ -76,11 +99,21 @@ export default function RecipesScreen() {
 
   useEffect(() => {
     queueMicrotask(() => {
-      void loadSaved().catch(() => undefined);
+      void loadFavorites().catch(() => undefined);
       void loadLists().catch(() => undefined);
       void loadReady();
     });
-  }, [loadSaved, loadLists, loadReady]);
+  }, [loadFavorites, loadLists, loadReady]);
+
+  const filteredGenerated = useMemo(
+    () => generated.filter((recipe) => recipeMatchesSearch(recipe, searchQuery)),
+    [generated, searchQuery],
+  );
+
+  const filteredFavorites = useMemo(
+    () => favorites.filter((row) => recipeMatchesSearch(row.recipe, searchQuery)),
+    [favorites, searchQuery],
+  );
 
   const generate = async () => {
     if (!ready.serverOk) {
@@ -119,14 +152,25 @@ export default function RecipesScreen() {
     }
   };
 
-  const saveRecipe = async (recipe: GeneratedRecipe) => {
-    await apiFetch("/recipes/saved", {
-      baseUrl: serverUrl,
-      method: "POST",
-      body: JSON.stringify({ recipe, favorite: true }),
-    });
-    await loadSaved();
-    Alert.alert("Saved", recipe.title);
+  const toggleFavorite = async (recipe: GeneratedRecipe, favoriteId?: number) => {
+    const existing =
+      favoriteId != null
+        ? favorites.find((row) => row.id === favoriteId)
+        : findFavoriteMatch(favorites, recipe);
+    try {
+      if (existing) {
+        await apiFetch(`/recipes/saved/${existing.id}`, { baseUrl: serverUrl, method: "DELETE" });
+      } else {
+        await apiFetch("/recipes/saved", {
+          baseUrl: serverUrl,
+          method: "POST",
+          body: JSON.stringify({ recipe, favorite: true }),
+        });
+      }
+      await loadFavorites();
+    } catch (e) {
+      Alert.alert("Favorites", e instanceof Error ? e.message : "Could not update favorite");
+    }
   };
 
   const addRecipeToIngredients = async (recipe: GeneratedRecipe) => {
@@ -192,7 +236,7 @@ export default function RecipesScreen() {
   return (
     <Screen scroll contentContainerStyle={styles.scroll}>
       <Text style={[styles.lead, { color: colors.textMuted }]}>
-        Uses ingredients at home and your Ollama server. Add a recipe’s lines to ingredients or a shopping list.
+        Uses ingredients at home and your Ollama server. Tap the star to add recipes to Favorites.
       </Text>
 
       <Card>
@@ -230,40 +274,69 @@ export default function RecipesScreen() {
         onPress={() => void generate()}
       />
 
-      {generated.map((recipe) => (
-        <RecipeCard
-          key={recipe.title}
-          recipe={recipe}
-          colors={colors}
-          onSave={() => void saveRecipe(recipe)}
-          onAddIngredients={() => void addRecipeToIngredients(recipe)}
-          onAddShopping={() => void addRecipeToShoppingList(recipe)}
-          onStock={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
-          onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
-        />
-      ))}
+      <AppTextField
+        placeholder="Search recipes by title or ingredient"
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
 
-      <Text style={[styles.section, { color: colors.text }]}>Saved recipes</Text>
-      {saved.length === 0 ? (
-        <EmptyState title="No saved recipes yet" subtitle="Generate ideas above, then save your favorites." />
+      {generated.length > 0 ? (
+        <>
+          <Text style={[styles.section, { color: colors.text }]}>Generated ideas</Text>
+          {filteredGenerated.length === 0 ? (
+            <EmptyState title="No matches" subtitle="Try a different search term." />
+          ) : (
+            filteredGenerated.map((recipe) => {
+              const isFavorite = findFavoriteMatch(favorites, recipe) != null;
+              return (
+                <RecipeCard
+                  key={recipe.title}
+                  recipe={recipe}
+                  colors={colors}
+                  isFavorite={isFavorite}
+                  onToggleFavorite={() => void toggleFavorite(recipe)}
+                  onAddIngredients={() => void addRecipeToIngredients(recipe)}
+                  onAddShopping={() => void addRecipeToShoppingList(recipe)}
+                  onStock={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
+                  onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
+                />
+              );
+            })
+          )}
+        </>
+      ) : null}
+
+      <View style={styles.favoritesHeading}>
+        <Ionicons name="star" size={20} color={colors.primary} />
+        <Text style={[styles.section, styles.favoritesTitle, { color: colors.text }]}>Favorites</Text>
+      </View>
+      {favorites.length === 0 ? (
+        <EmptyState
+          title="No favorites yet"
+          subtitle="Generate ideas above, then tap the star on any recipe to save it here."
+        />
+      ) : filteredFavorites.length === 0 ? (
+        <EmptyState title="No matches in favorites" subtitle="Try a different search term." />
       ) : (
         <FlatList
-          data={saved}
+          data={filteredFavorites}
           scrollEnabled={false}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.savedList}
+          contentContainerStyle={styles.favoritesList}
           renderItem={({ item }) => (
             <RecipeCard
               recipe={item.recipe}
               titleOverride={item.title}
-              meta={`Saved ${new Date(item.created_at).toLocaleDateString()}`}
+              meta={`Favorited ${new Date(item.created_at).toLocaleDateString()}`}
               colors={colors}
-              onSave={() => void saveRecipe(item.recipe)}
+              isFavorite
+              onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
               onAddIngredients={() => void addRecipeToIngredients(item.recipe)}
               onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
               onStock={() => void stockFromSavedRecipe(item.id, serverUrl)}
               onShare={() => void shareText(item.title, formatRecipeShare(item.recipe))}
-              saveLabel="Save again"
             />
           )}
         />
@@ -285,12 +358,12 @@ type RecipeCardProps = {
   titleOverride?: string;
   meta?: string;
   colors: ThemeColors;
-  onSave: () => void;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
   onAddIngredients: () => void;
   onAddShopping: () => void;
   onStock: () => void;
   onShare: () => void;
-  saveLabel?: string;
 };
 
 function RecipeCard({
@@ -298,12 +371,12 @@ function RecipeCard({
   titleOverride,
   meta,
   colors,
-  onSave,
+  isFavorite,
+  onToggleFavorite,
   onAddIngredients,
   onAddShopping,
   onStock,
   onShare,
-  saveLabel = "Save recipe",
 }: RecipeCardProps) {
   const title = titleOverride ?? recipe.title;
   const subtitle =
@@ -312,15 +385,31 @@ function RecipeCard({
 
   return (
     <Card>
-      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-      <Text style={[styles.meta, { color: colors.textMuted }]}>{subtitle}</Text>
+      <View style={styles.titleRow}>
+        <View style={styles.titleBlock}>
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.meta, { color: colors.textMuted }]}>{subtitle}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isFavorite ? `Remove ${title} from favorites` : `Add ${title} to favorites`}
+          hitSlop={10}
+          onPress={onToggleFavorite}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Ionicons
+            name={isFavorite ? "star" : "star-outline"}
+            size={26}
+            color={isFavorite ? colors.primary : colors.textMuted}
+          />
+        </Pressable>
+      </View>
       {recipe.steps.slice(0, 2).map((step, i) => (
         <Text key={`${title}-step-${i}`} style={[styles.step, { color: colors.textSecondary }]}>
           {i + 1}. {step}
         </Text>
       ))}
       <View style={styles.actions}>
-        <AppButton label={saveLabel} variant="secondary" compact onPress={onSave} />
         <AppButton label="Share" variant="secondary" compact onPress={onShare} />
         <AppButton label="→ Ingredients" compact onPress={onAddIngredients} />
         <AppButton label="→ Shopping" variant="accent" compact onPress={onAddShopping} />
@@ -336,9 +425,23 @@ const styles = StyleSheet.create({
   readyTitle: typography.headline,
   readyLine: { ...typography.caption, lineHeight: 20 },
   section: { ...typography.title, marginTop: spacing.md },
+  favoritesHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  favoritesTitle: { marginTop: 0 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  titleBlock: { flex: 1 },
   title: typography.headline,
   meta: typography.caption,
   step: { ...typography.caption, lineHeight: 20 },
-  savedList: { gap: spacing.sm },
+  favoritesList: { gap: spacing.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
 });
