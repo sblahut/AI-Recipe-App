@@ -29,6 +29,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # FastAPI dependency injection uses Depends() in defaults by design
 "app/routers/*.py" = ["B008"]
+# CLI scripts extend sys.path before importing app
+"scripts/*.py" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"

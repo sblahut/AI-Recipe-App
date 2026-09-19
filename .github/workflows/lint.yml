@@ -19,12 +19,12 @@ jobs:
 
       - uses: astral-sh/ruff-action@v3
         with:
-          src: server/app
+          src: server/app server/scripts
           args: check
 
       - uses: astral-sh/ruff-action@v3
         with:
-          src: server/app
+          src: server/app server/scripts
           args: format --check
 
   eslint-mobile:

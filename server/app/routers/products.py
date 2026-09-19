@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Ingredient, Product, ShoppingList, ShoppingListItem
-from app.schemas import BarcodeScanRequest, BarcodeScanResponse, ProductRead
+from app.schemas import BarcodeScanRequest, BarcodeScanResponse, ProductCreate, ProductRead
+from app.services.barcode import normalize_barcode
 from app.units import default_unit
 
 router = APIRouter(tags=["products"])
@@ -22,18 +23,78 @@ def _resolve_quantity_fields(
     return kind, quantity, unit
 
 
+def _upsert_product(
+    db: Session,
+    *,
+    barcode: str,
+    name: str,
+    brand: str | None = None,
+    default_quantity_kind: str | None = None,
+    source: str,
+) -> Product:
+    code = normalize_barcode(barcode)
+    row = db.get(Product, code)
+    if row:
+        row.name = name
+        row.brand = brand
+        row.source = source
+        if default_quantity_kind is not None:
+            row.default_quantity_kind = default_quantity_kind
+    else:
+        row = Product(
+            barcode=code,
+            name=name,
+            brand=brand,
+            default_quantity_kind=default_quantity_kind,
+            source=source,
+        )
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 @router.get("/products/{barcode}", response_model=ProductRead | None)
 def get_product(barcode: str, db: Session = Depends(get_db)) -> Product | None:
-    return db.get(Product, barcode)
+    return db.get(Product, normalize_barcode(barcode))
+
+
+@router.post("/products", response_model=ProductRead, status_code=201)
+def create_product(body: ProductCreate, db: Session = Depends(get_db)) -> Product:
+    """Register a packaged item by barcode (family catalog, not yet in Open Food Facts import)."""
+    code = normalize_barcode(body.barcode)
+    if db.get(Product, code):
+        raise HTTPException(
+            status_code=409,
+            detail="Product barcode already exists",
+        )
+    return _upsert_product(
+        db,
+        barcode=code,
+        name=body.name.strip(),
+        brand=body.brand,
+        default_quantity_kind=body.default_quantity_kind,
+        source="manual",
+    )
 
 
 @router.post("/scan/barcode", response_model=BarcodeScanResponse)
 def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> BarcodeScanResponse:
-    product = db.get(Product, body.barcode)
+    code = normalize_barcode(body.barcode)
+    product = db.get(Product, code)
+
+    if body.manual_name and body.register_product:
+        product = _upsert_product(
+            db,
+            barcode=code,
+            name=body.manual_name.strip(),
+            source="manual",
+        )
+
     name = body.manual_name or (product.name if product else None)
     if not name:
         return BarcodeScanResponse(
-            barcode=body.barcode,
+            barcode=code,
             product=ProductRead.model_validate(product) if product else None,
             unknown=True,
         )
@@ -46,13 +107,13 @@ def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> Bar
             quantity=quantity,
             quantity_kind=quantity_kind,
             unit=unit,
-            barcode=body.barcode,
+            barcode=code,
         )
         db.add(row)
         db.commit()
         db.refresh(row)
         return BarcodeScanResponse(
-            barcode=body.barcode,
+            barcode=code,
             product=ProductRead.model_validate(product) if product else None,
             unknown=product is None and body.manual_name is None,
             ingredient_id=row.id,
@@ -72,13 +133,13 @@ def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> Bar
         quantity=quantity,
         quantity_kind=quantity_kind,
         unit=unit,
-        barcode=body.barcode,
+        barcode=code,
     )
     db.add(item)
     db.commit()
     db.refresh(item)
     return BarcodeScanResponse(
-        barcode=body.barcode,
+        barcode=code,
         product=ProductRead.model_validate(product) if product else None,
         unknown=product is None and body.manual_name is None,
         shopping_list_item_id=item.id,
