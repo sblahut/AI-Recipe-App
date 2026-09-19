@@ -29,6 +29,7 @@ export const userPreferencesSchema = z.object({
   promptForStorageLocation: z.boolean().optional().default(true),
   prioritizeExpiringWhenGenerating: z.boolean().optional().default(true),
   defaultRecipeCount: z.number().int().min(1).max(10).optional().default(3),
+  profilePhotoUri: z.string().nullable().optional().default(null),
 });
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
@@ -42,6 +43,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   promptForStorageLocation: true,
   prioritizeExpiringWhenGenerating: true,
   defaultRecipeCount: 3,
+  profilePhotoUri: null,
 };
 
 export function allStorageLocations(customZones: readonly string[]): string[] {

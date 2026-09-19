@@ -1,7 +1,8 @@
 import Constants from "expo-constants";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, StyleSheet, Text, View } from "react-native";
 
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { SettingsLinkRow, SettingsSwitchRow } from "@/components/ui/SettingsRow";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -13,6 +14,7 @@ import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
+import { pickProfilePhoto, profilePhotoSourceOptions } from "@/lib/profilePhoto";
 import { weeklyAdUrlForStore } from "@/lib/storeChains";
 import {
   STORE_CHAINS,
@@ -39,14 +41,6 @@ const THEME_OPTIONS: { mode: ThemeMode; label: string }[] = [
 
 const RECIPE_COUNT_OPTIONS = [1, 2, 3, 5, 10] as const;
 
-function profileInitial(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) {
-    return "?";
-  }
-  return trimmed.charAt(0).toUpperCase();
-}
-
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
   const { serverUrl, setServerUrl, loading, testConnection } = useServerSettings();
@@ -64,7 +58,9 @@ export default function SettingsScreen() {
     setPromptForStorageLocation,
     setPrioritizeExpiringWhenGenerating,
     setDefaultRecipeCount,
+    setProfilePhotoUri,
   } = useUserPreferences();
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [draft, setDraft] = useState(serverUrl);
   const [usernameDraft, setUsernameDraft] = useState(preferences.username);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -176,6 +172,54 @@ export default function SettingsScreen() {
     }
   };
 
+  const applyPickedPhoto = async (source: "library" | "camera") => {
+    setPhotoBusy(true);
+    try {
+      const uri = await pickProfilePhoto(source);
+      if (uri) {
+        await setProfilePhotoUri(uri);
+      }
+    } catch (e) {
+      Alert.alert("Profile photo", e instanceof Error ? e.message : "Could not update photo");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const openProfilePhotoMenu = () => {
+    if (photoBusy) {
+      return;
+    }
+    const buttons: { text: string; style?: "cancel" | "destructive"; onPress?: () => void }[] = [];
+    if (profilePhotoSourceOptions().includes("library")) {
+      buttons.push({
+        text: "Choose from library",
+        onPress: () => {
+          void applyPickedPhoto("library");
+        },
+      });
+    }
+    if (profilePhotoSourceOptions().includes("camera")) {
+      buttons.push({
+        text: "Take photo",
+        onPress: () => {
+          void applyPickedPhoto("camera");
+        },
+      });
+    }
+    if (preferences.profilePhotoUri) {
+      buttons.push({
+        text: "Remove photo",
+        style: "destructive",
+        onPress: () => {
+          void setProfilePhotoUri(null);
+        },
+      });
+    }
+    buttons.push({ text: "Cancel", style: "cancel" });
+    Alert.alert("Profile photo", undefined, buttons);
+  };
+
   const confirmRemoveZone = (zone: string) => {
     Alert.alert("Remove area", `Remove "${zone}" from your filters? Items keep their location.`, [
       { text: "Cancel", style: "cancel" },
@@ -200,23 +244,49 @@ export default function SettingsScreen() {
 
       <Card>
         <Text style={[styles.section, { color: colors.text }]}>Profile</Text>
+        <View style={styles.profilePhotoBlock}>
+          <ProfileAvatar
+            colors={colors}
+            username={preferences.username}
+            photoUri={preferences.profilePhotoUri}
+            size={88}
+            onPress={openProfilePhotoMenu}
+          />
+          <AppButton
+            label={photoBusy ? "Updating…" : "Change photo"}
+            variant="secondary"
+            compact
+            disabled={photoBusy}
+            onPress={openProfilePhotoMenu}
+          />
+          {preferences.profilePhotoUri ? (
+            <AppButton
+              label="Remove photo"
+              variant="ghost"
+              compact
+              disabled={photoBusy}
+              onPress={() => void setProfilePhotoUri(null)}
+            />
+          ) : null}
+          {Platform.OS === "web" ? (
+            <Text style={[styles.hint, { color: colors.textMuted }]}>
+              On web, choose a photo from your files.
+            </Text>
+          ) : null}
+        </View>
+
         {!editingProfile ? (
           <View style={styles.profileRow}>
-            <View style={[styles.avatar, { backgroundColor: colors.primaryMuted }]}>
-              <Text style={[styles.avatarText, { color: colors.primary }]}>
-                {profileInitial(preferences.username)}
-              </Text>
-            </View>
             <View style={styles.profileText}>
               <Text style={[styles.displayName, { color: colors.text }]}>
                 {preferences.username.trim() || "No display name"}
               </Text>
               <Text style={[styles.hint, { color: colors.textMuted }]}>
-                Stored on this device only.
+                Name and photo stay on this device only.
               </Text>
             </View>
             <AppButton
-              label={preferences.username.trim() ? "Edit" : "Add name"}
+              label={preferences.username.trim() ? "Edit name" : "Add name"}
               variant="secondary"
               compact
               onPress={() => setEditingProfile(true)}
@@ -521,19 +591,16 @@ const styles = StyleSheet.create({
   hint: { ...typography.caption, lineHeight: 18 },
   result: { ...typography.body, marginTop: spacing.xs },
   empty: typography.caption,
+  profilePhotoBlock: {
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { ...typography.headline, fontSize: 20 },
   profileText: { flex: 1, gap: 2 },
   displayName: typography.label,
   profileEdit: { gap: spacing.sm },

@@ -34,6 +34,13 @@
         {
           "cameraPermission": "Scan barcodes to add pantry and shopping items."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a profile photo from your photo library.",
+          "cameraPermission": "Take a photo for your profile."
+        }
       ]
     ],
     "experiments": {

@@ -20,6 +20,7 @@ import {
   type ThemeMode,
   type UserPreferences,
 } from "@/lib/userPreferences";
+import { deleteStoredProfilePhoto } from "@/lib/profilePhoto";
 
 type UserPreferencesContextValue = {
   preferences: UserPreferences;
@@ -36,6 +37,7 @@ type UserPreferencesContextValue = {
   setPromptForStorageLocation: (prompt: boolean) => Promise<void>;
   setPrioritizeExpiringWhenGenerating: (enabled: boolean) => Promise<void>;
   setDefaultRecipeCount: (count: number) => Promise<void>;
+  setProfilePhotoUri: (uri: string | null) => Promise<void>;
 };
 
 const UserPreferencesContext = createContext<UserPreferencesContextValue | null>(null);
@@ -167,6 +169,16 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     [persist, preferences],
   );
 
+  const setProfilePhotoUri = useCallback(
+    async (uri: string | null) => {
+      if (uri === null) {
+        await deleteStoredProfilePhoto();
+      }
+      await persist({ ...preferences, profilePhotoUri: uri });
+    },
+    [persist, preferences],
+  );
+
   const value = useMemo(
     () => ({
       preferences,
@@ -183,6 +195,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       setPromptForStorageLocation,
       setPrioritizeExpiringWhenGenerating,
       setDefaultRecipeCount,
+      setProfilePhotoUri,
     }),
     [
       preferences,
@@ -199,6 +212,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       setPromptForStorageLocation,
       setPrioritizeExpiringWhenGenerating,
       setDefaultRecipeCount,
+      setProfilePhotoUri,
     ],
   );
 
