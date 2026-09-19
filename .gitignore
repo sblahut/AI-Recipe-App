@@ -218,7 +218,10 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Local app data
-server/data/
+server/data/app.db
+server/data/imports/*.gz
+server/data/imports/*.jsonl
+!server/data/imports/sample.openfoodfacts.jsonl
 server/.env
 apps/mobile/node_modules/
 apps/mobile/.expo/

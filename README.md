@@ -174,7 +174,9 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 | GET | `/health` | Liveness + Ollama reachability |
 | GET | `/meta/quantity-units` | Units per kind (for UI dropdowns) |
 | GET/POST/PATCH/DELETE | `/inventory` | Pantry stock (manual or from barcode) |
+| POST | `/products` | Register a barcode product in the family catalog |
 | POST | `/scan/barcode` | UPC lookup + add to inventory or shopping list |
+| POST | `/inventory` | Manual pantry entry (no barcode — produce, bulk, etc.) |
 | POST | `/recipes/generate` | AI recipes from inventory |
 | GET/POST/DELETE | `/recipes/saved` | Store and browse family recipes |
 | GET/POST | `/shopping/lists` | Shopping trips and line items |
@@ -194,11 +196,45 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 | **CI** | `.github/workflows/lint.yml` | [Actions tab](https://github.com/sblahut/AI-Recipe-App/actions) — Ruff on push/PR; ESLint when `apps/mobile/package.json` exists |
 | **Optional hooks** | `.pre-commit-config.yaml` | `pip install pre-commit && pre-commit install` |
 
+## Barcode catalog (Phase 2)
+
+Packaged goods are resolved from the local **`products`** table (Open Food Facts import + family entries). Items **without barcodes** use **`POST /inventory`** only (eggs, produce, bulk spices).
+
+### Import Open Food Facts (offline)
+
+1. Download the JSONL export (large file, several GB compressed):  
+   https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz  
+2. Save under `server/data/imports/` (gitignored except the small sample file).
+3. Run the import:
+
+   ```powershell
+   cd server
+   .\.venv\Scripts\Activate.ps1
+   python scripts/import_open_food_facts.py --input data/imports/openfoodfacts-products.jsonl.gz --country en:united-states
+   ```
+
+   Test on the committed sample:
+
+   ```powershell
+   python scripts/import_open_food_facts.py --input data/imports/sample.openfoodfacts.jsonl
+   ```
+
+   Options: `--limit N`, `--dry-run`, `--country en:united-states`.
+
+### Manual entry paths
+
+| Situation | API |
+|-----------|-----|
+| No barcode (fresh food, pantry staples) | `POST /inventory` with `name`, quantities — omit `barcode` |
+| Barcode not in import / store brand | `POST /products` with `barcode`, `name`, optional `brand` |
+| Scan unknown UPC once and remember it | `POST /scan/barcode` with `manual_name` and `"register_product": true` |
+| Scan unknown UPC one-time only | `POST /scan/barcode` with `manual_name` only (adds to inventory, not catalog) |
+
 ## Build order
 
 - [x] README + architecture (no vision)
 - [x] FastAPI: inventory, barcodes, recipes, shopping, quantity kinds, saved recipes
-- [ ] Import script for offline barcode database
+- [x] Open Food Facts import script + manual product / inventory entry
 - [ ] Expo mobile app
 
 ## Environment variables

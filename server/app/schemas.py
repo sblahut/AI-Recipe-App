@@ -73,8 +73,16 @@ class ProductRead(BaseModel):
     name: str
     brand: str | None = None
     default_quantity_kind: QuantityKindField | None = None
+    source: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class ProductCreate(BaseModel):
+    barcode: str
+    name: str
+    brand: str | None = None
+    default_quantity_kind: QuantityKindField | None = None
 
 
 class BarcodeScanRequest(QuantityFieldsMixin):
@@ -82,6 +90,10 @@ class BarcodeScanRequest(QuantityFieldsMixin):
     target: Literal["inventory", "shopping_list"] = "inventory"
     shopping_list_id: int | None = None
     manual_name: str | None = None
+    register_product: bool = Field(
+        default=False,
+        description="When barcode is unknown, save manual_name to the local product catalog",
+    )
 
 
 class BarcodeScanResponse(BaseModel):
