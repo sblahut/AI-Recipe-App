@@ -185,6 +185,15 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 2. **Cook** — generate recipes; save favorites with `POST /recipes/saved`.
 3. **Shop** — build lists, scan items in the store, check off lines (no AI).
 
+## Linting
+
+| Stack | Config | Run locally |
+|-------|--------|-------------|
+| **Python** (`server/`) | `server/pyproject.toml` (Ruff) | `pip install -r requirements-dev.txt` then `ruff check app` and `ruff format app` |
+| **TypeScript** (`apps/mobile/`) | `apps/mobile/.eslintrc.yml` | After Expo scaffold: `npm run lint` |
+| **CI** | `.github/workflows/lint.yml` | Ruff on push/PR; ESLint when `apps/mobile/package.json` exists |
+| **Optional hooks** | `.pre-commit-config.yaml` | `pip install pre-commit && pre-commit install` |
+
 ## Build order
 
 - [x] README + architecture (no vision)

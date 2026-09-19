@@ -1,0 +1,52 @@
+name: Lint
+
+on:
+  push:
+    branches: [main, initial-app-setup]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python:
+    name: Ruff (server)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ruff
+        run: pip install ruff==0.8.4
+
+      - name: Ruff check
+        run: ruff check app
+
+      - name: Ruff format (check)
+        run: ruff format --check app
+
+  typescript:
+    name: ESLint (mobile)
+    runs-on: ubuntu-latest
+    if: hashFiles('apps/mobile/package.json') != ''
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint

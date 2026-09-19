@@ -1,0 +1,36 @@
+# Used when Expo app is scaffolded: npm install + extend this config in package.json scripts.
+root: true
+env:
+  es2022: true
+parser: "@typescript-eslint/parser"
+parserOptions:
+  ecmaVersion: latest
+  sourceType: module
+  ecmaFeatures:
+    jsx: true
+  project: ./tsconfig.json
+plugins:
+  - "@typescript-eslint"
+extends:
+  - eslint:recommended
+  - plugin:@typescript-eslint/recommended
+  - plugin:@typescript-eslint/recommended-requiring-type-checking
+  - plugin:@typescript-eslint/strict
+rules:
+  "@typescript-eslint/no-explicit-any": error
+  "@typescript-eslint/no-unused-vars":
+    - error
+    - argsIgnorePattern: "^_"
+      varsIgnorePattern: "^_"
+  "@typescript-eslint/consistent-type-imports":
+    - error
+    - prefer: type-imports
+  "@typescript-eslint/no-floating-promises": error
+  "@typescript-eslint/no-misused-promises":
+    - error
+    - checksVoidReturn:
+        attributes: false
+ignorePatterns:
+  - node_modules/
+  - .expo/
+  - dist/
