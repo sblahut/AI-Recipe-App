@@ -63,38 +63,109 @@ ai-recipe-app/
     mobile/
 ```
 
-## Windows setup
+## Run locally
 
-### 1. Ollama
+### Prerequisites
 
-1. Install [Ollama for Windows](https://ollama.com).
-2. Pull the recipe model:
+| Tool | Required for | Install |
+|------|----------------|---------|
+| **Python 3.11+** | API server | [python.org](https://www.python.org/downloads/) — check **Add to PATH** |
+| **Ollama** | `POST /recipes/generate` only | [ollama.com](https://ollama.com) — inventory, barcodes, shopping work without it |
 
-   ```powershell
-   ollama pull mistral:7b
-   ```
+### Start the API (Windows)
 
-3. Optional — keep the model loaded:
-
-   ```powershell
-   setx OLLAMA_KEEP_ALIVE "30m"
-   ```
-
-### 2. Python backend
+From the repo root:
 
 ```powershell
 cd server
 .\run.ps1
 ```
 
-Or manually: venv, `pip install -r requirements.txt`, `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
+`run.ps1` creates a venv, installs dependencies, copies `.env.example` → `.env` if needed, and starts Uvicorn on port **8000**.
 
-- API docs: http://localhost:8000/docs
-- LAN: http://\<your-pc-ip\>:8000
+**Manual equivalent:**
 
-### 3. Firewall
+```powershell
+cd server
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
 
-Allow inbound **TCP 8000** on **Private** networks.
+Leave this terminal open while testing. You should see Uvicorn listening on `http://127.0.0.1:8000`.
+
+### Verify it works
+
+1. Open **http://127.0.0.1:8000/docs** (Swagger UI).
+2. Run **GET `/health`** — expect `"status": "ok"`. `"ollama": true` if Ollama is running.
+3. Run **GET `/meta/quantity-units`** — unit lists for forms.
+4. Run **POST `/inventory`** with a sample body:
+
+   ```json
+   {
+     "name": "Eggs",
+     "quantity": 12,
+     "quantity_kind": "count",
+     "unit": "each",
+     "location": "fridge"
+   }
+   ```
+
+5. Run **GET `/inventory`** — your item should appear.
+
+**PowerShell one-liners** (server must be running):
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8000/inventory
+```
+
+### Recipe generation (optional)
+
+```powershell
+ollama pull mistral:7b
+```
+
+In Swagger, **POST `/recipes/generate`**:
+
+```json
+{ "use_all": true, "count": 2 }
+```
+
+Optional — keep the model loaded between requests (restart Ollama after `setx`):
+
+```powershell
+setx OLLAMA_KEEP_ALIVE "30m"
+```
+
+### Where data is stored
+
+Inventory and other records live in SQLite:
+
+```text
+server/data/app.db
+```
+
+Created on first startup. Browse via **GET `/inventory`**, [DB Browser for SQLite](https://sqlitebrowser.org/), or the `sqlite3` CLI. The file is gitignored.
+
+### Phone / other devices on your Wi‑Fi
+
+Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/docs`.
+
+- Start Uvicorn with `--host 0.0.0.0` ( `run.ps1` already does this ).
+- Allow inbound **TCP 8000** on **Private** networks in Windows Firewall.
+
+### Troubleshooting
+
+| Problem | What to try |
+|---------|----------------|
+| `Python was not found` | Install from python.org (not the Store stub); reopen the terminal |
+| Port already in use | `uvicorn app.main:app --reload --port 8001` |
+| `POST /recipes/generate` returns 502 | Start Ollama; run `ollama pull mistral:7b` |
+| Validation error on `unit` | Use **GET `/meta/quantity-units`** — e.g. `volume` + `l`, not `each` |
+| `git push` hangs | Wait for Git Credential Manager / browser login; first HTTPS push can take 1–2 minutes |
 
 ## API overview
 
