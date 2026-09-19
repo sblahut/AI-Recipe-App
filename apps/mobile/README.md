@@ -46,11 +46,55 @@ Set **8000** in the app **Settings** tab. **8081** is only for Expo Go / web dev
 
 4. **Windows Firewall** — allow **Node.js** on **Private** networks (ports **8081** for Metro and **8000** for API).
 
-5. If LAN still fails: `npm run start:tunnel` (slower; works across tricky networks).
+5. Prefer **`npm start` (LAN)** over tunnel when phone and PC share Wi‑Fi. Tunnel QR codes often fail in the **iPhone Camera** app with *“No usable data found”*.
 
 6. **Web preview**: after a successful bundle, press **`w`** in the Expo terminal, or run `npm run start:web`. A blank page usually means the bundle failed — check the terminal for red errors.
 
-7. **Expo Go** must support **SDK 52** (update Expo Go from the app store).
+7. **Expo Go** must match the project **SDK 57** (update Expo Go from the app store). If you see “SDK 57 vs SDK 52”, run `npm install`, `npm run fix-deps`, restart Metro with `npm start`.
+
+## Connect Expo Go (no “Scan QR” / “Enter URL” on your phone?)
+
+Recent **Expo Go** versions (especially **iOS**) often **removed “Enter URL manually”**. The home screen may only show tutorials unless you use one of these paths:
+
+### A. Easiest: use the web app on your PC (no phone)
+
+With Metro running, press **`w`** in the terminal (or `npm run start:web`).  
+Set API in **Settings** to `http://127.0.0.1:8000` and test pantry there.
+
+### B. Phone: force **Expo Go** mode on the PC
+
+1. Stop Metro (**Ctrl+C**), then:
+
+   ```powershell
+   npm start
+   ```
+
+   (`npm start` uses **`--go`** so the QR is for Expo Go, not a dev client.)
+
+2. Under the QR, the terminal must say **`› Using Expo Go`**.  
+   If it says **development build**, press **`s`** in that terminal to switch to Expo Go.
+
+3. **Same Wi‑Fi** as the PC (not guest network). Prefer LAN (`exp://192.168.x.x:8081`), not tunnel, when possible.
+
+### C. Open the project without Expo Go’s scan UI
+
+**iPhone**
+
+1. Copy the URL from the terminal, e.g. `exp://192.168.1.45:8081`.
+2. **AirDrop / Messages / Notes** → paste the link → tap it → choose **Open in Expo Go**.  
+   Or paste into **Safari’s address bar** and go (should offer Expo Go).
+
+**Android**
+
+1. Open **Expo Go**.
+2. Look for **Scan QR code** on the home tab (layout varies by version; sometimes **Profile → Projects**, or a **camera icon** top-right).
+3. If there is no scanner, paste `exp://192.168.x.x:8081` wherever the app allows opening a link, or tap the LAN link if **Development servers** lists your machine (same Wi‑Fi).
+
+### D. “No usable data found” (Camera app)
+
+That is the **system Camera** scanning an **`exp://`** or **tunnel** QR — use **B/C** above, not the iPhone Camera app alone.
+
+**Not the same:** **Pantry → Scan** in this app is for **grocery barcodes**, not the Metro QR on your monitor.
 
 ## Scripts
 

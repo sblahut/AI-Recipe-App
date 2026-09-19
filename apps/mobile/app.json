@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "scheme": "airecipe",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.airecipe.mobile",
@@ -18,10 +17,17 @@
     },
     "android": {
       "package": "com.airecipe.mobile",
-      "usesCleartextTraffic": true,
       "permissions": ["android.permission.CAMERA"]
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-camera",
