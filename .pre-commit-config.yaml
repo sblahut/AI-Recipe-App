@@ -1,0 +1,19 @@
+# Optional local hooks: pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^server/app/
+      - id: ruff-format
+        files: ^server/app/
+
+  - repo: local
+    hooks:
+      - id: eslint-mobile
+        name: eslint (apps/mobile)
+        entry: bash -c 'test -f apps/mobile/package.json && cd apps/mobile && npm run lint || exit 0'
+        language: system
+        files: ^apps/mobile/.*\.(ts|tsx)$
+        pass_filenames: false

@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local app data
+server/data/
+server/.env
+apps/mobile/node_modules/
+apps/mobile/.expo/

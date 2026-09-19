@@ -1,0 +1,35 @@
+---
+description: Core engineering principles for all code in this repo
+alwaysApply: true
+---
+
+# Engineering core
+
+## Scope and diffs
+
+- Solve the requested problem with the **smallest correct change**. No drive-by refactors or unrelated edits.
+- **Reuse** existing modules, types, and patterns before adding new abstractions.
+- Match the **style of the file and folder** you are editing (naming, layering, error handling).
+
+## SOLID (apply with judgment)
+
+- **Single responsibility**: one reason to change per module/class/function group.
+- **Open/closed**: extend via new types or composition; avoid editing stable code for every variant.
+- **Liskov**: subtypes must honor the contract of the base (no surprising overrides).
+- **Interface segregation**: small, focused interfaces/types — clients depend only on what they use.
+- **Dependency inversion**: high-level logic depends on abstractions (interfaces, injected deps), not concrete I/O.
+
+Prefer **composition over inheritance**. Do not force OOP where plain functions + types are clearer (common in React/TS).
+
+## AI-generated code
+
+- No `any`, no `@ts-ignore`, no empty `catch`, no hardcoded secrets or LAN IPs in committed code.
+- No fake implementations or “TODO: implement” unless the user asked for a stub.
+- Validate external input at boundaries (API, forms, barcode payloads).
+- Prefer explicit, readable code over clever one-liners.
+
+## Repo layout
+
+- **Python API**: `server/` (FastAPI, SQLite, Ollama).
+- **Mobile (planned)**: `apps/mobile/` (Expo / TypeScript).
+- Keep backend and client types aligned with OpenAPI / shared schemas when both exist.

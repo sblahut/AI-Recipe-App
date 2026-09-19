@@ -1,0 +1,54 @@
+---
+description: TypeScript and React Native (Expo) standards
+globs: apps/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# TypeScript standards
+
+## Strict typing
+
+- Enable and respect **`strict`** (and `noImplicitAny`). **Never use `any`.** Use `unknown` and narrow, or generics.
+- Avoid unsafe casts (`as Foo`). Prefer type guards, Zod/io-ts parsing at boundaries, or discriminated unions.
+- Prefer **`satisfies`** and `as const` for config and API literals instead of widening to `string`.
+
+```typescript
+// ❌ BAD
+function parse(data: any) {
+  return data.items as Item[];
+}
+
+// ✅ GOOD
+function parse(data: unknown): Item[] {
+  const result = inventoryResponseSchema.safeParse(data);
+  if (!result.success) throw new ApiError("Invalid response", result.error);
+  return result.data.items;
+}
+```
+
+## Types vs classes
+
+- Use **`interface` / `type`** for data and contracts. Use **classes** only when instance behavior or DI warrants it (services, repositories), not for DTOs.
+- Model domain states with **discriminated unions** (`kind: "ok" | "error"`) instead of optional soup.
+
+## Functions and modules
+
+- **Pure functions** for transforms; **hooks** for React state and effects (`useInventory`, `useServerUrl`).
+- One main export per file when practical; colocate tests next to modules.
+- Use **`readonly`** for props and immutable collections where possible.
+
+## Async and errors
+
+- Do not fire-and-forget promises without handling. Use `try/catch` or `.catch()` with user-visible or logged errors.
+- Typed errors or Result-style returns at API client boundaries; map to UI messages in one place.
+
+## React / Expo
+
+- **Functional components** only. No class components.
+- Keep components thin; move fetching and validation into hooks or small service modules.
+- Server base URL from **settings/env**, not literals in components.
+
+## Lint mindset
+
+- Prefer `eslint` `@typescript-eslint/no-explicit-any`, `no-floating-promises`, and exhaustive-deps compliance.
+- If a third-party type is wrong, wrap it in a thin typed adapter — do not punch through with `any`.
