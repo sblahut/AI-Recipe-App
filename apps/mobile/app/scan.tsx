@@ -1,7 +1,16 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -10,7 +19,11 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiJson } from "@/lib/api";
-import { barcodeScanResponseSchema, savedRecipeReadSchema } from "@/lib/schemas";
+import {
+  barcodeScanResponseSchema,
+  productReadSchema,
+  savedRecipeReadSchema,
+} from "@/lib/schemas";
 
 type ScanParams = {
   target?: string;
@@ -20,8 +33,15 @@ type ScanParams = {
   savedRecipeId?: string;
 };
 
+type PendingScan = {
+  barcode: string;
+  productName: string | null;
+  resolving: boolean;
+};
+
 export default function ScanScreen() {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { serverUrl } = useServerSettings();
   const params = useLocalSearchParams<ScanParams>();
   const target = params.target === "shopping_list" ? "shopping_list" : "inventory";
@@ -36,8 +56,12 @@ export default function ScanScreen() {
   const [busy, setBusy] = useState(false);
   const [lastAdded, setLastAdded] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<string[]>([]);
+  const [pending, setPending] = useState<PendingScan | null>(null);
+  const [quantity, setQuantity] = useState("1");
   const handled = useRef<string | null>(null);
   const cooldown = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scannerPaused = Boolean(pending) || Boolean(lastBarcode) || busy;
 
   useEffect(() => {
     if (savedRecipeId == null) {
@@ -66,15 +90,42 @@ export default function ScanScreen() {
     }, 1500);
   };
 
-  const submitBarcode = async (barcode: string, nameOverride?: string) => {
+  const finishAdded = (label: string, qty: number) => {
+    const where =
+      target === "inventory" && storageLocation
+        ? ` in ${storageLocation}`
+        : target === "shopping_list"
+          ? " to your shopping list"
+          : " to ingredients";
+
+    if (continuous) {
+      setLastAdded(`${qty} × ${label}`);
+      releaseScanner();
+      return;
+    }
+
+    const backLabel = target === "shopping_list" ? "Back to shopping" : "Back to ingredients";
+    Alert.alert(
+      "Added",
+      `${qty} × ${label}${where}.`,
+      [{ text: backLabel, onPress: () => router.back() }],
+      { cancelable: false },
+    );
+  };
+
+  const submitBarcode = async (
+    barcode: string,
+    options?: { nameOverride?: string; quantity?: number },
+  ) => {
+    const qty = options?.quantity ?? 1;
     setBusy(true);
     try {
       const body: Record<string, unknown> = {
         barcode,
         target,
-        manual_name: nameOverride ?? null,
-        register_product: Boolean(nameOverride),
-        quantity: 1,
+        manual_name: options?.nameOverride ?? null,
+        register_product: Boolean(options?.nameOverride),
+        quantity: qty,
         quantity_kind: "count",
         unit: "each",
       };
@@ -92,8 +143,9 @@ export default function ScanScreen() {
       });
       const parsed = barcodeScanResponseSchema.parse(raw);
 
-      if (parsed.unknown && !nameOverride) {
+      if (parsed.unknown && !options?.nameOverride) {
         setLastBarcode(barcode);
+        setPending(null);
         Alert.alert(
           "Unknown barcode",
           "Not in your UPC catalog yet. Enter a name to add and save it for next time.",
@@ -101,23 +153,73 @@ export default function ScanScreen() {
         return;
       }
 
-      const label = parsed.product?.name ?? parsed.barcode;
+      const label = parsed.product?.name ?? options?.nameOverride ?? parsed.barcode;
       setLastAdded(label);
       setLastBarcode(null);
       setManualName("");
+      setPending(null);
+      setQuantity("1");
+      handled.current = barcode;
 
-      if (continuous) {
-        releaseScanner();
-        return;
-      }
-
-      Alert.alert("Added", label, [{ text: "OK", onPress: () => router.back() }]);
+      finishAdded(label, qty);
     } catch (e) {
       Alert.alert("Scan failed", e instanceof Error ? e.message : "Unknown error");
       releaseScanner();
     } finally {
       setBusy(false);
     }
+  };
+
+  const beginConfirmScan = (barcode: string) => {
+    setQuantity("1");
+    setPending({ barcode, productName: null, resolving: true });
+    void (async () => {
+      try {
+        const raw = await apiJson<unknown>(`/products/${barcode}`, { baseUrl: serverUrl });
+        const product = raw == null ? null : productReadSchema.parse(raw);
+        if (!product?.name) {
+          setPending(null);
+          setLastBarcode(barcode);
+          return;
+        }
+        setPending({ barcode, productName: product.name, resolving: false });
+      } catch {
+        setPending(null);
+        setLastBarcode(barcode);
+      }
+    })();
+  };
+
+  const onBarcodeDetected = (data: string) => {
+    if (scannerPaused || handled.current === data) {
+      return;
+    }
+    handled.current = data;
+
+    if (continuous) {
+      void submitBarcode(data, { quantity: 1 });
+      return;
+    }
+
+    beginConfirmScan(data);
+  };
+
+  const confirmPending = () => {
+    if (!pending) {
+      return;
+    }
+    const parsedQty = Number(quantity);
+    if (Number.isNaN(parsedQty) || parsedQty <= 0) {
+      Alert.alert("Quantity", "Enter a number greater than zero.");
+      return;
+    }
+    void submitBarcode(pending.barcode, { quantity: parsedQty });
+  };
+
+  const cancelPending = () => {
+    setPending(null);
+    setQuantity("1");
+    handled.current = null;
   };
 
   if (!permission) {
@@ -139,34 +241,25 @@ export default function ScanScreen() {
     );
   }
 
-  const hint =
-    busy && lastAdded
-      ? `Added ${lastAdded}`
-      : busy
-        ? "Adding…"
-        : storageLocation
-          ? `Scan into ${storageLocation} · stays open for multiple scans`
-          : "Point at a barcode inside the frame";
+  const hint = continuous
+    ? busy && lastAdded
+      ? `Added ${lastAdded} — scan next item`
+      : storageLocation
+        ? `Scan into ${storageLocation} · tap Done when finished`
+        : "Scan each item · tap Done when finished"
+    : "Scan one barcode · confirm quantity · return to Ingredients";
 
   return (
     <View style={styles.container}>
       <CameraView
         style={styles.camera}
         barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128"] }}
-        onBarcodeScanned={
-          busy
-            ? undefined
-            : ({ data }) => {
-                if (handled.current === data) return;
-                handled.current = data;
-                void submitBarcode(data);
-              }
-        }
+        onBarcodeScanned={scannerPaused ? undefined : ({ data }) => onBarcodeDetected(data)}
       />
       <View style={[styles.frameHint, { borderColor: colors.primary }]} pointerEvents="none" />
 
-      {checklist.length > 0 ? (
-        <View style={styles.checklistWrap}>
+      {checklist.length > 0 && !pending && !lastBarcode ? (
+        <View style={[styles.checklistWrap, { top: insets.top + spacing.sm }]}>
           <Card padded style={styles.checklistCard}>
             <Text style={[styles.checklistTitle, { color: colors.text }]}>Recipe items</Text>
             <ScrollView style={styles.checklistScroll} nestedScrollEnabled>
@@ -180,8 +273,47 @@ export default function ScanScreen() {
         </View>
       ) : null}
 
-      {lastBarcode ? (
-        <View style={styles.manualWrap}>
+      {pending ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={[styles.sheetWrapTop, { paddingTop: insets.top + spacing.sm }]}
+          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+        >
+          <Card>
+            <Text style={[styles.manualTitle, { color: colors.text }]}>
+              {pending.resolving ? "Looking up product…" : pending.productName ?? "Product"}
+            </Text>
+            {!pending.resolving && pending.productName ? (
+              <>
+                <Text style={[styles.meta, { color: colors.textMuted }]}>
+                  {storageLocation ? `Add to ${storageLocation}` : "Add to ingredients"}
+                </Text>
+                <AppTextField
+                  label="Quantity"
+                  value={quantity}
+                  onChangeText={setQuantity}
+                  keyboardType="decimal-pad"
+                />
+                <View style={styles.sheetActions}>
+                  <AppButton label="Cancel" variant="ghost" onPress={cancelPending} />
+                  <AppButton
+                    label={busy ? "Adding…" : "Add"}
+                    loading={busy}
+                    onPress={confirmPending}
+                  />
+                </View>
+              </>
+            ) : null}
+          </Card>
+        </KeyboardAvoidingView>
+      ) : null}
+
+      {lastBarcode && !pending ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={[styles.sheetWrapTop, { paddingTop: insets.top + spacing.sm }]}
+          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+        >
           <Card>
             <Text style={[styles.manualTitle, { color: colors.text }]}>Unknown barcode</Text>
             <Text style={[styles.manualCode, { color: colors.textMuted }]}>{lastBarcode}</Text>
@@ -190,23 +322,46 @@ export default function ScanScreen() {
               value={manualName}
               onChangeText={setManualName}
             />
+            <AppTextField
+              label="Quantity"
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="decimal-pad"
+            />
             <AppButton
               label="Add & save to UPC catalog"
+              loading={busy}
               onPress={() => {
                 if (!manualName.trim()) return;
-                void submitBarcode(lastBarcode, manualName.trim());
+                const parsedQty = Number(quantity);
+                if (Number.isNaN(parsedQty) || parsedQty <= 0) {
+                  Alert.alert("Quantity", "Enter a number greater than zero.");
+                  return;
+                }
+                void submitBarcode(lastBarcode, {
+                  nameOverride: manualName.trim(),
+                  quantity: parsedQty,
+                });
               }}
             />
+            <AppButton label="Cancel" variant="ghost" onPress={() => {
+              setLastBarcode(null);
+              handled.current = null;
+            }} />
           </Card>
-        </View>
-      ) : (
+        </KeyboardAvoidingView>
+      ) : null}
+
+      {!pending && !lastBarcode ? (
         <View style={styles.hintBar}>
           <Text style={[styles.hintText, { color: colors.text }]}>{hint}</Text>
           {continuous ? (
             <AppButton label="Done scanning" variant="secondary" compact onPress={() => router.back()} />
-          ) : null}
+          ) : (
+            <AppButton label="Cancel" variant="ghost" compact onPress={() => router.back()} />
+          )}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -224,7 +379,7 @@ const styles = StyleSheet.create({
   message: { textAlign: "center", ...typography.body },
   frameHint: {
     position: "absolute",
-    top: "22%",
+    top: "42%",
     alignSelf: "center",
     width: "72%",
     height: 120,
@@ -234,7 +389,6 @@ const styles = StyleSheet.create({
   },
   checklistWrap: {
     position: "absolute",
-    top: spacing.lg,
     left: spacing.lg,
     right: spacing.lg,
     maxHeight: 140,
@@ -243,6 +397,23 @@ const styles = StyleSheet.create({
   checklistTitle: { ...typography.caption, fontWeight: "700" },
   checklistScroll: { maxHeight: 100 },
   checklistLine: { ...typography.caption, lineHeight: 18 },
+  sheetWrapTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    backgroundColor: "rgba(247, 245, 240, 0.97)",
+    zIndex: 10,
+    elevation: 10,
+  },
+  sheetActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
   hintBar: {
     position: "absolute",
     bottom: spacing.xl,
@@ -254,14 +425,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   hintText: { textAlign: "center", ...typography.label },
-  manualWrap: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.lg,
-    backgroundColor: "rgba(247, 245, 240, 0.96)",
-  },
   manualTitle: typography.headline,
   manualCode: { ...typography.caption, fontFamily: "monospace" },
+  meta: typography.caption,
 });

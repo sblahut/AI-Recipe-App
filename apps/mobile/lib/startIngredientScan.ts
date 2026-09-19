@@ -6,6 +6,8 @@ type ScanParams = {
   location: string;
   savedRecipeId?: number;
   shoppingListId?: number;
+  /** When true, keep scanning after each add (stocking from recipe/list). */
+  continuous?: boolean;
 };
 
 export function openIngredientScan(params: ScanParams): void {
@@ -14,7 +16,7 @@ export function openIngredientScan(params: ScanParams): void {
     params: {
       target: "inventory",
       location: params.location,
-      continuous: "1",
+      ...(params.continuous ? { continuous: "1" } : {}),
       ...(params.savedRecipeId != null
         ? { savedRecipeId: String(params.savedRecipeId) }
         : {}),
@@ -25,8 +27,9 @@ export function openIngredientScan(params: ScanParams): void {
   });
 }
 
+/** Single scan: confirm quantity, then return to Ingredients. */
 export async function startIngredientScan(
-  options: Omit<ScanParams, "location"> & { location?: string } = {},
+  options: Omit<ScanParams, "location" | "continuous"> & { location?: string } = {},
 ): Promise<void> {
   const location = options.location ?? (await pickStorageLocation());
   if (!location) {
@@ -34,6 +37,7 @@ export async function startIngredientScan(
   }
   openIngredientScan({
     location,
+    continuous: false,
     ...(options.savedRecipeId != null ? { savedRecipeId: options.savedRecipeId } : {}),
     ...(options.shoppingListId != null ? { shoppingListId: options.shoppingListId } : {}),
   });

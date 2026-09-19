@@ -34,7 +34,7 @@ export async function stockFromSavedRecipe(
       {
         text: "Scan barcodes",
         onPress: () => {
-          openIngredientScan({ location, savedRecipeId });
+          openIngredientScan({ location, savedRecipeId, continuous: true });
         },
       },
       { text: "Done", style: "cancel" },

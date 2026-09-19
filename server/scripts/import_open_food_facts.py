@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 Import Open Food Facts JSONL export into the local products table.
 
 Download (example, English dump):
@@ -7,7 +7,11 @@ Download (example, English dump):
 
 Usage:
   cd server
+  .\.venv\Scripts\Activate.ps1
+  pip install -r requirements.txt
   python scripts/import_open_food_facts.py --input data/imports/openfoodfacts-products.jsonl.gz
+
+  Or: .\import-products.ps1
   python scripts/import_open_food_facts.py --input data/imports/sample.jsonl --limit 1000
   python scripts/import_open_food_facts.py --input ... --country en:united-states
 """

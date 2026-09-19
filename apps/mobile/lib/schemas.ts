@@ -92,6 +92,12 @@ export const shoppingListDetailSchema = shoppingListSchema.extend({
 });
 export type ShoppingListDetail = z.infer<typeof shoppingListDetailSchema>;
 
+export const productReadSchema = z.object({
+  barcode: z.string(),
+  name: z.string(),
+  brand: z.string().nullable().optional(),
+});
+
 export const barcodeScanResponseSchema = z.object({
   barcode: z.string(),
   product: z

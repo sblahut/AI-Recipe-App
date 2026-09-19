@@ -55,9 +55,26 @@ def _upsert_product(
     return row
 
 
+def _resolve_product(db: Session, code: str) -> Product | None:
+    product = db.get(Product, code)
+    if product is not None:
+        return product
+    looked_up = lookup_product_name(code)
+    if not looked_up:
+        return None
+    off_name, off_brand = looked_up
+    return _upsert_product(
+        db,
+        barcode=code,
+        name=off_name,
+        brand=off_brand,
+        source="openfoodfacts_api",
+    )
+
+
 @router.get("/products/{barcode}", response_model=ProductRead | None)
 def get_product(barcode: str, db: Session = Depends(get_db)) -> Product | None:
-    return db.get(Product, normalize_barcode(barcode))
+    return _resolve_product(db, normalize_barcode(barcode))
 
 
 @router.post("/products", response_model=ProductRead, status_code=201)
@@ -83,18 +100,8 @@ def create_product(body: ProductCreate, db: Session = Depends(get_db)) -> Produc
 def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> BarcodeScanResponse:
     code = normalize_barcode(body.barcode)
     product = db.get(Product, code)
-
     if product is None and not body.manual_name:
-        looked_up = lookup_product_name(code)
-        if looked_up:
-            off_name, off_brand = looked_up
-            product = _upsert_product(
-                db,
-                barcode=code,
-                name=off_name,
-                brand=off_brand,
-                source="openfoodfacts_api",
-            )
+        product = _resolve_product(db, code)
 
     if body.manual_name and body.register_product:
         product = _upsert_product(

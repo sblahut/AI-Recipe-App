@@ -41,7 +41,7 @@ export async function stockFromShoppingList(listId: number, serverUrl: string): 
       {
         text: "Scan barcodes",
         onPress: () => {
-          openIngredientScan({ location, shoppingListId: listId });
+          openIngredientScan({ location, shoppingListId: listId, continuous: true });
         },
       },
       { text: "Done", style: "cancel" },
