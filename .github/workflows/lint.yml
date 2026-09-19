@@ -30,21 +30,36 @@ jobs:
   eslint-mobile:
     name: ESLint (mobile)
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('apps/mobile/package.json') != '' }}
-    defaults:
-      run:
-        working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check for mobile app
+        id: mobile
+        shell: bash
+        run: |
+          if [ -f apps/mobile/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.mobile.outputs.present == 'true'
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
 
       - name: Install dependencies
+        if: steps.mobile.outputs.present == 'true'
+        working-directory: apps/mobile
         run: npm ci
 
       - name: ESLint
+        if: steps.mobile.outputs.present == 'true'
+        working-directory: apps/mobile
         run: npm run lint
+
+      - name: Skip (no mobile app yet)
+        if: steps.mobile.outputs.present != 'true'
+        run: echo "apps/mobile/package.json not found — skipping ESLint"
