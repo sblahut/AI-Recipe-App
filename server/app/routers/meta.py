@@ -20,7 +20,5 @@ def quantity_units() -> QuantityUnitsResponse:
 @router.get("/product-catalog", response_model=ProductCatalogStats)
 def product_catalog_stats(db: Session = Depends(get_db)) -> ProductCatalogStats:
     count = db.query(Product).count()
-    sample_count = (
-        db.query(Product).filter(Product.source == "sample").count() if count else 0
-    )
+    sample_count = db.query(Product).filter(Product.source == "sample").count() if count else 0
     return ProductCatalogStats(product_count=count, sample_seeded=sample_count > 0)
