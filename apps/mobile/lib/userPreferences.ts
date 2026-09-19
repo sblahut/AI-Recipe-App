@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
 
+import { BUILTIN_ZONES } from "@/constants/inventoryLocations";
 import { STORE_CHAINS } from "@/lib/storeChains";
 
 export { STORE_CHAINS, type StoreChain } from "@/lib/storeChains";
@@ -15,10 +16,20 @@ export const groceryStoreSchema = z.object({
 });
 export type GroceryStore = z.infer<typeof groceryStoreSchema>;
 
+export const themeModeSchema = z.enum(["system", "light", "dark"]);
+export type ThemeMode = z.infer<typeof themeModeSchema>;
+
 export const userPreferencesSchema = z.object({
   username: z.string(),
   customZones: z.array(z.string()),
   stores: z.array(groceryStoreSchema),
+  autoPersistGeneratedRecipes: z.boolean().optional().default(false),
+  themeMode: themeModeSchema.optional().default("system"),
+  defaultStorageLocation: z.string().nullable().optional().default(null),
+  promptForStorageLocation: z.boolean().optional().default(true),
+  prioritizeExpiringWhenGenerating: z.boolean().optional().default(true),
+  defaultRecipeCount: z.number().int().min(1).max(10).optional().default(3),
+  profilePhotoUri: z.string().nullable().optional().default(null),
 });
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
@@ -26,7 +37,18 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   username: "",
   customZones: [],
   stores: [],
+  autoPersistGeneratedRecipes: false,
+  themeMode: "system",
+  defaultStorageLocation: null,
+  promptForStorageLocation: true,
+  prioritizeExpiringWhenGenerating: true,
+  defaultRecipeCount: 3,
+  profilePhotoUri: null,
 };
+
+export function allStorageLocations(customZones: readonly string[]): string[] {
+  return [...BUILTIN_ZONES, ...customZones];
+}
 
 export const RESERVED_ZONE_NAMES = [
   "All",

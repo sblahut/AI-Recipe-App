@@ -2,9 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Ingredient, Product, ShoppingList, ShoppingListItem
-from app.schemas import BarcodeScanRequest, BarcodeScanResponse, ProductCreate, ProductRead
+from app.models import Product, ShoppingList, ShoppingListItem
+from app.schemas import (
+    BarcodeScanRequest,
+    BarcodeScanResponse,
+    IngredientCreate,
+    ProductCreate,
+    ProductRead,
+)
 from app.services.barcode import normalize_barcode
+from app.services.inventory_merge import upsert_ingredient
 from app.services.openfoodfacts_lookup import lookup_product_name
 from app.units import default_unit
 
@@ -122,17 +129,17 @@ def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> Bar
     quantity_kind, quantity, unit = _resolve_quantity_fields(body, product)
 
     if body.target == "inventory":
-        row = Ingredient(
-            name=name,
-            quantity=quantity,
-            quantity_kind=quantity_kind,
-            unit=unit,
-            barcode=code,
-            location=body.location.strip() if body.location and body.location.strip() else None,
+        row = upsert_ingredient(
+            db,
+            IngredientCreate(
+                name=name,
+                quantity=quantity,
+                quantity_kind=quantity_kind,
+                unit=unit,
+                barcode=code,
+                location=body.location.strip() if body.location and body.location.strip() else None,
+            ),
         )
-        db.add(row)
-        db.commit()
-        db.refresh(row)
         return BarcodeScanResponse(
             barcode=code,
             product=ProductRead.model_validate(product) if product else None,

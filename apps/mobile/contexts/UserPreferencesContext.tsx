@@ -17,8 +17,10 @@ import {
   setUserPreferences,
   zoneNameTaken,
   type GroceryStore,
+  type ThemeMode,
   type UserPreferences,
 } from "@/lib/userPreferences";
+import { deleteStoredProfilePhoto } from "@/lib/profilePhoto";
 
 type UserPreferencesContextValue = {
   preferences: UserPreferences;
@@ -29,6 +31,13 @@ type UserPreferencesContextValue = {
   addStore: (store: Omit<GroceryStore, "id">) => Promise<void>;
   updateStore: (store: GroceryStore) => Promise<void>;
   deleteStore: (id: string) => Promise<void>;
+  setAutoPersistGeneratedRecipes: (enabled: boolean) => Promise<void>;
+  setThemeMode: (mode: ThemeMode) => Promise<void>;
+  setDefaultStorageLocation: (location: string | null) => Promise<void>;
+  setPromptForStorageLocation: (prompt: boolean) => Promise<void>;
+  setPrioritizeExpiringWhenGenerating: (enabled: boolean) => Promise<void>;
+  setDefaultRecipeCount: (count: number) => Promise<void>;
+  setProfilePhotoUri: (uri: string | null) => Promise<void>;
 };
 
 const UserPreferencesContext = createContext<UserPreferencesContextValue | null>(null);
@@ -117,6 +126,59 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     [persist, preferences],
   );
 
+  const setAutoPersistGeneratedRecipes = useCallback(
+    async (enabled: boolean) => {
+      await persist({ ...preferences, autoPersistGeneratedRecipes: enabled });
+    },
+    [persist, preferences],
+  );
+
+  const setThemeMode = useCallback(
+    async (mode: ThemeMode) => {
+      await persist({ ...preferences, themeMode: mode });
+    },
+    [persist, preferences],
+  );
+
+  const setDefaultStorageLocation = useCallback(
+    async (location: string | null) => {
+      await persist({ ...preferences, defaultStorageLocation: location });
+    },
+    [persist, preferences],
+  );
+
+  const setPromptForStorageLocation = useCallback(
+    async (prompt: boolean) => {
+      await persist({ ...preferences, promptForStorageLocation: prompt });
+    },
+    [persist, preferences],
+  );
+
+  const setPrioritizeExpiringWhenGenerating = useCallback(
+    async (enabled: boolean) => {
+      await persist({ ...preferences, prioritizeExpiringWhenGenerating: enabled });
+    },
+    [persist, preferences],
+  );
+
+  const setDefaultRecipeCount = useCallback(
+    async (count: number) => {
+      const clamped = Math.min(10, Math.max(1, Math.round(count)));
+      await persist({ ...preferences, defaultRecipeCount: clamped });
+    },
+    [persist, preferences],
+  );
+
+  const setProfilePhotoUri = useCallback(
+    async (uri: string | null) => {
+      if (uri === null) {
+        await deleteStoredProfilePhoto();
+      }
+      await persist({ ...preferences, profilePhotoUri: uri });
+    },
+    [persist, preferences],
+  );
+
   const value = useMemo(
     () => ({
       preferences,
@@ -127,8 +189,31 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       addStore,
       updateStore,
       deleteStore,
+      setAutoPersistGeneratedRecipes,
+      setThemeMode,
+      setDefaultStorageLocation,
+      setPromptForStorageLocation,
+      setPrioritizeExpiringWhenGenerating,
+      setDefaultRecipeCount,
+      setProfilePhotoUri,
     }),
-    [preferences, loading, setUsername, addZone, removeZone, addStore, updateStore, deleteStore],
+    [
+      preferences,
+      loading,
+      setUsername,
+      addZone,
+      removeZone,
+      addStore,
+      updateStore,
+      deleteStore,
+      setAutoPersistGeneratedRecipes,
+      setThemeMode,
+      setDefaultStorageLocation,
+      setPromptForStorageLocation,
+      setPrioritizeExpiringWhenGenerating,
+      setDefaultRecipeCount,
+      setProfilePhotoUri,
+    ],
   );
 
   return <UserPreferencesContext.Provider value={value}>{children}</UserPreferencesContext.Provider>;

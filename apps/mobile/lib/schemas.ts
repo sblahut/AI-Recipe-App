@@ -54,10 +54,6 @@ export const generatedRecipeSchema = z.object({
 });
 export type GeneratedRecipe = z.infer<typeof generatedRecipeSchema>;
 
-export const recipeGenerateResponseSchema = z.object({
-  recipes: z.array(generatedRecipeSchema),
-});
-
 export const savedRecipeReadSchema = z.object({
   id: z.number(),
   title: z.string(),
@@ -66,6 +62,11 @@ export const savedRecipeReadSchema = z.object({
   created_at: z.string(),
 });
 export type SavedRecipe = z.infer<typeof savedRecipeReadSchema>;
+
+export const recipeGenerateResponseSchema = z.object({
+  recipes: z.array(generatedRecipeSchema),
+  saved_recipes: z.array(savedRecipeReadSchema).optional().default([]),
+});
 
 export const shoppingListSchema = z.object({
   id: z.number(),
@@ -91,6 +92,12 @@ export const shoppingListDetailSchema = shoppingListSchema.extend({
   items: z.array(shoppingListItemSchema),
 });
 export type ShoppingListDetail = z.infer<typeof shoppingListDetailSchema>;
+
+export const shoppingFromRecipeResponseSchema = z.object({
+  added: z.array(shoppingListItemSchema),
+  skipped_in_pantry: z.array(z.string()),
+});
+export type ShoppingFromRecipeResponse = z.infer<typeof shoppingFromRecipeResponseSchema>;
 
 export const productReadSchema = z.object({
   barcode: z.string(),

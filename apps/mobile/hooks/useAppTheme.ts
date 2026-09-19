@@ -8,6 +8,7 @@ import {
   typography,
   type ThemeColors,
 } from "@/constants/theme";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 
 export function useAppTheme(): {
   colors: ThemeColors;
@@ -16,8 +17,11 @@ export function useAppTheme(): {
   typography: typeof typography;
   isDark: boolean;
 } {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
+  const systemScheme = useColorScheme();
+  const { preferences } = useUserPreferences();
+  const mode = preferences.themeMode ?? "system";
+  const isDark =
+    mode === "dark" || (mode === "system" && systemScheme === "dark");
   return {
     colors: isDark ? darkColors : lightColors,
     spacing,

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from app.models import SavedRecipe
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.units import QuantityKind, default_unit, validate_unit_for_kind
 
@@ -114,11 +114,28 @@ class RecipeGenerateRequest(BaseModel):
     count: int = Field(default=3, ge=1, le=10)
     constraints: str | None = None
     prioritize_expiring: bool = True
+    persist_generated: bool | None = Field(
+        default=None,
+        description="When true, save each generated recipe (non-favorite). When omitted, uses server default.",
+    )
 
 
 class RecipeIngredient(BaseModel):
     name: str
     quantity: str | None = None
+
+    @field_validator("quantity", mode="before")
+    @classmethod
+    def coerce_quantity_to_string(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if isinstance(value, bool):
+            raise ValueError("quantity must be a string or number")
+        if isinstance(value, (int, float)):
+            return str(value)
+        return str(value)
 
 
 class GeneratedRecipe(BaseModel):
@@ -132,6 +149,7 @@ class GeneratedRecipe(BaseModel):
 
 class RecipeGenerateResponse(BaseModel):
     recipes: list[GeneratedRecipe]
+    saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
 
 
 class SavedRecipeCreate(BaseModel):
@@ -198,3 +216,25 @@ class ShoppingListItemRead(ShoppingListItemCreate):
 
 class ShoppingListDetail(ShoppingListRead):
     items: list[ShoppingListItemRead]
+
+
+class ShoppingFromRecipeRequest(BaseModel):
+    list_id: int
+    recipe: GeneratedRecipe | None = None
+    saved_recipe_id: int | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_recipe_source(self) -> "ShoppingFromRecipeRequest":
+        has_recipe = self.recipe is not None
+        has_id = self.saved_recipe_id is not None
+        if has_recipe == has_id:
+            raise ValueError("Provide exactly one of recipe or saved_recipe_id")
+        return self
+
+
+class ShoppingFromRecipeResponse(BaseModel):
+    added: list[ShoppingListItemRead]
+    skipped_in_pantry: list[str]
+
+
+RecipeGenerateResponse.model_rebuild()

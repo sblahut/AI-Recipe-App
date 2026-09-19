@@ -122,23 +122,41 @@ Invoke-RestMethod http://127.0.0.1:8000/health
 Invoke-RestMethod http://127.0.0.1:8000/inventory
 ```
 
-### Recipe generation (optional)
+### Ollama on Windows (recipe generation)
 
-```powershell
-ollama pull mistral:7b
-```
+Recipe generation is optional — inventory, barcodes, and shopping lists work without Ollama.
 
-In Swagger, **POST `/recipes/generate`**:
+1. **Install** from [ollama.com](https://ollama.com) and start the Ollama app (tray icon). The API listens on **http://127.0.0.1:11434** by default.
+2. **Pull the text model** (match `OLLAMA_TEXT_MODEL` in `server/.env`, default `mistral:7b`):
 
-```json
-{ "use_all": true, "count": 2 }
-```
+   ```powershell
+   ollama pull mistral:7b
+   ```
 
-Optional — keep the model loaded between requests (restart Ollama after `setx`):
+3. **Point the FastAPI server at Ollama** via `server/.env` (copied from `.env.example`):
 
-```powershell
-setx OLLAMA_KEEP_ALIVE "30m"
-```
+   | Variable | Purpose |
+   |----------|---------|
+   | `OLLAMA_HOST` | Base URL for the Ollama HTTP API (this app reads this). |
+   | `OLLAMA_TEXT_MODEL` | Model name passed to Ollama for `POST /recipes/generate`. |
+
+   These are **app settings**, not Ollama’s own environment variables.
+
+4. **Keep the model loaded (optional, faster repeat generates)** — set Ollama’s **`OLLAMA_KEEP_ALIVE`** (Ollama process env, not `server/.env`). Example after install:
+
+   ```powershell
+   setx OLLAMA_KEEP_ALIVE "30m"
+   ```
+
+   Restart the Ollama app so it picks up the variable. Use values like `5m`, `30m`, or `-1` (keep loaded until Ollama exits).
+
+5. **Verify**: **GET `/health`** should show `"ollama": true`. Then **POST `/recipes/generate`**:
+
+   ```json
+   { "use_all": true, "count": 2 }
+   ```
+
+   Optional body flag `persist_generated: true` saves each generated recipe on the server (non-favorite). The server default is `DEFAULT_PERSIST_GENERATED_RECIPES` in `.env`.
 
 ### Where data is stored
 
@@ -177,9 +195,10 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 | POST | `/products` | Register a barcode product in the family catalog |
 | POST | `/scan/barcode` | UPC lookup + add to inventory or shopping list |
 | POST | `/inventory` | Manual pantry entry (no barcode — produce, bulk, etc.) |
-| POST | `/recipes/generate` | AI recipes from inventory |
+| POST | `/recipes/generate` | AI recipes from inventory (optional auto-save) |
 | GET/POST/DELETE | `/recipes/saved` | Store and browse family recipes |
 | GET/POST | `/shopping/lists` | Shopping trips and line items |
+| POST | `/shopping/from-recipe` | Missing recipe lines → list (skips pantry) |
 
 ## Usage flow
 

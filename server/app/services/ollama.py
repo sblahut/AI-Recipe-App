@@ -2,6 +2,7 @@ import json
 import re
 
 import httpx
+from pydantic import ValidationError
 
 from app.config import settings
 from app.schemas import GeneratedRecipe
@@ -48,7 +49,8 @@ async def generate_recipes(
     prompt = f"""You are a home chef. Create {count} practical recipes using primarily these pantry items.
 Return ONLY a JSON object with key "recipes" (array). Each recipe must have:
 title (string), servings (integer), prep_minutes (integer),
-ingredients (array of {{name, quantity}}), steps (array of strings),
+ingredients (array of {{name, quantity}} where quantity is a string like "2" or "1 cup"),
+steps (array of strings),
 uses_from_pantry (array of strings — subset of pantry item names used).
 
 Pantry:
@@ -79,6 +81,11 @@ Pantry:
             raise OllamaError("Unexpected JSON shape from model")
 
     recipes: list[GeneratedRecipe] = []
+    if not isinstance(recipes_raw, list):
+        raise OllamaError("Unexpected JSON shape from model")
     for item in recipes_raw:
-        recipes.append(GeneratedRecipe.model_validate(item))
+        try:
+            recipes.append(GeneratedRecipe.model_validate(item))
+        except ValidationError as e:
+            raise OllamaError(f"Model returned an invalid recipe: {e}") from e
     return recipes
