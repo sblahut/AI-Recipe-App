@@ -7,13 +7,19 @@ import { getUserPreferences } from "@/lib/userPreferences";
 export async function pickStorageLocation(title = "Storage location"): Promise<string | null> {
   const prefs = await getUserPreferences();
   const locations = [...BUILTIN_ZONES, ...prefs.customZones];
+  const defaultLoc = prefs.defaultStorageLocation?.trim() || null;
+
+  if (!prefs.promptForStorageLocation && defaultLoc && locations.includes(defaultLoc)) {
+    return defaultLoc;
+  }
+
   return new Promise((resolve) => {
     Alert.alert(
       title,
-      "Choose where these items go.",
+      defaultLoc ? `Default: ${defaultLoc}. Pick a location.` : "Choose where these items go.",
       [
         ...locations.map((loc) => ({
-          text: loc,
+          text: loc === defaultLoc ? `${loc} (default)` : loc,
           onPress: () => {
             resolve(loc);
           },

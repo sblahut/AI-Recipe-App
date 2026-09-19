@@ -145,8 +145,9 @@ export default function RecipesScreen() {
         method: "POST",
         body: JSON.stringify({
           use_all: true,
-          count: 3,
+          count: preferences.defaultRecipeCount ?? 3,
           persist_generated: preferences.autoPersistGeneratedRecipes,
+          prioritize_expiring: preferences.prioritizeExpiringWhenGenerating ?? true,
         }),
       });
       const parsed = recipeGenerateResponseSchema.parse(raw);

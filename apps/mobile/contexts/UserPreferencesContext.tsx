@@ -17,6 +17,7 @@ import {
   setUserPreferences,
   zoneNameTaken,
   type GroceryStore,
+  type ThemeMode,
   type UserPreferences,
 } from "@/lib/userPreferences";
 
@@ -30,6 +31,11 @@ type UserPreferencesContextValue = {
   updateStore: (store: GroceryStore) => Promise<void>;
   deleteStore: (id: string) => Promise<void>;
   setAutoPersistGeneratedRecipes: (enabled: boolean) => Promise<void>;
+  setThemeMode: (mode: ThemeMode) => Promise<void>;
+  setDefaultStorageLocation: (location: string | null) => Promise<void>;
+  setPromptForStorageLocation: (prompt: boolean) => Promise<void>;
+  setPrioritizeExpiringWhenGenerating: (enabled: boolean) => Promise<void>;
+  setDefaultRecipeCount: (count: number) => Promise<void>;
 };
 
 const UserPreferencesContext = createContext<UserPreferencesContextValue | null>(null);
@@ -125,6 +131,42 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     [persist, preferences],
   );
 
+  const setThemeMode = useCallback(
+    async (mode: ThemeMode) => {
+      await persist({ ...preferences, themeMode: mode });
+    },
+    [persist, preferences],
+  );
+
+  const setDefaultStorageLocation = useCallback(
+    async (location: string | null) => {
+      await persist({ ...preferences, defaultStorageLocation: location });
+    },
+    [persist, preferences],
+  );
+
+  const setPromptForStorageLocation = useCallback(
+    async (prompt: boolean) => {
+      await persist({ ...preferences, promptForStorageLocation: prompt });
+    },
+    [persist, preferences],
+  );
+
+  const setPrioritizeExpiringWhenGenerating = useCallback(
+    async (enabled: boolean) => {
+      await persist({ ...preferences, prioritizeExpiringWhenGenerating: enabled });
+    },
+    [persist, preferences],
+  );
+
+  const setDefaultRecipeCount = useCallback(
+    async (count: number) => {
+      const clamped = Math.min(10, Math.max(1, Math.round(count)));
+      await persist({ ...preferences, defaultRecipeCount: clamped });
+    },
+    [persist, preferences],
+  );
+
   const value = useMemo(
     () => ({
       preferences,
@@ -136,6 +178,11 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       updateStore,
       deleteStore,
       setAutoPersistGeneratedRecipes,
+      setThemeMode,
+      setDefaultStorageLocation,
+      setPromptForStorageLocation,
+      setPrioritizeExpiringWhenGenerating,
+      setDefaultRecipeCount,
     }),
     [
       preferences,
@@ -147,6 +194,11 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       updateStore,
       deleteStore,
       setAutoPersistGeneratedRecipes,
+      setThemeMode,
+      setDefaultStorageLocation,
+      setPromptForStorageLocation,
+      setPrioritizeExpiringWhenGenerating,
+      setDefaultRecipeCount,
     ],
   );
 
