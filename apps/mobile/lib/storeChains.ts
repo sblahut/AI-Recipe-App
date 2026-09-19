@@ -32,20 +32,48 @@ export function weeklyAdUrlForChain(chain: StoreChain): string | null {
   return WEEKLY_AD_URLS[chain];
 }
 
-export function weeklyAdUrlForStore(store: { chain: StoreChain; name: string }): string | null {
-  const fromChain = weeklyAdUrlForChain(store.chain);
-  if (fromChain) {
-    return fromChain;
-  }
-  const name = store.name.toLowerCase();
-  if (name.includes("publix")) return WEEKLY_AD_URLS.Publix;
-  if (name.includes("food lion")) return WEEKLY_AD_URLS["Food Lion"];
-  if (name.includes("walmart")) return WEEKLY_AD_URLS.Walmart;
-  if (name.includes("aldi")) return WEEKLY_AD_URLS.Aldi;
-  if (name.includes("lidl")) return WEEKLY_AD_URLS.Lidl;
-  if (name.includes("giant")) return WEEKLY_AD_URLS.Giant;
-  if (name.includes("harris teeter")) return WEEKLY_AD_URLS["Harris Teeter"];
-  if (name.includes("wegmans")) return WEEKLY_AD_URLS.Wegmans;
-  if (name.includes("target")) return WEEKLY_AD_URLS.Target;
+function inferChainFromStoreName(name: string): StoreChain | null {
+  const lower = name.toLowerCase();
+  if (lower.includes("publix")) return "Publix";
+  if (lower.includes("food lion")) return "Food Lion";
+  if (lower.includes("walmart")) return "Walmart";
+  if (lower.includes("aldi")) return "Aldi";
+  if (lower.includes("lidl")) return "Lidl";
+  if (lower.includes("giant")) return "Giant";
+  if (lower.includes("harris teeter")) return "Harris Teeter";
+  if (lower.includes("wegmans")) return "Wegmans";
+  if (lower.includes("target")) return "Target";
   return null;
+}
+
+/** Chain used for weekly-ad links (explicit chain on the store, or inferred from name). */
+export function weeklyAdChainForStore(store: { chain: StoreChain; name: string }): StoreChain | null {
+  if (weeklyAdUrlForChain(store.chain)) {
+    return store.chain;
+  }
+  return inferChainFromStoreName(store.name);
+}
+
+export function weeklyAdUrlForStore(store: { chain: StoreChain; name: string }): string | null {
+  const chain = weeklyAdChainForStore(store);
+  if (chain) {
+    return weeklyAdUrlForChain(chain);
+  }
+  return null;
+}
+
+/** Unique chains among saved stores that have a known weekly-ad URL. */
+export function weeklyAdChainsForStores(
+  stores: readonly { chain: StoreChain; name: string }[],
+): StoreChain[] {
+  const seen = new Set<StoreChain>();
+  const out: StoreChain[] = [];
+  for (const store of stores) {
+    const chain = weeklyAdChainForStore(store);
+    if (chain && !seen.has(chain)) {
+      seen.add(chain);
+      out.push(chain);
+    }
+  }
+  return out;
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
+import { Chip } from "@/components/ui/Chip";
 import { StorageFilterOption } from "@/components/StorageFilterOption";
 import { SwipeableRow } from "@/components/SwipeableRow";
 import { AppButton } from "@/components/ui/AppButton";
@@ -19,7 +20,8 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
 import { formatShoppingListShare, shareText } from "@/lib/shareContent";
 import { stockFromShoppingList } from "@/lib/stockFromShoppingList";
-import { PUBLIX_WEEKLY_AD } from "@/lib/storeChains";
+import { weeklyAdChainsForStores, weeklyAdChainForStore, weeklyAdUrlForChain } from "@/lib/storeChains";
+import type { StoreChain } from "@/lib/userPreferences";
 import {
   shoppingListDetailSchema,
   shoppingListSchema,
@@ -48,13 +50,32 @@ export default function ShoppingScreen() {
   const [itemFilter, setItemFilter] = useState<ItemFilter>("All");
   const [loading, setLoading] = useState(true);
 
-  const publixStores = useMemo(
-    () =>
-      preferences.stores.filter(
-        (store) => store.chain === "Publix" || /publix/i.test(store.name),
-      ),
+  const weeklyAdChains = useMemo(
+    () => weeklyAdChainsForStores(preferences.stores),
     [preferences.stores],
   );
+
+  const [weeklyAdChain, setWeeklyAdChain] = useState<StoreChain | null>(null);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setWeeklyAdChain((current) => {
+        if (current && weeklyAdChains.includes(current)) {
+          return current;
+        }
+        return weeklyAdChains[0] ?? null;
+      });
+    });
+  }, [weeklyAdChains]);
+
+  const storesForWeeklyChain = useMemo(() => {
+    if (!weeklyAdChain) {
+      return [];
+    }
+    return preferences.stores.filter(
+      (store) => weeklyAdChainForStore(store) === weeklyAdChain,
+    );
+  }, [preferences.stores, weeklyAdChain]);
 
   const loadLists = useCallback(async () => {
     const raw = await apiJson<unknown>("/shopping/lists", { baseUrl: serverUrl });
@@ -200,9 +221,17 @@ export default function ShoppingScreen() {
     await shareText(detail.name, formatShoppingListShare(detail));
   };
 
-  const openPublixAd = () => {
-    void openExternalUrl(PUBLIX_WEEKLY_AD).catch((e: unknown) => {
-      Alert.alert("Could not open Publix", e instanceof Error ? e.message : "Unknown error");
+  const openWeeklyAd = () => {
+    if (!weeklyAdChain) {
+      return;
+    }
+    const url = weeklyAdUrlForChain(weeklyAdChain);
+    if (!url) {
+      Alert.alert("Weekly ad", `No weekly ad link for ${weeklyAdChain}.`);
+      return;
+    }
+    void openExternalUrl(url).catch((e: unknown) => {
+      Alert.alert("Weekly ad", e instanceof Error ? e.message : "Could not open weekly ad");
     });
   };
 
@@ -310,21 +339,51 @@ export default function ShoppingScreen() {
 
           <View style={styles.sectionPad}>
             <Card>
-              <Text style={[styles.dealTitle, { color: colors.text }]}>Publix weekly BOGOs</Text>
-              <AppButton label="Open Publix weekly ad" compact onPress={openPublixAd} />
-              {publixStores.map((store) => (
-                <AppButton
-                  key={store.id}
-                  label={store.address ? `Directions to ${store.name}` : store.name}
-                  variant="secondary"
-                  compact
-                  onPress={() => {
-                    void openAddressInMaps(store.address || store.name).catch((e: unknown) => {
-                      Alert.alert("Maps", e instanceof Error ? e.message : "Could not open maps");
-                    });
-                  }}
-                />
-              ))}
+              <Text style={[styles.dealTitle, { color: colors.text }]}>Weekly ad</Text>
+              {weeklyAdChains.length === 0 ? (
+                <Text style={[styles.dealHint, { color: colors.textMuted }]}>
+                  Add favorite stores in Settings and set each store&apos;s chain (e.g. Publix, Food
+                  Lion) to open that chain&apos;s weekly ad here.
+                </Text>
+              ) : (
+                <>
+                  <Text style={[styles.dealHint, { color: colors.textMuted }]}>
+                    Chain comes from Settings → Favorite grocery stores. Links open the chain site
+                    (you may pick your store on their page).
+                  </Text>
+                  <View style={styles.chainRow}>
+                    {weeklyAdChains.map((chain) => (
+                      <Chip
+                        key={chain}
+                        label={chain}
+                        selected={weeklyAdChain === chain}
+                        capitalize={false}
+                        onPress={() => setWeeklyAdChain(chain)}
+                      />
+                    ))}
+                  </View>
+                  <AppButton
+                    label={
+                      weeklyAdChain ? `Open ${weeklyAdChain} weekly ad` : "Open weekly ad"
+                    }
+                    compact
+                    onPress={openWeeklyAd}
+                  />
+                  {storesForWeeklyChain.map((store) => (
+                    <AppButton
+                      key={store.id}
+                      label={store.address ? `Directions to ${store.name}` : store.name}
+                      variant="secondary"
+                      compact
+                      onPress={() => {
+                        void openAddressInMaps(store.address || store.name).catch((e: unknown) => {
+                          Alert.alert("Maps", e instanceof Error ? e.message : "Could not open maps");
+                        });
+                      }}
+                    />
+                  ))}
+                </>
+              )}
             </Card>
           </View>
 
@@ -422,6 +481,13 @@ const styles = StyleSheet.create({
   itemToolbar: { marginBottom: spacing.sm },
   actionsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
   dealTitle: typography.headline,
+  dealHint: { ...typography.caption, lineHeight: 18, marginTop: spacing.xs },
+  chainRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginVertical: spacing.sm,
+  },
   filterSection: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
