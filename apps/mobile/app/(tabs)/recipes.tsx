@@ -13,6 +13,8 @@ import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { recipeToIngredientCreates } from "@/lib/recipeIngredients";
+import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
+import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
 import {
   recipeGenerateResponseSchema,
   savedRecipeReadSchema,
@@ -172,6 +174,7 @@ export default function RecipesScreen() {
           onSave={() => void saveRecipe(recipe)}
           onAddIngredients={() => void addRecipeToIngredients(recipe)}
           onAddShopping={() => void addRecipeToShoppingList(recipe)}
+          onStock={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
         />
       ))}
 
@@ -193,6 +196,7 @@ export default function RecipesScreen() {
               onSave={() => void saveRecipe(item.recipe)}
               onAddIngredients={() => void addRecipeToIngredients(item.recipe)}
               onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
+              onStock={() => void stockFromSavedRecipe(item.id, serverUrl)}
               saveLabel="Save again"
             />
           )}
@@ -210,6 +214,7 @@ type RecipeCardProps = {
   onSave: () => void;
   onAddIngredients: () => void;
   onAddShopping: () => void;
+  onStock: () => void;
   saveLabel?: string;
 };
 
@@ -221,6 +226,7 @@ function RecipeCard({
   onSave,
   onAddIngredients,
   onAddShopping,
+  onStock,
   saveLabel = "Save recipe",
 }: RecipeCardProps) {
   const title = titleOverride ?? recipe.title;
@@ -241,6 +247,7 @@ function RecipeCard({
         <AppButton label={saveLabel} variant="secondary" compact onPress={onSave} />
         <AppButton label="→ Ingredients" compact onPress={onAddIngredients} />
         <AppButton label="→ Shopping" variant="accent" compact onPress={onAddShopping} />
+        <AppButton label="Stock + scan" variant="secondary" compact onPress={onStock} />
       </View>
     </Card>
   );

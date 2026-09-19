@@ -60,7 +60,13 @@ def _apply_sqlite_migrations() -> None:
 
 def init_db() -> None:
     from app import models  # noqa: F401
+    from app.services.product_seed import seed_sample_products_if_empty
 
     (SERVER_ROOT / "data").mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     _apply_sqlite_migrations()
+    db = SessionLocal()
+    try:
+        seed_sample_products_if_empty(db)
+    finally:
+        db.close()

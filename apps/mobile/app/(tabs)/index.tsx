@@ -1,12 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,16 +12,18 @@ import {
 import { z } from "zod";
 
 import { PantryItemForm } from "@/components/PantryItemForm";
+import { StorageFilterOption } from "@/components/StorageFilterOption";
 import { AppButton } from "@/components/ui/AppButton";
 import { Card } from "@/components/ui/Card";
-import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
-import { formatLocationLabel, type InventoryLocationPreset } from "@/constants/inventoryLocations";
+import { formatLocationLabel } from "@/constants/inventoryLocations";
+import { STORAGE_FILTERS, type StorageFilterId } from "@/constants/storageFilters";
 import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
+import { startIngredientScan } from "@/lib/startIngredientScan";
 import {
   ingredientSchema,
   quantityUnitsSchema,
@@ -38,8 +38,6 @@ const defaultUnits: Record<QuantityKind, string[]> = {
   volume: ["ml"],
 };
 
-type LocationFilter = "All" | "Unassigned" | InventoryLocationPreset;
-
 export default function IngredientsScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
@@ -49,7 +47,7 @@ export default function IngredientsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Ingredient | null>(null);
-  const [locationFilter, setLocationFilter] = useState<LocationFilter>("All");
+  const [locationFilter, setLocationFilter] = useState<StorageFilterId>("All");
 
   const loadUnits = useCallback(async () => {
     try {
@@ -85,6 +83,27 @@ export default function IngredientsScreen() {
     });
   }, [refresh]);
 
+  const countByFilter = useMemo(() => {
+    const counts = new Map<StorageFilterId, number>();
+    for (const filter of STORAGE_FILTERS) {
+      counts.set(filter.id, 0);
+    }
+    for (const item of items) {
+      counts.set("All", (counts.get("All") ?? 0) + 1);
+      const loc = item.location?.trim() ?? "";
+      if (!loc) {
+        counts.set("Unassigned", (counts.get("Unassigned") ?? 0) + 1);
+        continue;
+      }
+      if (loc === "Fridge" || loc === "Pantry" || loc === "Freezer") {
+        counts.set(loc, (counts.get(loc) ?? 0) + 1);
+      } else {
+        counts.set("Other", (counts.get("Other") ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [items]);
+
   const filteredItems = useMemo(() => {
     if (locationFilter === "All") {
       return items;
@@ -95,12 +114,7 @@ export default function IngredientsScreen() {
     return items.filter((item) => {
       const loc = item.location?.trim() ?? "";
       if (locationFilter === "Other") {
-        return (
-          loc.length > 0 &&
-          loc !== "Fridge" &&
-          loc !== "Pantry" &&
-          loc !== "Freezer"
-        );
+        return loc.length > 0 && loc !== "Fridge" && loc !== "Pantry" && loc !== "Freezer";
       }
       return loc === locationFilter;
     });
@@ -173,8 +187,6 @@ export default function IngredientsScreen() {
     );
   }
 
-  const filterOptions: LocationFilter[] = ["All", "Fridge", "Pantry", "Freezer", "Other", "Unassigned"];
-
   return (
     <Screen padded={false}>
       <View style={styles.toolbar}>
@@ -184,24 +196,23 @@ export default function IngredientsScreen() {
           variant="accent"
           compact
           style={styles.toolbarBtn}
-          onPress={() => router.push("/scan")}
+          onPress={() => void startIngredientScan()}
         />
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filters}
-      >
-        {filterOptions.map((filter) => (
-          <Chip
-            key={filter}
-            label={filter}
-            selected={locationFilter === filter}
-            onPress={() => setLocationFilter(filter)}
+      <View style={styles.filterSection}>
+        <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
+        {STORAGE_FILTERS.map((filter) => (
+          <StorageFilterOption
+            key={filter.id}
+            label={filter.label}
+            icon={filter.icon}
+            selected={locationFilter === filter.id}
+            count={countByFilter.get(filter.id) ?? 0}
+            onPress={() => setLocationFilter(filter.id)}
           />
         ))}
-      </ScrollView>
+      </View>
 
       <FlatList
         data={filteredItems}
@@ -213,7 +224,7 @@ export default function IngredientsScreen() {
         ListEmptyComponent={
           <EmptyState
             title={locationFilter === "All" ? "No ingredients yet" : "Nothing in this location"}
-            subtitle="Add manually, scan a barcode, or change the filter above."
+            subtitle="Add manually, scan a barcode, or pick another storage filter."
           />
         }
         renderItem={({ item }) => (
@@ -255,10 +266,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   toolbarBtn: { flex: 1 },
-  filters: {
-    gap: spacing.sm,
+  filterSection: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
+    gap: 2,
+  },
+  filterHeading: {
+    ...typography.caption,
+    fontWeight: "600",
+    marginBottom: spacing.xs,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
   listEmpty: { flexGrow: 1 },

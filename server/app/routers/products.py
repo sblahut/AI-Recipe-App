@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import Ingredient, Product, ShoppingList, ShoppingListItem
 from app.schemas import BarcodeScanRequest, BarcodeScanResponse, ProductCreate, ProductRead
 from app.services.barcode import normalize_barcode
+from app.services.openfoodfacts_lookup import lookup_product_name
 from app.units import default_unit
 
 router = APIRouter(tags=["products"])
@@ -83,6 +84,18 @@ def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> Bar
     code = normalize_barcode(body.barcode)
     product = db.get(Product, code)
 
+    if product is None and not body.manual_name:
+        looked_up = lookup_product_name(code)
+        if looked_up:
+            off_name, off_brand = looked_up
+            product = _upsert_product(
+                db,
+                barcode=code,
+                name=off_name,
+                brand=off_brand,
+                source="openfoodfacts_api",
+            )
+
     if body.manual_name and body.register_product:
         product = _upsert_product(
             db,
@@ -108,6 +121,7 @@ def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> Bar
             quantity_kind=quantity_kind,
             unit=unit,
             barcode=code,
+            location=body.location.strip() if body.location and body.location.strip() else None,
         )
         db.add(row)
         db.commit()

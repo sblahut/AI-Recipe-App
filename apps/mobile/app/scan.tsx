@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router, useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -10,11 +10,14 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiJson } from "@/lib/api";
-import { barcodeScanResponseSchema } from "@/lib/schemas";
+import { barcodeScanResponseSchema, savedRecipeReadSchema } from "@/lib/schemas";
 
 type ScanParams = {
   target?: string;
   listId?: string;
+  location?: string;
+  continuous?: string;
+  savedRecipeId?: string;
 };
 
 export default function ScanScreen() {
@@ -23,12 +26,45 @@ export default function ScanScreen() {
   const params = useLocalSearchParams<ScanParams>();
   const target = params.target === "shopping_list" ? "shopping_list" : "inventory";
   const listId = params.listId ? Number(params.listId) : undefined;
+  const storageLocation = params.location?.trim() || undefined;
+  const continuous = params.continuous === "1";
+  const savedRecipeId = params.savedRecipeId ? Number(params.savedRecipeId) : undefined;
 
   const [permission, requestPermission] = useCameraPermissions();
   const [manualName, setManualName] = useState("");
   const [lastBarcode, setLastBarcode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [lastAdded, setLastAdded] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState<string[]>([]);
   const handled = useRef<string | null>(null);
+  const cooldown = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (savedRecipeId == null) {
+      return;
+    }
+    void (async () => {
+      try {
+        const raw = await apiJson<unknown>(`/recipes/saved/${savedRecipeId}`, {
+          baseUrl: serverUrl,
+        });
+        const saved = savedRecipeReadSchema.parse(raw);
+        setChecklist(saved.recipe.ingredients.map((line) => line.name));
+      } catch {
+        setChecklist([]);
+      }
+    })();
+  }, [savedRecipeId, serverUrl]);
+
+  const releaseScanner = () => {
+    if (cooldown.current) {
+      clearTimeout(cooldown.current);
+    }
+    cooldown.current = setTimeout(() => {
+      handled.current = null;
+      cooldown.current = null;
+    }, 1500);
+  };
 
   const submitBarcode = async (barcode: string, nameOverride?: string) => {
     setBusy(true);
@@ -45,6 +81,9 @@ export default function ScanScreen() {
       if (target === "shopping_list" && listId != null) {
         body.shopping_list_id = listId;
       }
+      if (target === "inventory" && storageLocation) {
+        body.location = storageLocation;
+      }
 
       const raw = await apiJson<unknown>("/scan/barcode", {
         baseUrl: serverUrl,
@@ -55,15 +94,27 @@ export default function ScanScreen() {
 
       if (parsed.unknown && !nameOverride) {
         setLastBarcode(barcode);
-        Alert.alert("Unknown barcode", "Enter a name below to add and optionally save to catalog.");
+        Alert.alert(
+          "Unknown barcode",
+          "Not in your UPC catalog yet. Enter a name to add and save it for next time.",
+        );
         return;
       }
 
-      Alert.alert("Added", `Barcode ${parsed.barcode}`, [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      const label = parsed.product?.name ?? parsed.barcode;
+      setLastAdded(label);
+      setLastBarcode(null);
+      setManualName("");
+
+      if (continuous) {
+        releaseScanner();
+        return;
+      }
+
+      Alert.alert("Added", label, [{ text: "OK", onPress: () => router.back() }]);
     } catch (e) {
       Alert.alert("Scan failed", e instanceof Error ? e.message : "Unknown error");
+      releaseScanner();
     } finally {
       setBusy(false);
     }
@@ -88,6 +139,15 @@ export default function ScanScreen() {
     );
   }
 
+  const hint =
+    busy && lastAdded
+      ? `Added ${lastAdded}`
+      : busy
+        ? "Adding…"
+        : storageLocation
+          ? `Scan into ${storageLocation} · stays open for multiple scans`
+          : "Point at a barcode inside the frame";
+
   return (
     <View style={styles.container}>
       <CameraView
@@ -104,6 +164,22 @@ export default function ScanScreen() {
         }
       />
       <View style={[styles.frameHint, { borderColor: colors.primary }]} pointerEvents="none" />
+
+      {checklist.length > 0 ? (
+        <View style={styles.checklistWrap}>
+          <Card padded style={styles.checklistCard}>
+            <Text style={[styles.checklistTitle, { color: colors.text }]}>Recipe items</Text>
+            <ScrollView style={styles.checklistScroll} nestedScrollEnabled>
+              {checklist.map((name) => (
+                <Text key={name} style={[styles.checklistLine, { color: colors.textSecondary }]}>
+                  · {name}
+                </Text>
+              ))}
+            </ScrollView>
+          </Card>
+        </View>
+      ) : null}
+
       {lastBarcode ? (
         <View style={styles.manualWrap}>
           <Card>
@@ -115,7 +191,7 @@ export default function ScanScreen() {
               onChangeText={setManualName}
             />
             <AppButton
-              label="Add & save to catalog"
+              label="Add & save to UPC catalog"
               onPress={() => {
                 if (!manualName.trim()) return;
                 void submitBarcode(lastBarcode, manualName.trim());
@@ -125,9 +201,10 @@ export default function ScanScreen() {
         </View>
       ) : (
         <View style={styles.hintBar}>
-          <Text style={[styles.hintText, { color: colors.text }]}>
-            {busy ? "Adding…" : "Point at a barcode inside the frame"}
-          </Text>
+          <Text style={[styles.hintText, { color: colors.text }]}>{hint}</Text>
+          {continuous ? (
+            <AppButton label="Done scanning" variant="secondary" compact onPress={() => router.back()} />
+          ) : null}
         </View>
       )}
     </View>
@@ -137,11 +214,17 @@ export default function ScanScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   camera: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg, gap: spacing.md },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
   message: { textAlign: "center", ...typography.body },
   frameHint: {
     position: "absolute",
-    top: "28%",
+    top: "22%",
     alignSelf: "center",
     width: "72%",
     height: 120,
@@ -149,6 +232,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderStyle: "dashed",
   },
+  checklistWrap: {
+    position: "absolute",
+    top: spacing.lg,
+    left: spacing.lg,
+    right: spacing.lg,
+    maxHeight: 140,
+  },
+  checklistCard: { gap: spacing.xs },
+  checklistTitle: { ...typography.caption, fontWeight: "700" },
+  checklistScroll: { maxHeight: 100 },
+  checklistLine: { ...typography.caption, lineHeight: 18 },
   hintBar: {
     position: "absolute",
     bottom: spacing.xl,
@@ -157,6 +251,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.92)",
     padding: spacing.md,
     borderRadius: radius.md,
+    gap: spacing.sm,
   },
   hintText: { textAlign: "center", ...typography.label },
   manualWrap: {

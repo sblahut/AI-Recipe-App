@@ -13,6 +13,7 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
+import { stockFromShoppingList } from "@/lib/stockFromShoppingList";
 import {
   shoppingListDetailSchema,
   shoppingListSchema,
@@ -234,6 +235,13 @@ export default function ShoppingScreen() {
                   params: { target: "shopping_list", listId: String(selectedId) },
                 })
               }
+            />
+          </View>
+
+          <View style={styles.sectionPad}>
+            <AppButton
+              label="Stock list into ingredients"
+              onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
             />
           </View>
 

@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from app.schemas import QuantityUnitsResponse
+from app.database import get_db
+from app.models import Product
+from app.schemas import ProductCatalogStats, QuantityUnitsResponse
 from app.units import UNITS_BY_KIND, QuantityKind
 
 router = APIRouter(prefix="/meta", tags=["meta"])
@@ -12,3 +15,12 @@ def quantity_units() -> QuantityUnitsResponse:
         kind: list(units) for kind, units in UNITS_BY_KIND.items()
     }
     return QuantityUnitsResponse(kinds=kinds)
+
+
+@router.get("/product-catalog", response_model=ProductCatalogStats)
+def product_catalog_stats(db: Session = Depends(get_db)) -> ProductCatalogStats:
+    count = db.query(Product).count()
+    sample_count = (
+        db.query(Product).filter(Product.source == "sample").count() if count else 0
+    )
+    return ProductCatalogStats(product_count=count, sample_seeded=sample_count > 0)
