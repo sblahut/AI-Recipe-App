@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -17,6 +18,7 @@ import {
   shoppingListSchema,
   type ShoppingList,
   type ShoppingListDetail,
+  type ShoppingListItem,
 } from "@/lib/schemas";
 
 export default function ShoppingScreen() {
@@ -75,6 +77,30 @@ export default function ShoppingScreen() {
     }
   };
 
+  const deleteList = (list: ShoppingList) => {
+    Alert.alert("Delete list", `Remove "${list.name}" and all its items?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            try {
+              await apiFetch(`/shopping/lists/${list.id}`, { baseUrl: serverUrl, method: "DELETE" });
+              if (selectedId === list.id) {
+                setSelectedId(null);
+                setDetail(null);
+              }
+              await loadLists();
+            } catch (e) {
+              Alert.alert("Delete failed", e instanceof Error ? e.message : "Unknown error");
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
   const addItem = async () => {
     if (selectedId == null) return;
     const name = newItemName.trim();
@@ -96,6 +122,32 @@ export default function ShoppingScreen() {
     );
     await loadDetail(selectedId);
   };
+
+  const deleteItem = (item: ShoppingListItem) => {
+    if (selectedId == null) return;
+    Alert.alert("Remove item", `Remove ${item.name}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            try {
+              await apiFetch(`/shopping/lists/${selectedId}/items/${item.id}`, {
+                baseUrl: serverUrl,
+                method: "DELETE",
+              });
+              await loadDetail(selectedId);
+            } catch (e) {
+              Alert.alert("Remove failed", e instanceof Error ? e.message : "Unknown error");
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
+  const selectedList = lists.find((list) => list.id === selectedId);
 
   if (loading) {
     return <Screen loading />;
@@ -128,6 +180,7 @@ export default function ShoppingScreen() {
           return (
             <Pressable
               onPress={() => selectList(item.id)}
+              onLongPress={() => deleteList(item)}
               style={({ pressed }) => [
                 styles.chip,
                 {
@@ -152,6 +205,15 @@ export default function ShoppingScreen() {
 
       {selectedId != null ? (
         <>
+          <View style={[styles.sectionPad, styles.listHeader]}>
+            <Text style={[styles.listTitle, { color: colors.text }]}>{selectedList?.name}</Text>
+            {selectedList ? (
+              <Pressable onPress={() => deleteList(selectedList)} hitSlop={8}>
+                <Text style={[styles.deleteList, { color: colors.danger }]}>Delete list</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
           <View style={[styles.sectionPad, styles.row, styles.itemToolbar]}>
             <View style={styles.flex}>
               <AppTextField
@@ -183,35 +245,44 @@ export default function ShoppingScreen() {
               <EmptyState title="Nothing on this list yet" subtitle="Add items or scan barcodes." />
             }
             renderItem={({ item }) => (
-              <Pressable onPress={() => void toggleItem(item.id, item.checked)}>
-                <Card style={styles.itemCard}>
-                  <View style={styles.checkRow}>
-                    <View
-                      style={[
-                        styles.checkbox,
-                        {
-                          borderColor: item.checked ? colors.primary : colors.border,
-                          backgroundColor: item.checked ? colors.primary : colors.surface,
-                        },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.itemText,
-                        { color: colors.text },
-                        item.checked && { color: colors.textMuted, textDecorationLine: "line-through" },
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                  </View>
-                </Card>
-              </Pressable>
+              <Card style={styles.itemCard}>
+                <Pressable
+                  onPress={() => void toggleItem(item.id, item.checked)}
+                  style={styles.checkRow}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      {
+                        borderColor: item.checked ? colors.primary : colors.border,
+                        backgroundColor: item.checked ? colors.primary : colors.surface,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.itemText,
+                      { color: colors.text },
+                      item.checked && { color: colors.textMuted, textDecorationLine: "line-through" },
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel={`Remove ${item.name}`}
+                  onPress={() => deleteItem(item)}
+                  hitSlop={8}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <Ionicons name="close-circle-outline" size={22} color={colors.textMuted} />
+                </Pressable>
+              </Card>
             )}
           />
         </>
       ) : (
-        <EmptyState title="Select or create a list" subtitle="Lists help you track what to buy on your next trip." />
+        <EmptyState title="Select or create a list" subtitle="Long-press a list chip to delete it." />
       )}
     </Screen>
   );
@@ -229,10 +300,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: { ...typography.caption, fontWeight: "600" },
+  listHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: spacing.sm,
+  },
+  listTitle: typography.headline,
+  deleteList: { ...typography.caption, fontWeight: "600" },
   itemToolbar: { marginBottom: spacing.sm },
   itemsList: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
-  itemCard: { marginBottom: spacing.xs },
-  checkRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  itemCard: {
+    marginBottom: spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  checkRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },
   checkbox: {
     width: 22,
     height: 22,

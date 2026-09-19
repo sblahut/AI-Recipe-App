@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Chip } from "@/components/ui/Chip";
 import { Screen } from "@/components/ui/Screen";
+import { INVENTORY_LOCATIONS, type InventoryLocationPreset } from "@/constants/inventoryLocations";
 import { spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { Ingredient, IngredientCreate, QuantityKind } from "@/lib/schemas";
@@ -14,17 +15,39 @@ type Props = {
   unitsByKind: Record<QuantityKind, string[]>;
   onSubmit: (payload: IngredientCreate) => Promise<void>;
   onCancel: () => void;
+  onDelete?: () => void;
 };
 
-export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel }: Props) {
+function initialLocationState(location: string | null | undefined): {
+  preset: InventoryLocationPreset | "None";
+  custom: string;
+} {
+  if (!location?.trim()) {
+    return { preset: "Pantry", custom: "" };
+  }
+  const match = INVENTORY_LOCATIONS.find((loc) => loc === location);
+  if (match && match !== "Other") {
+    return { preset: match, custom: "" };
+  }
+  if (location === "Other") {
+    return { preset: "Other", custom: "" };
+  }
+  return { preset: "Other", custom: location };
+}
+
+export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDelete }: Props) {
   const { colors } = useAppTheme();
+  const locInit = useMemo(() => initialLocationState(initial?.location), [initial?.location]);
   const [name, setName] = useState(initial?.name ?? "");
   const [quantityKind, setQuantityKind] = useState<QuantityKind>(
     initial?.quantity_kind ?? "count",
   );
   const [unit, setUnit] = useState(initial?.unit ?? unitsByKind.count[0] ?? "each");
   const [quantity, setQuantity] = useState(initial?.quantity?.toString() ?? "");
-  const [location, setLocation] = useState(initial?.location ?? "");
+  const [locationPreset, setLocationPreset] = useState<InventoryLocationPreset | "None">(
+    locInit.preset === "Other" ? "Other" : locInit.preset,
+  );
+  const [customLocation, setCustomLocation] = useState(locInit.custom);
   const [saving, setSaving] = useState(false);
 
   const selectKind = (kind: QuantityKind) => {
@@ -33,6 +56,16 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel }: Pro
     if (units.length > 0) {
       setUnit(units[0] ?? "each");
     }
+  };
+
+  const resolvedLocation = (): string | null => {
+    if (locationPreset === "None") {
+      return null;
+    }
+    if (locationPreset === "Other") {
+      return customLocation.trim() || null;
+    }
+    return locationPreset;
   };
 
   const submit = async () => {
@@ -44,7 +77,7 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel }: Pro
         quantity_kind: quantityKind,
         unit,
         quantity: parsedQty,
-        location: location.trim() || null,
+        location: resolvedLocation(),
       });
     } finally {
       setSaving(false);
@@ -54,10 +87,35 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel }: Pro
   return (
     <Screen scroll>
       <Text style={[styles.heading, { color: colors.text }]}>
-        {initial ? "Edit item" : "Add to pantry"}
+        {initial ? "Edit ingredient" : "Add ingredient"}
       </Text>
 
       <AppTextField label="Name" value={name} onChangeText={setName} autoFocus={!initial} />
+
+      <Text style={[styles.label, { color: colors.text }]}>Storage</Text>
+      <View style={styles.chipRowWrap}>
+        <Chip
+          label="None"
+          selected={locationPreset === "None"}
+          onPress={() => setLocationPreset("None")}
+        />
+        {INVENTORY_LOCATIONS.map((loc) => (
+          <Chip
+            key={loc}
+            label={loc}
+            selected={locationPreset === loc}
+            onPress={() => setLocationPreset(loc)}
+          />
+        ))}
+      </View>
+      {locationPreset === "Other" ? (
+        <AppTextField
+          label="Custom location"
+          value={customLocation}
+          onChangeText={setCustomLocation}
+          placeholder="Garage, spice rack…"
+        />
+      ) : null}
 
       <Text style={[styles.label, { color: colors.text }]}>Kind</Text>
       <View style={styles.chipRow}>
@@ -86,16 +144,14 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel }: Pro
         ))}
       </View>
 
-      <AppTextField
-        label="Location"
-        value={location}
-        onChangeText={setLocation}
-        placeholder="Pantry, fridge, freezer…"
-      />
-
       <View style={styles.actions}>
-        <AppButton label="Cancel" variant="ghost" onPress={onCancel} />
-        <AppButton label="Save" loading={saving} onPress={() => void submit()} style={styles.saveBtn} />
+        {initial && onDelete ? (
+          <AppButton label="Delete" variant="ghost" onPress={onDelete} style={styles.deleteBtn} />
+        ) : null}
+        <View style={styles.actionRight}>
+          <AppButton label="Cancel" variant="ghost" onPress={onCancel} />
+          <AppButton label="Save" loading={saving} onPress={() => void submit()} style={styles.saveBtn} />
+        </View>
       </View>
     </Screen>
   );
@@ -108,10 +164,11 @@ const styles = StyleSheet.create({
   chipRowWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   actions: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: spacing.sm,
     marginTop: spacing.lg,
   },
-  saveBtn: { minWidth: 120 },
+  actionRight: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  saveBtn: { minWidth: 100 },
+  deleteBtn: { marginRight: "auto" },
 });

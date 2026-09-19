@@ -48,6 +48,7 @@
     "babel-preset-expo": "~57.0.0",
     "eslint": "^8.57.1",
     "eslint-config-expo": "~57.0.2",
+    "eslint-import-resolver-typescript": "^4.4.5",
     "typescript": "~6.0.3"
   }
 }

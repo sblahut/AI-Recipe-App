@@ -1,10 +1,12 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,8 +16,10 @@ import { z } from "zod";
 import { PantryItemForm } from "@/components/PantryItemForm";
 import { AppButton } from "@/components/ui/AppButton";
 import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
+import { formatLocationLabel, type InventoryLocationPreset } from "@/constants/inventoryLocations";
 import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -34,7 +38,9 @@ const defaultUnits: Record<QuantityKind, string[]> = {
   volume: ["ml"],
 };
 
-export default function PantryScreen() {
+type LocationFilter = "All" | "Unassigned" | InventoryLocationPreset;
+
+export default function IngredientsScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
   const [items, setItems] = useState<Ingredient[]>([]);
@@ -43,6 +49,7 @@ export default function PantryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Ingredient | null>(null);
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>("All");
 
   const loadUnits = useCallback(async () => {
     try {
@@ -65,7 +72,7 @@ export default function PantryScreen() {
     try {
       await Promise.all([loadUnits(), loadInventory()]);
     } catch (e) {
-      Alert.alert("Error", e instanceof Error ? e.message : "Failed to load pantry");
+      Alert.alert("Error", e instanceof Error ? e.message : "Failed to load ingredients");
     } finally {
       setRefreshing(false);
       setLoading(false);
@@ -77,6 +84,27 @@ export default function PantryScreen() {
       void refresh();
     });
   }, [refresh]);
+
+  const filteredItems = useMemo(() => {
+    if (locationFilter === "All") {
+      return items;
+    }
+    if (locationFilter === "Unassigned") {
+      return items.filter((item) => !item.location?.trim());
+    }
+    return items.filter((item) => {
+      const loc = item.location?.trim() ?? "";
+      if (locationFilter === "Other") {
+        return (
+          loc.length > 0 &&
+          loc !== "Fridge" &&
+          loc !== "Pantry" &&
+          loc !== "Freezer"
+        );
+      }
+      return loc === locationFilter;
+    });
+  }, [items, locationFilter]);
 
   const saveItem = async (payload: IngredientCreate) => {
     try {
@@ -103,15 +131,23 @@ export default function PantryScreen() {
   };
 
   const deleteItem = (item: Ingredient) => {
-    Alert.alert("Delete item", `Remove ${item.name}?`, [
+    Alert.alert("Delete ingredient", `Remove ${item.name}?`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
         onPress: () => {
           void (async () => {
-            await apiFetch(`/inventory/${item.id}`, { baseUrl: serverUrl, method: "DELETE" });
-            await loadInventory();
+            try {
+              await apiFetch(`/inventory/${item.id}`, { baseUrl: serverUrl, method: "DELETE" });
+              if (editing?.id === item.id) {
+                setEditing(null);
+                setShowForm(false);
+              }
+              await loadInventory();
+            } catch (e) {
+              Alert.alert("Delete failed", e instanceof Error ? e.message : "Unknown error");
+            }
           })();
         },
       },
@@ -132,9 +168,12 @@ export default function PantryScreen() {
           setShowForm(false);
           setEditing(null);
         }}
+        {...(editing ? { onDelete: () => deleteItem(editing) } : {})}
       />
     );
   }
+
+  const filterOptions: LocationFilter[] = ["All", "Fridge", "Pantry", "Freezer", "Other", "Unassigned"];
 
   return (
     <Screen padded={false}>
@@ -149,33 +188,54 @@ export default function PantryScreen() {
         />
       </View>
 
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filters}
+      >
+        {filterOptions.map((filter) => (
+          <Chip
+            key={filter}
+            label={filter}
+            selected={locationFilter === filter}
+            onPress={() => setLocationFilter(filter)}
+          />
+        ))}
+      </ScrollView>
+
       <FlatList
-        data={items}
+        data={filteredItems}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={items.length === 0 ? styles.listEmpty : styles.list}
+        contentContainerStyle={filteredItems.length === 0 ? styles.listEmpty : styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
         }
         ListEmptyComponent={
           <EmptyState
-            title="Your pantry is empty"
-            subtitle="Add items manually or scan a barcode to get started."
+            title={locationFilter === "All" ? "No ingredients yet" : "Nothing in this location"}
+            subtitle="Add manually, scan a barcode, or change the filter above."
           />
         }
         renderItem={({ item }) => (
-          <Pressable
-            onPress={() => setEditing(item)}
-            onLongPress={() => deleteItem(item)}
-            style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}
-          >
-            <Card style={styles.row}>
+          <Card style={styles.row}>
+            <Pressable
+              onPress={() => setEditing(item)}
+              style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
+            >
               <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
               <Text style={[styles.meta, { color: colors.textMuted }]}>
-                {formatQty(item)}
-                {item.location ? ` · ${item.location}` : ""}
+                {formatQty(item)} · {formatLocationLabel(item.location)}
               </Text>
-            </Card>
-          </Pressable>
+            </Pressable>
+            <Pressable
+              accessibilityLabel={`Delete ${item.name}`}
+              hitSlop={8}
+              onPress={() => deleteItem(item)}
+              style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+            </Pressable>
+          </Card>
         )}
       />
     </Screen>
@@ -195,9 +255,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   toolbarBtn: { flex: 1 },
+  filters: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
   listEmpty: { flexGrow: 1 },
-  row: { marginBottom: spacing.sm },
+  row: {
+    marginBottom: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  rowMain: { flex: 1 },
+  deleteIcon: { padding: spacing.sm },
   name: typography.headline,
   meta: { ...typography.caption, marginTop: 2 },
 });

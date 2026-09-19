@@ -39,7 +39,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: "Pantry", tabBarIcon: tabIcon("nutrition-outline") }}
+        options={{ title: "Ingredients", tabBarIcon: tabIcon("nutrition-outline") }}
       />
       <Tabs.Screen
         name="recipes"
