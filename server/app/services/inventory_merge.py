@@ -6,7 +6,9 @@ from app.services.ingredient_names import ingredient_names_match
 from app.units import QuantityKind, default_unit, normalize_unit
 
 
-def _units_compatible(kind: QuantityKind, existing_unit: str | None, incoming_unit: str | None) -> bool:
+def _units_compatible(
+    kind: QuantityKind, existing_unit: str | None, incoming_unit: str | None
+) -> bool:
     eu = normalize_unit(existing_unit) if existing_unit else default_unit(kind)
     iu = normalize_unit(incoming_unit) if incoming_unit else default_unit(kind)
     return eu == iu

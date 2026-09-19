@@ -13,9 +13,7 @@ def _pantry_covers_line(
 ) -> bool:
     if any(ingredient_names_match(row.name, line_name) for row in inventory):
         return True
-    return any(
-        ingredient_names_match(pantry_name, line_name) for pantry_name in uses_from_pantry
-    )
+    return any(ingredient_names_match(pantry_name, line_name) for pantry_name in uses_from_pantry)
 
 
 def _find_list_item_by_name(items: list[ShoppingListItem], name: str) -> ShoppingListItem | None:
@@ -67,7 +65,8 @@ def add_recipe_to_shopping_list(
             name=parsed.name,
             quantity=parsed.quantity,
             quantity_kind=parsed.quantity_kind,
-            unit=parsed.unit or (effective_unit(parsed.quantity_kind, None) if parsed.quantity else None),
+            unit=parsed.unit
+            or (effective_unit(parsed.quantity_kind, None) if parsed.quantity else None),
             barcode=None,
             checked=False,
         )
