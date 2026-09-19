@@ -30,6 +30,8 @@ export function ServerSettingsProvider({ children }: { children: ReactNode }) {
       const stored = await getStoredServerUrl();
       if (stored) {
         setServerUrlState(stored);
+      } else {
+        await setStoredServerUrl(DEFAULT_SERVER_URL);
       }
       setLoading(false);
     })();

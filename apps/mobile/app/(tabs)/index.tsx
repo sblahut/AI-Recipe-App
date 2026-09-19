@@ -72,22 +72,27 @@ export default function PantryScreen() {
   }, [refresh]);
 
   const saveItem = async (payload: IngredientCreate) => {
-    if (editing) {
-      await apiFetch(`/inventory/${editing.id}`, {
-        baseUrl: serverUrl,
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-    } else {
-      await apiFetch("/inventory", {
-        baseUrl: serverUrl,
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+    try {
+      if (editing) {
+        await apiFetch(`/inventory/${editing.id}`, {
+          baseUrl: serverUrl,
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await apiFetch("/inventory", {
+          baseUrl: serverUrl,
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+      setShowForm(false);
+      setEditing(null);
+      await loadInventory();
+    } catch (e) {
+      Alert.alert("Save failed", e instanceof Error ? e.message : "Unknown error");
+      throw e;
     }
-    setShowForm(false);
-    setEditing(null);
-    await loadInventory();
   };
 
   const deleteItem = (item: Ingredient) => {

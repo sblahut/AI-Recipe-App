@@ -31,7 +31,10 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Home server URL</Text>
-      <Text style={styles.hint}>Use your PC LAN IP, e.g. http://192.168.1.50:8000</Text>
+      <Text style={styles.hint}>
+        API port is 8000 (FastAPI), not 8081 (Expo). Use your PC LAN IP from the Expo terminal, e.g.
+        http://192.168.1.45:8000 — then tap Save before using Pantry.
+      </Text>
       <TextInput
         style={styles.input}
         value={draft}
