@@ -81,7 +81,18 @@ export default function ShoppingScreen() {
     });
   }, [loadLists]);
 
+  const deselectList = () => {
+    setSelectedId(null);
+    setDetail(null);
+    setItemFilter("All");
+    setNewItemName("");
+  };
+
   const selectList = (id: number) => {
+    if (selectedId === id) {
+      deselectList();
+      return;
+    }
     setSelectedId(id);
     setItemFilter("All");
     void loadDetail(id);
@@ -245,7 +256,12 @@ export default function ShoppingScreen() {
       {selectedId != null ? (
         <>
           <View style={[styles.sectionPad, styles.listHeader]}>
-            <Text style={[styles.listTitle, { color: colors.text }]}>{selectedList?.name}</Text>
+            <View style={styles.flex}>
+              <Text style={[styles.listTitle, { color: colors.text }]}>{selectedList?.name}</Text>
+              <Pressable onPress={deselectList} hitSlop={8} accessibilityRole="button">
+                <Text style={[styles.allListsLink, { color: colors.primary }]}>All lists</Text>
+              </Pressable>
+            </View>
             {selectedList ? (
               <Pressable onPress={() => deleteList(selectedList)} hitSlop={8}>
                 <Text style={[styles.deleteList, { color: colors.danger }]}>Delete list</Text>
@@ -376,7 +392,10 @@ export default function ShoppingScreen() {
           />
         </>
       ) : (
-        <EmptyState title="Select or create a list" subtitle="Long-press a list to delete it." />
+        <EmptyState
+          title="Select or create a list"
+          subtitle="Tap a list again to close it. Long-press to delete."
+        />
       )}
     </Screen>
   );
@@ -398,6 +417,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   listTitle: typography.headline,
+  allListsLink: { ...typography.caption, fontWeight: "600", marginTop: spacing.xs },
   deleteList: { ...typography.caption, fontWeight: "600" },
   itemToolbar: { marginBottom: spacing.sm },
   actionsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
