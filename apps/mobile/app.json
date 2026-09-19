@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "AI Recipe",
+    "slug": "ai-recipe-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "airecipe",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.airecipe.mobile",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "com.airecipe.mobile",
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan barcodes to add pantry and shopping items."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    }
+  }
+}

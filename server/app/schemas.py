@@ -89,6 +89,10 @@ class BarcodeScanRequest(QuantityFieldsMixin):
     barcode: str
     target: Literal["inventory", "shopping_list"] = "inventory"
     shopping_list_id: int | None = None
+    location: str | None = Field(
+        default=None,
+        description="Storage location when target is inventory (fridge, pantry, etc.)",
+    )
     manual_name: str | None = None
     register_product: bool = Field(
         default=False,
@@ -159,6 +163,11 @@ class SavedRecipeRead(BaseModel):
 
 class QuantityUnitsResponse(BaseModel):
     kinds: dict[QuantityKind, list[str]]
+
+
+class ProductCatalogStats(BaseModel):
+    product_count: int
+    sample_seeded: bool
 
 
 class ShoppingListCreate(BaseModel):

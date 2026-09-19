@@ -69,3 +69,21 @@ def update_shopping_item(
     db.commit()
     db.refresh(item)
     return item
+
+
+@router.delete("/lists/{list_id}", status_code=204)
+def delete_shopping_list(list_id: int, db: Session = Depends(get_db)) -> None:
+    row = db.get(ShoppingList, list_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Shopping list not found")
+    db.delete(row)
+    db.commit()
+
+
+@router.delete("/lists/{list_id}/items/{item_id}", status_code=204)
+def delete_shopping_item(list_id: int, item_id: int, db: Session = Depends(get_db)) -> None:
+    item = db.get(ShoppingListItem, item_id)
+    if not item or item.shopping_list_id != list_id:
+        raise HTTPException(status_code=404, detail="Item not found")
+    db.delete(item)
+    db.commit()
