@@ -191,7 +191,7 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 |-------|--------|-------------|
 | **Python** (`server/`) | `server/pyproject.toml` (Ruff) | `pip install -r requirements-dev.txt` then `ruff check app` and `ruff format app` |
 | **TypeScript** (`apps/mobile/`) | `apps/mobile/.eslintrc.yml` | After Expo scaffold: `npm run lint` |
-| **CI** | `.github/workflows/lint.yml` | Ruff on push/PR; ESLint when `apps/mobile/package.json` exists |
+| **CI** | `.github/workflows/lint.yml` | [Actions tab](https://github.com/sblahut/AI-Recipe-App/actions) — Ruff on push/PR; ESLint when `apps/mobile/package.json` exists |
 | **Optional hooks** | `.pre-commit-config.yaml` | `pip install pre-commit && pre-commit install` |
 
 ## Build order

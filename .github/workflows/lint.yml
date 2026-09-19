@@ -5,34 +5,32 @@ on:
     branches: [main, initial-app-setup]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  python:
+  ruff:
     name: Ruff (server)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/ruff-action@v3
         with:
-          python-version: "3.12"
+          src: server/app
+          args: check
 
-      - name: Install Ruff
-        run: pip install ruff==0.8.4
+      - uses: astral-sh/ruff-action@v3
+        with:
+          src: server/app
+          args: format --check
 
-      - name: Ruff check
-        run: ruff check app
-
-      - name: Ruff format (check)
-        run: ruff format --check app
-
-  typescript:
+  eslint-mobile:
     name: ESLint (mobile)
     runs-on: ubuntu-latest
-    if: hashFiles('apps/mobile/package.json') != ''
+    if: ${{ hashFiles('apps/mobile/package.json') != '' }}
     defaults:
       run:
         working-directory: apps/mobile
