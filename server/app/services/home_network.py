@@ -9,6 +9,6 @@ def primary_lan_ipv4() -> str | None:
             ip = sock.getsockname()[0]
     except OSError:
         return None
-    if ip.startswith("127.") or ip.startswith("169.254."):
+    if ip.startswith(("127.", "169.254.")):
         return None
     return ip
