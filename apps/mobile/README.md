@@ -105,12 +105,13 @@ That is the **system Camera** scanning an **`exp://`** or **tunnel** QR — use 
 | `npm run start:web` | Open web preview |
 | `npm run lint` | ESLint (strict TypeScript) |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Jest unit tests (`lib/`) |
 
 After first `npm install`, commit `package-lock.json` so CI can run `npm ci`.
 
 ## Tabs
 
-- **Ingredients** — pantry by storage area, manual add/edit, swipe delete, barcode scan, custom zones
-- **Recipes** — generate from pantry, paste-import text, search, favorites, share, add to shopping / ingredients
+- **Ingredients** — pantry by storage area, search, manual add/edit, swipe delete, barcode scan, custom zones
+- **Recipes** — generate from pantry, paste/URL import, search, favorites, share, add to shopping / ingredients
 - **Shopping** — lists, weekly ad links by store chain, scan to list; **Open list** for filters (all / to buy / in cart)
 - **Settings** — profile & photo, appearance, kitchen defaults, favorite stores, recipes options, home server URL (dev/LAN)

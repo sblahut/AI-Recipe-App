@@ -19,7 +19,7 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
 import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
-import { textMatchesSearch } from "@/lib/textSearch";
+import { recipeMatchesSearch } from "@/lib/recipeSearch";
 import {
   healthSchema,
   ingredientSchema,
@@ -38,13 +38,6 @@ type GenerateReady = {
   ollamaOk: boolean | null;
   ingredientCount: number;
 };
-
-function recipeMatchesSearch(recipe: GeneratedRecipe, query: string): boolean {
-  if (!textMatchesSearch(query, recipe.title)) {
-    return recipe.ingredients.some((line) => textMatchesSearch(query, line.name));
-  }
-  return true;
-}
 
 function findFavoriteMatch(
   favorites: SavedRecipe[],

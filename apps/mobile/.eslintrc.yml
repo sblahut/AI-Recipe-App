@@ -33,3 +33,6 @@ ignorePatterns:
   - .expo/
   - dist/
   - babel.config.js
+  - jest.config.js
+  - "**/__tests__/**"
+  - "**/*.test.ts"

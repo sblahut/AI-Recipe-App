@@ -22,3 +22,15 @@ def test_validate_blocks_localhost() -> None:
 
 def test_validate_accepts_https() -> None:
     assert validate_recipe_import_url("https://example.com/recipe") == "https://example.com/recipe"
+
+
+def test_validate_rejects_non_http_scheme() -> None:
+    with pytest.raises(RecipeFetchError, match="http and https"):
+        validate_recipe_import_url("file:///etc/passwd")
+
+
+def test_html_to_text_removes_script_content() -> None:
+    html = "<html><script>alert(1)</script><p>Recipe body</p></html>"
+    text = html_to_text(html)
+    assert "alert" not in text
+    assert "Recipe body" in text

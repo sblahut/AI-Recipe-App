@@ -259,8 +259,17 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 | Stack | Config | Run locally |
 |-------|--------|-------------|
 | **Python** (`server/`) | `server/pyproject.toml` (Ruff) | `pip install -r requirements-dev.txt` then `ruff check app tests` and `pytest tests` |
-| **TypeScript** (`apps/mobile/`) | `apps/mobile/.eslintrc.yml` | `cd apps/mobile && npm run lint && npm run typecheck` |
-| **CI** | `.github/workflows/lint.yml` | Push/PR: Ruff, pytest, ESLint |
+| **TypeScript** (`apps/mobile/`) | `apps/mobile/.eslintrc.yml` | `cd apps/mobile && npm run lint && npm run typecheck && npm test` |
+| **CI** | `.github/workflows/lint.yml` | Push/PR: Ruff, pytest, ESLint, typecheck, Jest (see jobs below) |
+
+**GitHub branch protection:** require these status checks before merging to `main`:
+
+- `Ruff (server)`
+- `Unit tests (server)`
+- `ESLint (mobile)`
+- `Unit tests (mobile)`
+
+(`Typecheck` runs in the ESLint job; it is not a separate check name.)
 | **Optional hooks** | `.pre-commit-config.yaml` | `pip install pre-commit && pre-commit install` |
 
 ## Roadmap (later)
