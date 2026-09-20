@@ -78,6 +78,8 @@ export function weeklyAdChainsForStores(
   return out;
 }
 
+const WEEKLY_AD_PICKER_EXCLUDED: ReadonlySet<StoreChain> = new Set(["Other", "Harris Teeter"]);
+
 /** Chains to show under Weekly ad (saved stores + common defaults, deduped). */
 export function weeklyAdChainsForPicker(
   stores: readonly { chain: StoreChain; name: string }[],
@@ -91,12 +93,11 @@ export function weeklyAdChainsForPicker(
     "Target",
     "Lidl",
     "Giant",
-    "Harris Teeter",
   ];
   const seen = new Set<StoreChain>();
   const out: StoreChain[] = [];
   for (const chain of [...weeklyAdChainsForStores(stores), ...defaults]) {
-    if (chain === "Other" || !weeklyAdUrlForChain(chain) || seen.has(chain)) {
+    if (WEEKLY_AD_PICKER_EXCLUDED.has(chain) || !weeklyAdUrlForChain(chain) || seen.has(chain)) {
       continue;
     }
     seen.add(chain);

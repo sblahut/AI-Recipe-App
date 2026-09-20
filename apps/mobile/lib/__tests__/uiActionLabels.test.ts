@@ -1,4 +1,5 @@
 import {
+  RECIPE_MEAL_PLAN_BUTTON_LABEL,
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
   SHOPPING_OPEN_LIST_LABEL,
   SHOPPING_STOCK_FROM_LIST_LABEL,
@@ -7,10 +8,11 @@ import {
 } from "@/lib/uiActionLabels";
 
 describe("uiActionLabels", () => {
-  it("uses short stock-from-list label for the secondary shopping action", () => {
-    expect(SHOPPING_STOCK_FROM_LIST_LABEL).toBe("To ingredients");
+  it("uses recipe and shopping action labels", () => {
+    expect(SHOPPING_STOCK_FROM_LIST_LABEL).toBe("Add shopping cart to ingredients");
     expect(SHOPPING_OPEN_LIST_LABEL).toBe("Open list");
-    expect(RECIPE_SHOPPING_LIST_BUTTON_LABEL).toBe("Shopping list");
+    expect(RECIPE_SHOPPING_LIST_BUTTON_LABEL).toBe("+ Shopping list");
+    expect(RECIPE_MEAL_PLAN_BUTTON_LABEL).toBe("+ Meal plan");
   });
 
   it("builds share accessibility labels", () => {

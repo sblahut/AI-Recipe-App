@@ -2,10 +2,13 @@
 export const SHOPPING_OPEN_LIST_LABEL = "Open list";
 
 /** Move shopping list lines into Ingredients (inventory bulk). */
-export const SHOPPING_STOCK_FROM_LIST_LABEL = "To ingredients";
+export const SHOPPING_STOCK_FROM_LIST_LABEL = "Add shopping cart to ingredients";
 
-/** Recipe card action to add missing lines to a shopping list. */
-export const RECIPE_SHOPPING_LIST_BUTTON_LABEL = "Shopping list";
+/** Recipe card: add recipe lines to a shopping list. */
+export const RECIPE_SHOPPING_LIST_BUTTON_LABEL = "+ Shopping list";
+
+/** Recipe card: schedule recipe on the meal plan. */
+export const RECIPE_MEAL_PLAN_BUTTON_LABEL = "+ Meal plan";
 
 export function shareShoppingListAccessibilityLabel(listName: string): string {
   return `Share shopping list ${listName}`;

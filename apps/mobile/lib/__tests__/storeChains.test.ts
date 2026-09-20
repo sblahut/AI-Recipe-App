@@ -13,4 +13,11 @@ describe("weeklyAdChainsForPicker", () => {
     ]);
     expect(chains.filter((c) => c === "Publix")).toHaveLength(1);
   });
+
+  it("omits Harris Teeter from the weekly ad picker", () => {
+    const chains = weeklyAdChainsForPicker([
+      { chain: "Harris Teeter", name: "HT on Oak" },
+    ]);
+    expect(chains).not.toContain("Harris Teeter");
+  });
 });

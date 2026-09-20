@@ -23,6 +23,7 @@ import { findFavoriteMatch } from "@/lib/recipeFavorites";
 import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import {
+  RECIPE_MEAL_PLAN_BUTTON_LABEL,
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
   shareRecipeAccessibilityLabel,
 } from "@/lib/uiActionLabels";
@@ -608,7 +609,7 @@ function RecipeCard({
           }}
         />
         <AppButton
-          label="Plan"
+          label={RECIPE_MEAL_PLAN_BUTTON_LABEL}
           compact
           onPress={() => {
             onDismissSearch();
