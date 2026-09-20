@@ -28,6 +28,7 @@ import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { startIngredientScan } from "@/lib/startIngredientScan";
+import { textMatchesSearch } from "@/lib/textSearch";
 import {
   ingredientSchema,
   quantityUnitsSchema,
@@ -55,6 +56,7 @@ export default function IngredientsScreen() {
   const [locationFilter, setLocationFilter] = useState<StorageFilterId>("All");
   const [addingZone, setAddingZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const storageFilters = useMemo(
     () => buildStorageFilters(preferences.customZones),
@@ -116,7 +118,7 @@ export default function IngredientsScreen() {
     return counts;
   }, [items, preferences.customZones, storageFilters]);
 
-  const filteredItems = useMemo(() => {
+  const locationFilteredItems = useMemo(() => {
     if (locationFilter === "All") {
       return items;
     }
@@ -131,6 +133,14 @@ export default function IngredientsScreen() {
       return loc === locationFilter;
     });
   }, [items, locationFilter, preferences.customZones]);
+
+  const filteredItems = useMemo(
+    () =>
+      locationFilteredItems.filter((item) =>
+        textMatchesSearch(searchQuery, item.name, item.location, item.notes, item.barcode),
+      ),
+    [locationFilteredItems, searchQuery],
+  );
 
   const saveItem = async (payload: IngredientCreate) => {
     try {
@@ -294,6 +304,16 @@ export default function IngredientsScreen() {
         )}
       </View>
 
+      <View style={styles.searchPad}>
+        <AppTextField
+          placeholder="Search ingredients by name, location, notes, or barcode"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </View>
+
       <FlatList
         data={filteredItems}
         keyExtractor={(item) => String(item.id)}
@@ -303,8 +323,18 @@ export default function IngredientsScreen() {
         }
         ListEmptyComponent={
           <EmptyState
-            title={locationFilter === "All" ? "No ingredients yet" : "Nothing in this location"}
-            subtitle="Add manually, scan a barcode, or pick another storage filter."
+            title={
+              searchQuery.trim()
+                ? "No matches"
+                : locationFilter === "All"
+                  ? "No ingredients yet"
+                  : "Nothing in this location"
+            }
+            subtitle={
+              searchQuery.trim()
+                ? "Try another search or clear the search field."
+                : "Add manually, scan a barcode, or pick another storage filter."
+            }
           />
         }
         renderItem={({ item }) => (
@@ -354,6 +384,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
     gap: 2,
+  },
+  searchPad: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
   },
   filterHeading: {
     ...typography.caption,

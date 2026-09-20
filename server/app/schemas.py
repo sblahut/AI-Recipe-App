@@ -133,7 +133,7 @@ class RecipeIngredient(BaseModel):
             return value
         if isinstance(value, bool):
             raise ValueError("quantity must be a string or number")
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return str(value)
         return str(value)
 
@@ -153,12 +153,23 @@ class RecipeGenerateResponse(BaseModel):
 
 
 class RecipeImportRequest(BaseModel):
-    text: str = Field(min_length=20, max_length=50_000)
+    text: str | None = Field(default=None, max_length=50_000)
+    url: str | None = Field(default=None, max_length=2048)
     persist: bool | None = Field(
         default=None,
         description="Save on server when true. When omitted, uses DEFAULT_PERSIST_GENERATED_RECIPES.",
     )
     favorite: bool = False
+
+    @model_validator(mode="after")
+    def exactly_one_import_source(self) -> "RecipeImportRequest":
+        text = (self.text or "").strip()
+        url = (self.url or "").strip()
+        if bool(text) == bool(url):
+            raise ValueError("Provide exactly one of text or url")
+        if text and len(text) < 20:
+            raise ValueError("text must be at least 20 characters")
+        return self
 
 
 class RecipeImportResponse(BaseModel):

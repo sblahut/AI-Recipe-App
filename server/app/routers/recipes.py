@@ -13,6 +13,7 @@ from app.schemas import (
     SavedRecipeRead,
 )
 from app.services import ollama
+from app.services.recipe_url_fetch import RecipeFetchError, fetch_recipe_text_from_url
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
 
@@ -84,8 +85,15 @@ async def generate_recipes(
 async def import_recipe(
     body: RecipeImportRequest, db: Session = Depends(get_db)
 ) -> RecipeImportResponse:
+    source_text = (body.text or "").strip()
+    if body.url:
+        try:
+            source_text = await fetch_recipe_text_from_url(body.url.strip())
+        except RecipeFetchError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
     try:
-        recipe = await ollama.import_recipe_from_text(body.text)
+        recipe = await ollama.import_recipe_from_text(source_text)
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 

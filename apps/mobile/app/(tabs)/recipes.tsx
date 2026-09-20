@@ -19,6 +19,7 @@ import { recipeToIngredientCreates } from "@/lib/recipeIngredients";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
 import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
+import { textMatchesSearch } from "@/lib/textSearch";
 import {
   healthSchema,
   ingredientSchema,
@@ -39,14 +40,10 @@ type GenerateReady = {
 };
 
 function recipeMatchesSearch(recipe: GeneratedRecipe, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) {
-    return true;
+  if (!textMatchesSearch(query, recipe.title)) {
+    return recipe.ingredients.some((line) => textMatchesSearch(query, line.name));
   }
-  if (recipe.title.toLowerCase().includes(q)) {
-    return true;
-  }
-  return recipe.ingredients.some((line) => line.name.toLowerCase().includes(q));
+  return true;
 }
 
 function findFavoriteMatch(
@@ -65,6 +62,7 @@ export default function RecipesScreen() {
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [importText, setImportText] = useState("");
+  const [importUrl, setImportUrl] = useState("");
   const [importLoading, setImportLoading] = useState(false);
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -168,8 +166,16 @@ export default function RecipesScreen() {
 
   const importRecipe = async () => {
     const text = importText.trim();
-    if (text.length < 20) {
-      Alert.alert("Paste a recipe", "Include at least a title, ingredients, and steps (20+ characters).");
+    const url = importUrl.trim();
+    if (!url && text.length < 20) {
+      Alert.alert(
+        "Add a recipe",
+        "Paste recipe text (20+ characters) or enter a recipe page URL.",
+      );
+      return;
+    }
+    if (url && text.length > 0) {
+      Alert.alert("Import recipe", "Use either pasted text or a URL, not both.");
       return;
     }
     if (!ready.serverOk) {
@@ -187,13 +193,14 @@ export default function RecipesScreen() {
         baseUrl: serverUrl,
         method: "POST",
         body: JSON.stringify({
-          text,
+          ...(url ? { url } : { text }),
           persist: preferences.autoPersistGeneratedRecipes,
         }),
       });
       const parsed = recipeImportResponseSchema.parse(raw);
       setGenerated((prev) => [parsed.recipe, ...prev.filter((r) => r.title !== parsed.recipe.title)]);
       setImportText("");
+      setImportUrl("");
       if (parsed.saved_recipe) {
         await loadFavorites();
       }
@@ -330,8 +337,18 @@ export default function RecipesScreen() {
       <Card>
         <Text style={[styles.importCardTitle, { color: colors.text }]}>Import recipe</Text>
         <Text style={[styles.importHint, { color: colors.textMuted }]}>
-          Paste text from a cookbook, email, or notes. URL fetching is not supported yet.
+          Paste text or paste a public recipe page URL. The server fetches the page and parses it with
+          Ollama (HTTPS only, no LAN URLs).
         </Text>
+        <AppTextField
+          label="Recipe URL"
+          value={importUrl}
+          onChangeText={setImportUrl}
+          placeholder="https://…"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+        />
         <AppTextField
           label="Recipe text"
           value={importText}
