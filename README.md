@@ -256,11 +256,49 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 
 ## Linting & CI
 
+### Unit tests (local)
+
+These match the CI jobs **Unit tests (server)** and **Unit tests (mobile)** (not lint/typecheck).
+
+**Server** (from repo root; use your venv if you have one, e.g. `server\.venv\Scripts\python.exe` on Windows):
+
+```powershell
+cd server
+pip install -r requirements-dev.txt   # first time
+python -m pytest tests -q
+```
+
+**Mobile:**
+
+```powershell
+cd apps/mobile
+npm install   # first time
+npm test
+```
+
+**All unit tests** (PowerShell, from repo root):
+
+```powershell
+Push-Location server; python -m pytest tests -q; if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }; Pop-Location
+Push-Location apps/mobile; npm test; if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }; Pop-Location
+```
+
+**All unit tests** (bash, from repo root):
+
+```bash
+cd server && python -m pytest tests -q && cd ../apps/mobile && npm test
+```
+
+Verbose server run: `python -m pytest tests -v`. CI uses `npm test -- --ci` in `apps/mobile` (same as `npm test` locally).
+
+### Lint & typecheck
+
 | Stack | Config | Run locally |
 |-------|--------|-------------|
-| **Python** (`server/`) | `server/pyproject.toml` (Ruff) | `pip install -r requirements-dev.txt` then `ruff check app tests` and `pytest tests` |
-| **TypeScript** (`apps/mobile/`) | `apps/mobile/.eslintrc.yml` | `cd apps/mobile && npm run lint && npm run typecheck && npm test` |
-| **CI** | `.github/workflows/lint.yml` | Push/PR: Ruff, pytest, ESLint, typecheck, Jest (see jobs below) |
+| **Python** (`server/`) | `server/pyproject.toml` (Ruff) | `cd server` then `ruff check app tests` and `ruff format --check app tests` |
+| **TypeScript** (`apps/mobile/`) | `apps/mobile/.eslintrc.yml` | `cd apps/mobile` then `npm run lint` and `npm run typecheck` |
+| **CI** | `.github/workflows/lint.yml` | Push/PR: Ruff, pytest, ESLint, typecheck, Jest |
+| **Optional hooks** | `.pre-commit-config.yaml` | `pip install pre-commit && pre-commit install` |
 
 **GitHub branch protection:** require these status checks before merging to `main`:
 
@@ -270,7 +308,6 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 - `Unit tests (mobile)`
 
 (`Typecheck` runs in the ESLint job; it is not a separate check name.)
-| **Optional hooks** | `.pre-commit-config.yaml` | `pip install pre-commit && pre-commit install` |
 
 ## Roadmap (later)
 

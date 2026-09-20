@@ -107,6 +107,8 @@ That is the **system Camera** scanning an **`exp://`** or **tunnel** QR — use 
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Jest unit tests (`lib/`) |
 
+From the **repo root**, run server + mobile unit tests (see root **README** → *Linting & CI* → *Unit tests (local)*).
+
 After first `npm install`, commit `package-lock.json` so CI can run `npm ci`.
 
 ## Tabs
