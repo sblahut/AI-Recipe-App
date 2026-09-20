@@ -4,6 +4,14 @@ export const SHOPPING_OPEN_LIST_LABEL = "Shop this list";
 /** Move purchased list lines into Pantry inventory. */
 export const SHOPPING_STOCK_FROM_LIST_LABEL = "Add to pantry";
 
+/** Info hint for Shop tab “Add to pantry”. */
+export const SHOPPING_STOCK_FROM_LIST_HINT =
+  "Adds every item on this shopping list to your Pantry. You pick where they go (fridge, pantry, etc.). Packaged goods can be scanned afterward.";
+
+/** Info hint for Plan tab “Shop for this week”. */
+export const MEAL_PLAN_SHOP_WEEK_HINT =
+  "Builds a shopping list from your planned meals for this week. Ingredients you already track in Pantry are skipped so you only shop for what is missing.";
+
 /** Recipe card: add recipe lines to a shopping list. */
 export const RECIPE_SHOPPING_LIST_BUTTON_LABEL = "+ Shopping list";
 

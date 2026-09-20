@@ -6,6 +6,7 @@ import { z } from "zod";
 import { AppButton } from "@/components/ui/AppButton";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { InfoHint } from "@/components/ui/InfoHint";
 import { Screen } from "@/components/ui/Screen";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
@@ -16,6 +17,7 @@ import {
   mealPlanShopAlertTitle,
   mealPlanShopResultFromApi,
 } from "@/lib/shoppingFromMealPlanAlert";
+import { MEAL_PLAN_SHOP_WEEK_HINT } from "@/lib/uiActionLabels";
 import {
   MEAL_SLOT_LABELS,
   MEAL_SLOTS,
@@ -253,13 +255,21 @@ export default function MealPlanScreen() {
         </Pressable>
       </View>
 
-      {/* Shop this week CTA */}
-      <AppButton
-        label={shopLoading ? "Adding groceries…" : "Shop for this week"}
-        variant="accent"
-        loading={shopLoading}
-        onPress={shopThisWeek}
-      />
+      <View style={styles.shopWeekRow}>
+        <View style={styles.shopWeekButtonWrap}>
+          <AppButton
+            label={shopLoading ? "Adding groceries…" : "Shop for this week"}
+            variant="accent"
+            loading={shopLoading}
+            onPress={shopThisWeek}
+          />
+        </View>
+        <InfoHint
+          title="Shop for this week"
+          message={MEAL_PLAN_SHOP_WEEK_HINT}
+          accessibilityLabel="About Shop for this week"
+        />
+      </View>
 
       {/* Day cards */}
       {loading ? (
@@ -357,6 +367,15 @@ const styles = StyleSheet.create({
   },
   weekLabel: {
     ...typography.headline,
+  },
+  shopWeekRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  shopWeekButtonWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   loadingWrap: {
     paddingVertical: spacing.xxxl,

@@ -10,6 +10,7 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { InfoHint } from "@/components/ui/InfoHint";
 import { Screen } from "@/components/ui/Screen";
 import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
@@ -22,6 +23,7 @@ import { stockFromShoppingList } from "@/lib/stockFromShoppingList";
 import {
   SHOPPING_OPEN_LIST_LABEL,
   SHOPPING_STOCK_FROM_LIST_LABEL,
+  SHOPPING_STOCK_FROM_LIST_HINT,
   shareShoppingListAccessibilityLabel,
 } from "@/lib/uiActionLabels";
 import {
@@ -367,24 +369,33 @@ export default function ShoppingScreen() {
                 {SHOPPING_OPEN_LIST_LABEL}
               </Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={SHOPPING_STOCK_FROM_LIST_LABEL}
-              onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
-              style={({ pressed }) => [
-                styles.actionCard,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Ionicons name="nutrition-outline" size={22} color={colors.accent} />
-              <Text style={[styles.actionLabel, { color: colors.text }]}>
-                {SHOPPING_STOCK_FROM_LIST_LABEL}
-              </Text>
-            </Pressable>
+            <View style={styles.actionCardWithHint}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={SHOPPING_STOCK_FROM_LIST_LABEL}
+                onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  styles.actionCardInWrap,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <Ionicons name="nutrition-outline" size={22} color={colors.accent} />
+                <Text style={[styles.actionLabel, { color: colors.text }]}>
+                  {SHOPPING_STOCK_FROM_LIST_LABEL}
+                </Text>
+              </Pressable>
+              <InfoHint
+                title={SHOPPING_STOCK_FROM_LIST_LABEL}
+                message={SHOPPING_STOCK_FROM_LIST_HINT}
+                accessibilityLabel={`About ${SHOPPING_STOCK_FROM_LIST_LABEL}`}
+                style={styles.cardInfoHint}
+              />
+            </View>
           </View>
 
           <View style={styles.sectionPad}>
@@ -516,6 +527,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: 12,
     borderWidth: 1,
+  },
+  actionCardWithHint: {
+    flex: 1,
+    position: "relative",
+  },
+  actionCardInWrap: {
+    flex: undefined,
+    width: "100%",
+  },
+  cardInfoHint: {
+    position: "absolute",
+    top: spacing.xs,
+    right: spacing.xs,
+    zIndex: 2,
   },
   actionLabel: {
     ...typography.button,
