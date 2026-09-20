@@ -170,6 +170,8 @@ npm install
 npm start
 ```
 
+Or start the API + Expo together like a desktop program (see **Home stack launcher** below).
+
 Details: [apps/mobile/README.md](apps/mobile/README.md).
 
 ### Where data is stored
@@ -188,6 +190,53 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 
 - `run.ps1` binds **`0.0.0.0`** so LAN clients can reach the API.
 - Allow inbound **TCP 8000** on **Private** networks in Windows Firewall.
+
+### Home stack launcher (Windows)
+
+Starts the API (and Expo Go) from one shortcut and opens a status page with the **dedicated Tailscale URL** QR.
+
+```powershell
+# One-time: Desktop shortcut “AI Recipe”
+powershell -ExecutionPolicy Bypass -File scripts\install-home-stack-shortcut.ps1
+
+# Or run directly
+powershell -ExecutionPolicy Bypass -File scripts\start-home-stack.ps1
+
+# Stop API + Metro (leaves Ollama running)
+powershell -ExecutionPolicy Bypass -File scripts\stop-home-stack.ps1
+```
+
+The status page shows:
+
+- **QR B / dedicated URL** — paste into the iPhone **Settings → Home server** (MagicDNS, see below).
+- **Expo Go** — scan the QR in the Metro terminal (**QR A**) to open the app UI on the same Wi‑Fi.
+
+API-only (no Expo): `powershell -ExecutionPolicy Bypass -File scripts\start-home-stack.ps1 -SkipExpo`
+
+### Off-LAN with Tailscale (dedicated URL)
+
+Do **not** point `zero-tech.org` at this API. A public hostname would expose an unauthenticated kitchen API. Tailscale **MagicDNS** gives a stable name that only devices on your tailnet can resolve.
+
+1. Install [Tailscale](https://tailscale.com/download) on this Windows PC and on each iPhone (each person uses their own login; invite them to the same tailnet).
+2. In the [Tailscale admin console](https://login.tailscale.com/admin/dns) enable **MagicDNS**.
+3. Sign in on the PC. Confirm `tailscale status` shows this machine and a name like `kitchen-pc.tailxxxxx.ts.net`.
+4. Start the home stack. Use this in the app Settings (same URL at home and away):
+
+   `http://<machine>.<tailnet>.ts.net:8000`
+
+   The launcher prints this name and shows a QR for it. iOS is allowed to use HTTP on `*.ts.net` (see `apps/mobile/app.json`).
+5. On each iPhone: open the **Tailscale** app, stay connected, then open **Expo Go** / the recipe app and **Test connection**.
+6. Keep the PC **awake** while you want the kitchen API available.
+
+**Optional HTTPS** (no `:8000` in the URL), after the API is listening:
+
+```powershell
+tailscale serve --bg 8000
+```
+
+Then Settings can use `https://<machine>.<tailnet>.ts.net`. Requires **HTTPS Certificates** enabled in the Tailscale admin DNS page. Only tailnet devices can open it (this is not a public website).
+
+**Expo Go away from home** still needs Metro on the PC and is unreliable over Tailscale. For grocery-store use, keep the API + Tailscale URL and later install a TestFlight build so you do not need Metro.
 
 ### Troubleshooting
 
@@ -315,7 +364,7 @@ Verbose server run: `python -m pytest tests -v`. CI uses `npm test -- --ci` in `
 
 ## Roadmap (later)
 
-- **HTTPS / Tailscale** for using the app off-LAN.
+- **TestFlight** iOS build so phones do not need Expo / Metro off-LAN (API + Tailscale URL is already documented above).
 
 Product **`default_quantity_kind`** is inferred during OFF import and live OFF barcode lookup (e.g. milk → volume). Re-run the import script to backfill existing rows.
 
