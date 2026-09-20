@@ -5,7 +5,6 @@ import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from "re
 
 import { StorageFilterOption } from "@/components/StorageFilterOption";
 import { SwipeableRow } from "@/components/SwipeableRow";
-import { AppButton } from "@/components/ui/AppButton";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
@@ -142,8 +141,9 @@ export function ShoppingListItemsView({ listId, onListNameLoaded }: ShoppingList
         contentContainerStyle={filteredItems.length === 0 ? styles.listEmpty : styles.itemsList}
         ListEmptyComponent={
           <EmptyState
+            icon={itemFilter === "All" ? "cart-outline" : "checkmark-circle-outline"}
             title={itemFilter === "All" ? "Nothing on this list yet" : "Nothing in this filter"}
-            subtitle="Add items from the Shopping tab, or pick another filter."
+            subtitle="Add items from the Shop tab, or pick another filter."
           />
         }
         renderItem={({ item }) => (
@@ -168,6 +168,31 @@ function ItemRow({
   return (
     <SwipeableRow onDelete={() => onDelete(item)} label="Remove">
       <Card style={styles.rowCard}>
+        {/* Checkbox */}
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: item.checked }}
+          accessibilityLabel={`${item.name} — ${item.checked ? "in cart" : "to buy"}`}
+          onPress={() => void onToggleCart(item, !item.checked)}
+          hitSlop={8}
+          style={styles.checkboxWrap}
+        >
+          <View
+            style={[
+              styles.checkbox,
+              {
+                borderColor: item.checked ? colors.accent : colors.border,
+                backgroundColor: item.checked ? colors.accent : "transparent",
+              },
+            ]}
+          >
+            {item.checked ? (
+              <Ionicons name="checkmark" size={14} color={colors.onAccent} />
+            ) : null}
+          </View>
+        </Pressable>
+
+        {/* Content */}
         <View style={styles.rowMain}>
           <Text
             style={[
@@ -179,15 +204,10 @@ function ItemRow({
             {item.name}
           </Text>
           <Text style={[styles.meta, { color: colors.textMuted }]}>
-            {formatShoppingQty(item)} · {item.checked ? "In cart" : "Still to buy"}
+            {formatShoppingQty(item)}
           </Text>
         </View>
-        <AppButton
-          label={item.checked ? "Still to buy" : "Add to cart"}
-          variant={item.checked ? "secondary" : "accent"}
-          compact
-          onPress={() => void onToggleCart(item, !item.checked)}
-        />
+
         {Platform.OS === "web" ? (
           <Pressable
             accessibilityLabel={`Remove ${item.name}`}
@@ -195,7 +215,7 @@ function ItemRow({
             hitSlop={8}
             style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
           >
-            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+            <Ionicons name="trash-outline" size={18} color={colors.danger} />
           </Pressable>
         ) : null}
       </Card>
@@ -208,21 +228,32 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   filterSection: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
     gap: 2,
   },
-  itemsList: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  itemsList: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxxl },
   listEmpty: { flexGrow: 1 },
   rowCard: {
     marginBottom: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.md,
+  },
+  checkboxWrap: {
+    padding: spacing.xs,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   rowMain: { flex: 1 },
   deleteIcon: { padding: spacing.sm },
-  name: typography.headline,
+  name: { ...typography.bodyMedium },
   meta: { ...typography.caption, marginTop: 2 },
 });

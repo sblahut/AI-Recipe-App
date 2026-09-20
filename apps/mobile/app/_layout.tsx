@@ -18,21 +18,22 @@ function RootStack() {
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
+          headerTintColor: colors.primary,
           headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
+          headerTitleStyle: { color: colors.text, fontWeight: "600", fontSize: 17 },
         }}
       >
         <Stack.Screen
           name="(tabs)"
-          options={{ headerShown: false, title: "Shopping" }}
+          options={{ headerShown: false, title: "Home" }}
         />
         <Stack.Screen name="scan" options={{ title: "Scan barcode", presentation: "modal" }} />
         <Stack.Screen
           name="shopping-list/[listId]"
           options={{
             title: "Shopping list",
-            headerBackTitle: "Shopping",
+            headerBackTitle: "Shop",
             headerBackButtonDisplayMode: "minimal",
           }}
         />

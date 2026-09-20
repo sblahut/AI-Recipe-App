@@ -14,7 +14,6 @@ import type { Ingredient, IngredientCreate, QuantityKind } from "@/lib/schemas";
 
 type Props = {
   initial?: Ingredient;
-  /** When creating a row, pre-select this storage area. */
   defaultLocation?: string;
   unitsByKind: Record<QuantityKind, string[]>;
   onSubmit: (payload: IngredientCreate) => Promise<void>;
@@ -124,78 +123,91 @@ export function PantryItemForm({
 
       <AppTextField label="Name" value={name} onChangeText={setName} autoFocus={!initial} />
 
-      <Text style={[styles.label, { color: colors.text }]}>Storage</Text>
-      <View style={styles.chipRowWrap}>
-        <Chip
-          label="None"
-          selected={locationPreset === "None"}
-          onPress={() => setLocationPreset("None")}
-        />
-        {INVENTORY_LOCATIONS.filter((loc) => loc !== "Other").map((loc) => (
+      {/* Storage */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>Storage</Text>
+        <View style={styles.chipRowWrap}>
           <Chip
-            key={loc}
-            label={loc}
-            selected={locationPreset === loc}
-            onPress={() => setLocationPreset(loc)}
+            label="None"
+            selected={locationPreset === "None"}
+            onPress={() => setLocationPreset("None")}
           />
-        ))}
-        {preferences.customZones.map((zone) => (
+          {INVENTORY_LOCATIONS.filter((loc) => loc !== "Other").map((loc) => (
+            <Chip
+              key={loc}
+              label={loc}
+              selected={locationPreset === loc}
+              onPress={() => setLocationPreset(loc)}
+            />
+          ))}
+          {preferences.customZones.map((zone) => (
+            <Chip
+              key={zone}
+              label={zone}
+              selected={locationPreset === zone}
+              onPress={() => setLocationPreset(zone)}
+            />
+          ))}
           <Chip
-            key={zone}
-            label={zone}
-            selected={locationPreset === zone}
-            onPress={() => setLocationPreset(zone)}
+            label="Other"
+            selected={locationPreset === "Other"}
+            onPress={() => setLocationPreset("Other")}
           />
-        ))}
-        <Chip
-          label="Other"
-          selected={locationPreset === "Other"}
-          onPress={() => setLocationPreset("Other")}
-        />
-      </View>
-      {locationPreset === "Other" ? (
-        <AppTextField
-          label="Custom location"
-          value={customLocation}
-          onChangeText={setCustomLocation}
-          placeholder="Garage, spice rack…"
-        />
-      ) : null}
-
-      <Text style={[styles.label, { color: colors.text }]}>Kind</Text>
-      <View style={styles.chipRow}>
-        {(["count", "weight", "volume"] as const).map((kind) => (
-          <Chip
-            key={kind}
-            label={kind}
-            selected={quantityKind === kind}
-            onPress={() => selectKind(kind)}
+        </View>
+        {locationPreset === "Other" ? (
+          <AppTextField
+            label="Custom location"
+            value={customLocation}
+            onChangeText={setCustomLocation}
+            placeholder="Garage, spice rack…"
           />
-        ))}
+        ) : null}
       </View>
 
-      <AppTextField
-        label="Quantity"
-        value={quantity}
-        onChangeText={setQuantity}
-        keyboardType="decimal-pad"
-        placeholder="Optional"
-      />
+      {/* Quantity kind */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>Measurement</Text>
+        <View style={styles.chipRow}>
+          {(["count", "weight", "volume"] as const).map((kind) => (
+            <Chip
+              key={kind}
+              label={kind}
+              selected={quantityKind === kind}
+              onPress={() => selectKind(kind)}
+            />
+          ))}
+        </View>
+      </View>
 
-      <Text style={[styles.label, { color: colors.text }]}>Unit</Text>
-      <View style={styles.chipRowWrap}>
-        {unitOptions.map((u) => (
-          <Chip
-            key={u}
-            label={formatUnitLabel(u)}
-            selected={unit === u}
-            onPress={() => setUnit(u)}
+      {/* Quantity + unit */}
+      <View style={styles.quantityRow}>
+        <View style={styles.quantityField}>
+          <AppTextField
+            label="Quantity"
+            value={quantity}
+            onChangeText={setQuantity}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 500"
           />
-        ))}
+        </View>
+        <View style={styles.unitField}>
+          <Text style={[styles.sectionLabel, { color: colors.text }]}>Unit</Text>
+          <View style={styles.chipRowWrap}>
+            {unitOptions.map((u) => (
+              <Chip
+                key={u}
+                label={formatUnitLabel(u)}
+                selected={unit === u}
+                onPress={() => setUnit(u)}
+              />
+            ))}
+          </View>
+        </View>
       </View>
 
       <ExpirationDateField value={expiresAt} onChange={setExpiresAt} />
 
+      {/* Actions */}
       <View style={styles.actions}>
         {initial && onDelete ? (
           <AppButton label="Delete" variant="ghost" onPress={onDelete} style={styles.deleteBtn} />
@@ -210,15 +222,35 @@ export function PantryItemForm({
 }
 
 const styles = StyleSheet.create({
-  heading: { ...typography.title, marginBottom: spacing.sm },
-  label: { ...typography.label, marginTop: spacing.xs },
+  heading: {
+    ...typography.h1,
+    marginBottom: spacing.sm,
+  },
+  section: {
+    gap: spacing.sm,
+  },
+  sectionLabel: {
+    ...typography.label,
+    marginTop: spacing.xs,
+  },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chipRowWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  quantityRow: {
+    flexDirection: "row",
+    gap: spacing.lg,
+  },
+  quantityField: {
+    width: 120,
+  },
+  unitField: {
+    flex: 1,
+    gap: spacing.sm,
+  },
   actions: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
   },
   actionRight: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   saveBtn: { minWidth: 100 },

@@ -29,17 +29,23 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.tabBarBorder,
-          paddingTop: 4,
+          borderTopWidth: 0.5,
+          paddingTop: 6,
+          height: 56,
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.tabInactive,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+          letterSpacing: 0.1,
+        },
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
       <Tabs.Screen
         name="index"
-        options={{ title: "Ingredients", tabBarIcon: tabIcon("nutrition-outline") }}
+        options={{ title: "Pantry", tabBarIcon: tabIcon("nutrition-outline") }}
       />
       <Tabs.Screen
         name="recipes"
@@ -51,7 +57,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="shopping"
-        options={{ title: "Shopping", tabBarIcon: tabIcon("cart-outline") }}
+        options={{ title: "Shop", tabBarIcon: tabIcon("cart-outline") }}
       />
       <Tabs.Screen
         name="settings"

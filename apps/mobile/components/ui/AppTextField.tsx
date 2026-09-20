@@ -40,12 +40,13 @@ export const AppTextField = forwardRef<TextInput, Props>(function AppTextField(
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
   label: typography.label,
-  hint: typography.caption,
+  hint: { ...typography.caption, lineHeight: 18 },
   input: {
     borderWidth: 1,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 16,
+    lineHeight: 22,
   },
 });

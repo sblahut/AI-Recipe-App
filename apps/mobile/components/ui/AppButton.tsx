@@ -33,7 +33,7 @@ export function AppButton({
       : variant === "accent"
         ? colors.accent
         : variant === "secondary"
-          ? colors.overlay
+          ? colors.surface
           : "transparent";
 
   const textColor =
@@ -45,6 +45,9 @@ export function AppButton({
           ? colors.text
           : colors.primary;
 
+  const borderColor =
+    variant === "secondary" ? colors.border : "transparent";
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -53,9 +56,12 @@ export function AppButton({
       style={({ pressed }) => [
         styles.base,
         compact ? styles.compact : styles.default,
-        { backgroundColor: bg, opacity: pressed && !isDisabled ? 0.88 : 1 },
+        {
+          backgroundColor: bg,
+          borderColor,
+          opacity: isDisabled ? 0.45 : pressed ? 0.82 : 1,
+        },
         variant === "ghost" && styles.ghost,
-        isDisabled && styles.disabled,
         style,
       ]}
     >
@@ -73,25 +79,25 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
   },
   default: {
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    minHeight: 48,
+    paddingHorizontal: spacing.xl,
+    minHeight: 50,
   },
   compact: {
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    minHeight: 40,
+    paddingHorizontal: spacing.lg,
+    minHeight: 42,
   },
   ghost: {
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-  },
-  disabled: {
-    opacity: 0.5,
+    paddingHorizontal: spacing.md,
+    borderWidth: 0,
   },
   label: {
-    ...typography.label,
+    ...typography.button,
   },
 });

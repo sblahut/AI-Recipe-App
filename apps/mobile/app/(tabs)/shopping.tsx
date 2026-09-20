@@ -214,13 +214,14 @@ export default function ShoppingScreen() {
 
   return (
     <Screen scroll padded={false}>
+      {/* Lists filter section */}
       <View style={styles.filterSection}>
         <View style={styles.filterHeadingRow}>
           <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Your lists</Text>
           {!addingList ? (
             <AppButton
               label="+ New list"
-              variant="secondary"
+              variant="ghost"
               compact
               onPress={() => setAddingList(true)}
             />
@@ -263,14 +264,16 @@ export default function ShoppingScreen() {
 
       {selectedId != null ? (
         <>
+          {/* List header */}
           <View style={[styles.sectionPad, styles.listHeader]}>
             <Text style={[styles.listTitle, { color: colors.text }]}>{selectedList?.name}</Text>
           </View>
 
+          {/* Add item bar */}
           <View style={[styles.sectionPad, styles.row, styles.itemToolbar]}>
             <View style={styles.flex}>
               <AppTextField
-                placeholder="Add item"
+                placeholder="Add an item"
                 value={newItemName}
                 onChangeText={setNewItemName}
                 onSubmitEditing={() => void addItem()}
@@ -290,6 +293,7 @@ export default function ShoppingScreen() {
             />
           </View>
 
+          {/* Actions */}
           <View style={[styles.sectionPad, styles.actionsRow]}>
             <AppButton
               label={SHOPPING_OPEN_LIST_LABEL}
@@ -311,19 +315,20 @@ export default function ShoppingScreen() {
               onPress={() => void shareList()}
               style={({ pressed }) => [
                 styles.shareIconBtn,
-                { backgroundColor: colors.overlay },
-                pressed && { opacity: 0.88 },
+                { backgroundColor: colors.overlay, borderColor: colors.border },
+                pressed && { opacity: 0.82 },
               ]}
             >
-              <Ionicons name="share-outline" size={22} color={colors.text} />
+              <Ionicons name="share-outline" size={20} color={colors.text} />
             </Pressable>
           </View>
 
+          {/* Weekly ad card */}
           <View style={styles.sectionPad}>
             <Card>
-              <Text style={[styles.dealTitle, { color: colors.text }]}>Weekly ad</Text>
+              <Text style={[styles.dealTitle, { color: colors.text }]}>Weekly deals</Text>
               <Text style={[styles.dealHint, { color: colors.textMuted }]}>
-                Pick a chain, then open its weekly ad. Add stores in Settings for directions links.
+                Pick a chain to open their weekly ad. Add stores in Settings for directions.
               </Text>
               <View style={styles.chainRow}>
                 {weeklyAdChains.map((chain) => (
@@ -357,6 +362,7 @@ export default function ShoppingScreen() {
             </Card>
           </View>
 
+          {/* Delete list */}
           {selectedList ? (
             <View style={[styles.sectionPad, styles.deleteListSection]}>
               <Pressable
@@ -364,15 +370,16 @@ export default function ShoppingScreen() {
                 onPress={() => deleteList(selectedList)}
                 style={({ pressed }) => [styles.deleteListPress, pressed && { opacity: 0.7 }]}
               >
-                <Text style={[styles.deleteList, { color: colors.danger }]}>Delete list</Text>
+                <Text style={[styles.deleteList, { color: colors.danger }]}>Delete this list</Text>
               </Pressable>
             </View>
           ) : null}
         </>
       ) : (
         <EmptyState
+          icon="cart-outline"
           title="Select or create a list"
-          subtitle="Tap a list again to close it. Long-press to delete."
+          subtitle="Tap a list to open it. Long-press to delete."
         />
       )}
     </Screen>
@@ -380,23 +387,23 @@ export default function ShoppingScreen() {
 }
 
 const styles = StyleSheet.create({
-  sectionPad: { paddingHorizontal: spacing.lg },
+  sectionPad: { paddingHorizontal: spacing.xl },
   row: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-end" },
   flex: { flex: 1 },
   listHeader: {
     paddingBottom: spacing.sm,
   },
-  listTitle: typography.headline,
+  listTitle: typography.title,
   deleteListSection: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxxl,
     alignItems: "center",
   },
   deleteListPress: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
-  deleteList: { ...typography.label, fontWeight: "600" },
+  deleteList: { ...typography.label },
   newListForm: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -415,14 +422,15 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     alignItems: "stretch",
   },
   actionBtn: { flex: 1, minWidth: 0 },
   shareIconBtn: {
-    minHeight: 40,
+    minHeight: 42,
     minWidth: 44,
     borderRadius: radius.md,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
@@ -436,16 +444,15 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
   },
   filterSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
     gap: 2,
   },
   filterHeading: {
-    ...typography.caption,
-    fontWeight: "600",
+    ...typography.captionMedium,
     flex: 1,
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
 });

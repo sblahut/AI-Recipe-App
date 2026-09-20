@@ -238,18 +238,15 @@ export default function SettingsScreen() {
 
   return (
     <Screen scroll>
-      <Text style={[styles.lead, { color: colors.textMuted }]}>
-        Profile, appearance, and kitchen defaults for your pantry.
-      </Text>
-
+      {/* Profile */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Profile</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Profile</Text>
         <View style={styles.profilePhotoBlock}>
           <ProfileAvatar
             colors={colors}
             username={preferences.username}
             photoUri={preferences.profilePhotoUri}
-            size={88}
+            size={80}
             onPress={openProfilePhotoMenu}
           />
           <AppButton
@@ -286,7 +283,7 @@ export default function SettingsScreen() {
               </Text>
             </View>
             <AppButton
-              label={preferences.username.trim() ? "Edit name" : "Add name"}
+              label={preferences.username.trim() ? "Edit" : "Add name"}
               variant="secondary"
               compact
               onPress={() => setEditingProfile(true)}
@@ -296,7 +293,7 @@ export default function SettingsScreen() {
           <View style={styles.profileEdit}>
             <AppTextField
               label="Display name"
-              hint="How you want to be shown in the app."
+              hint="How you appear in the app."
               value={usernameDraft}
               onChangeText={setUsernameDraft}
               autoCapitalize="words"
@@ -317,10 +314,11 @@ export default function SettingsScreen() {
         )}
       </Card>
 
+      {/* Appearance */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Appearance</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Override light or dark mode, or follow your phone.
+          Choose light or dark mode, or follow your phone.
         </Text>
         <View style={styles.chipRow}>
           {THEME_OPTIONS.map(({ mode, label }) => (
@@ -335,12 +333,13 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
+      {/* Kitchen defaults */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Kitchen</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Kitchen</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Default storage when stocking from recipes or scans.
+          Default storage when adding items from scans or recipes.
         </Text>
-        <Text style={[styles.chainLabel, { color: colors.text }]}>Default location</Text>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Default location</Text>
         <View style={styles.chipRow}>
           <Chip
             label="None"
@@ -361,17 +360,17 @@ export default function SettingsScreen() {
         <SettingsSwitchRow
           colors={colors}
           label="Ask every time"
-          hint="When off, uses your default location without prompting."
+          hint="When off, uses your default location without asking."
           value={preferences.promptForStorageLocation ?? true}
           onValueChange={(next) => void setPromptForStorageLocation(next)}
           disabled={!preferences.defaultStorageLocation}
         />
 
-        <Text style={[styles.chainLabel, { color: colors.text, marginTop: spacing.sm }]}>
+        <Text style={[styles.fieldLabel, { color: colors.text, marginTop: spacing.md }]}>
           Custom storage areas
         </Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Same areas as on the Ingredients tab. Removing one does not delete items.
+          Same areas as on the Pantry tab. Removing one doesn't delete items.
         </Text>
         {preferences.customZones.length === 0 ? (
           <Text style={[styles.empty, { color: colors.textMuted }]}>No custom areas yet.</Text>
@@ -399,12 +398,13 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
+      {/* Recipes */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Recipes</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipes</Text>
         <SettingsSwitchRow
           colors={colors}
           label="Auto-save generated recipes"
-          hint="Saves each generate run on the server (not favorites)."
+          hint="Saves each generate run on the server (not as favorites)."
           value={preferences.autoPersistGeneratedRecipes}
           onValueChange={(next) => void setAutoPersistGeneratedRecipes(next)}
         />
@@ -415,7 +415,7 @@ export default function SettingsScreen() {
           value={preferences.prioritizeExpiringWhenGenerating ?? true}
           onValueChange={(next) => void setPrioritizeExpiringWhenGenerating(next)}
         />
-        <Text style={[styles.chainLabel, { color: colors.text }]}>Recipes per generate</Text>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Recipes per generate</Text>
         <View style={styles.chipRow}>
           {RECIPE_COUNT_OPTIONS.map((count) => (
             <Chip
@@ -429,10 +429,11 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
+      {/* Stores */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Favorite grocery stores</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Grocery stores</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Save stores you shop at. Open an address in your phone’s default maps app.
+          Save the stores you shop at. Open directions in your phone's maps app.
         </Text>
 
         {preferences.stores.length === 0 && storeDraft == null ? (
@@ -466,7 +467,7 @@ export default function SettingsScreen() {
                 onPress={() => setStoreDraft(store)}
               />
               <AppButton
-                label="Weekly ad"
+                label="Ad"
                 variant="secondary"
                 compact
                 onPress={() => openStoreWeeklyAd(store)}
@@ -486,12 +487,12 @@ export default function SettingsScreen() {
             />
             <AppTextField
               label="Address"
-              hint="Used to open Apple Maps, Google Maps, or your default GPS app."
+              hint="Used for directions in your maps app."
               placeholder="123 Main St, Locust Grove, VA"
               value={storeDraft.address}
               onChangeText={(address) => setStoreDraft({ ...storeDraft, address })}
             />
-            <Text style={[styles.chainLabel, { color: colors.text }]}>Chain</Text>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Chain</Text>
             <View style={styles.chipRow}>
               {STORE_CHAINS.map((chain) => (
                 <Chip
@@ -517,17 +518,18 @@ export default function SettingsScreen() {
         )}
       </Card>
 
+      {/* About */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>About</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           AI Recipe · version {appVersion}
         </Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Pantry, barcodes, and local recipe generation on your home network.
+          Your family's cooking assistant, running on your home network.
         </Text>
         <SettingsLinkRow
           colors={colors}
-          label="Open API docs in browser"
+          label="Open API docs"
           hint={`${serverUrl}/docs`}
           onPress={() => {
             void openExternalUrl(`${serverUrl.replace(/\/+$/, "")}/docs`).catch((e: unknown) => {
@@ -537,13 +539,14 @@ export default function SettingsScreen() {
         />
       </Card>
 
+      {/* Server connection */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Home server</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Home server</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Dev / LAN setup: recipe API on port 8000 (not Metro on 8081). Same Wi‑Fi as this phone.
+          Your phone connects to the recipe server on the same Wi-Fi. Use port 8000.
         </Text>
         <AppTextField
-          label="Home server URL"
+          label="Server address"
           hint="Example: http://192.168.1.45:8000"
           value={draft}
           onChangeText={setDraft}
@@ -553,7 +556,7 @@ export default function SettingsScreen() {
         />
 
         <AppButton
-          label="Save URL"
+          label="Save address"
           onPress={() => {
             void (async () => {
               await setServerUrl(draft);
@@ -586,11 +589,11 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  lead: { ...typography.caption, lineHeight: 20 },
-  section: typography.headline,
+  sectionTitle: typography.headline,
   hint: { ...typography.caption, lineHeight: 18 },
-  result: { ...typography.body, marginTop: spacing.xs },
-  empty: typography.caption,
+  result: { ...typography.bodyMedium },
+  empty: { ...typography.caption, paddingVertical: spacing.xs },
+  fieldLabel: { ...typography.label, marginTop: spacing.sm },
   profilePhotoBlock: {
     alignItems: "center",
     gap: spacing.sm,
@@ -602,7 +605,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   profileText: { flex: 1, gap: 2 },
-  displayName: typography.label,
+  displayName: typography.bodyMedium,
   profileEdit: { gap: spacing.sm },
   storeRow: {
     borderWidth: 1,
@@ -621,10 +624,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   zoneAdd: { gap: spacing.sm, marginTop: spacing.sm },
-  storeName: typography.label,
+  storeName: typography.bodyMedium,
   storeActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   storeForm: { gap: spacing.sm },
-  chainLabel: typography.label,
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   row: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, alignItems: "center" },
   flex: { flex: 1 },
