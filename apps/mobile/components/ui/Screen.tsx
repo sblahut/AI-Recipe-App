@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, RefObject } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -19,6 +19,7 @@ type Props = ViewProps & {
   loading?: boolean;
   contentContainerStyle?: object;
   refreshControl?: ReactElement<RefreshControlProps>;
+  scrollRef?: RefObject<ScrollView | null>;
 };
 
 export function Screen({
@@ -28,6 +29,7 @@ export function Screen({
   style,
   contentContainerStyle,
   refreshControl,
+  scrollRef,
   children,
   ...rest
 }: Props) {
@@ -49,6 +51,7 @@ export function Screen({
     return (
       <SafeAreaView style={[styles.fill, { backgroundColor: colors.background }]} edges={["bottom"]}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[pad, styles.scrollContent, contentContainerStyle]}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"

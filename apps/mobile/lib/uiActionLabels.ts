@@ -10,6 +10,9 @@ export const RECIPE_SHOPPING_LIST_BUTTON_LABEL = "+ Shopping list";
 /** Recipe card: schedule recipe on the meal plan. */
 export const RECIPE_MEAL_PLAN_BUTTON_LABEL = "+ Meal plan";
 
+/** Recipes tab: generate from home inventory via Ollama. */
+export const GENERATE_RECIPE_FROM_INGREDIENTS_LABEL = "Generate Recipe from Ingredients";
+
 export function shareShoppingListAccessibilityLabel(listName: string): string {
   return `Share shopping list ${listName}`;
 }

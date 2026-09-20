@@ -1,6 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type ScrollView,
+} from "react-native";
 import type { TextInput } from "react-native";
 import { z } from "zod";
 
@@ -23,6 +32,7 @@ import { findFavoriteMatch } from "@/lib/recipeFavorites";
 import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import {
+  GENERATE_RECIPE_FROM_INGREDIENTS_LABEL,
   RECIPE_MEAL_PLAN_BUTTON_LABEL,
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
   shareRecipeAccessibilityLabel,
@@ -66,13 +76,51 @@ export default function RecipesScreen() {
   const [importExpanded, setImportExpanded] = useState(true);
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const searchInputRef = useRef<TextInput>(null);
-  const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
   const [ready, setReady] = useState<GenerateReady>({
     serverOk: false,
     ollamaOk: null,
     ingredientCount: 0,
   });
+  const searchInputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const generatedSectionY = useRef(0);
+  const scrollToGeneratedPending = useRef(false);
+  const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
+
+  const markScrollToGenerated = useCallback(() => {
+    scrollToGeneratedPending.current = true;
+  }, []);
+
+  const performScrollToGenerated = useCallback(() => {
+    const y = generatedSectionY.current;
+    if (y <= 0) {
+      return false;
+    }
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: true });
+    scrollToGeneratedPending.current = false;
+    return true;
+  }, []);
+
+  const onGeneratedSectionLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      generatedSectionY.current = event.nativeEvent.layout.y;
+      if (scrollToGeneratedPending.current && generated.length > 0) {
+        performScrollToGenerated();
+      }
+    },
+    [generated.length, performScrollToGenerated],
+  );
+
+  useEffect(() => {
+    if (!scrollToGeneratedPending.current || generated.length === 0) {
+      return;
+    }
+    if (!performScrollToGenerated()) {
+      requestAnimationFrame(() => {
+        performScrollToGenerated();
+      });
+    }
+  }, [generated, performScrollToGenerated]);
 
   const loadFavorites = useCallback(async () => {
     const raw = await apiJson<unknown>("/recipes/saved", { baseUrl: serverUrl });
@@ -148,6 +196,9 @@ export default function RecipesScreen() {
         }),
       });
       const parsed = recipeGenerateResponseSchema.parse(raw);
+      if (parsed.recipes.length > 0) {
+        markScrollToGenerated();
+      }
       setGenerated(parsed.recipes);
       if (parsed.recipes.length === 0) {
         Alert.alert("Search AI", "No recipes came back — try a different description.");
@@ -200,6 +251,9 @@ export default function RecipesScreen() {
         }),
       });
       const parsed = recipeGenerateResponseSchema.parse(raw);
+      if (parsed.recipes.length > 0) {
+        markScrollToGenerated();
+      }
       setGenerated(parsed.recipes);
       if (parsed.saved_recipes.length > 0) {
         await loadFavorites();
@@ -288,7 +342,7 @@ export default function RecipesScreen() {
   };
 
   return (
-    <Screen scroll contentContainerStyle={styles.scroll}>
+    <Screen scroll scrollRef={scrollRef} contentContainerStyle={styles.scroll}>
       <RecipeDetailModal
         visible={detailRecipe != null}
         recipe={detailRecipe}
@@ -336,7 +390,7 @@ export default function RecipesScreen() {
       </Pressable>
 
       <AppButton
-        label={loading ? "Generating…" : "Generate from ingredients"}
+        label={loading ? "Generating…" : GENERATE_RECIPE_FROM_INGREDIENTS_LABEL}
         loading={loading}
         onPress={() => {
           dismissSearch();
@@ -418,42 +472,48 @@ export default function RecipesScreen() {
         autoCorrect={false}
       />
 
-      {generated.length > 0 ? (
-        <>
-          <Pressable onPress={dismissSearch}>
-            <Text style={[styles.section, { color: colors.text }]}>
-              Generated ideas ({filteredGenerated.length})
-            </Text>
-          </Pressable>
-          {filteredGenerated.length === 0 ? (
+      <View
+        collapsable={false}
+        onLayout={onGeneratedSectionLayout}
+        style={styles.generatedSection}
+      >
+        {generated.length > 0 ? (
+          <>
             <Pressable onPress={dismissSearch}>
-              <EmptyState title="No matches" subtitle="Try a different search term." />
+              <Text style={[styles.section, { color: colors.text }]}>
+                Generated ideas ({filteredGenerated.length})
+              </Text>
             </Pressable>
-          ) : (
-            filteredGenerated.map((recipe, index) => {
-              const isFavorite = findFavoriteMatch(favorites, recipe) != null;
-              return (
-                <RecipeCard
-                  key={recipeListKey(recipe, index)}
-                  recipe={recipe}
-                  colors={colors}
-                  isFavorite={isFavorite}
-                  onDismissSearch={dismissSearch}
-                  onViewRecipe={() => openRecipeDetail(recipe)}
-                  onToggleFavorite={() => void toggleFavorite(recipe)}
-                  onAddToShoppingList={() => promptAddRecipeToShoppingList(recipe, lists, serverUrl)}
-                  onAddToMealPlan={() =>
-                    void promptAddRecipeToMealPlan(recipe, serverUrl, favorites).then(() =>
-                      loadFavorites(),
-                    )
-                  }
-                  onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
-                />
-              );
-            })
-          )}
-        </>
-      ) : null}
+            {filteredGenerated.length === 0 ? (
+              <Pressable onPress={dismissSearch}>
+                <EmptyState title="No matches" subtitle="Try a different search term." />
+              </Pressable>
+            ) : (
+              filteredGenerated.map((recipe, index) => {
+                const isFavorite = findFavoriteMatch(favorites, recipe) != null;
+                return (
+                  <RecipeCard
+                    key={recipeListKey(recipe, index)}
+                    recipe={recipe}
+                    colors={colors}
+                    isFavorite={isFavorite}
+                    onDismissSearch={dismissSearch}
+                    onViewRecipe={() => openRecipeDetail(recipe)}
+                    onToggleFavorite={() => void toggleFavorite(recipe)}
+                    onAddToShoppingList={() => promptAddRecipeToShoppingList(recipe, lists, serverUrl)}
+                    onAddToMealPlan={() =>
+                      void promptAddRecipeToMealPlan(recipe, serverUrl, favorites).then(() =>
+                        loadFavorites(),
+                      )
+                    }
+                    onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
+                  />
+                );
+              })
+            )}
+          </>
+        ) : null}
+      </View>
 
       <CollapsibleSection
         title={`Favorites (${favorites.length})`}
@@ -623,6 +683,7 @@ function RecipeCard({
 
 const styles = StyleSheet.create({
   scroll: { gap: spacing.md },
+  generatedSection: { gap: spacing.md },
   lead: { ...typography.caption, lineHeight: 20 },
   readyTitle: typography.headline,
   readyLine: { ...typography.caption, lineHeight: 20 },

@@ -1,4 +1,5 @@
 import {
+  GENERATE_RECIPE_FROM_INGREDIENTS_LABEL,
   RECIPE_MEAL_PLAN_BUTTON_LABEL,
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
   SHOPPING_OPEN_LIST_LABEL,
@@ -13,6 +14,7 @@ describe("uiActionLabels", () => {
     expect(SHOPPING_OPEN_LIST_LABEL).toBe("Open list");
     expect(RECIPE_SHOPPING_LIST_BUTTON_LABEL).toBe("+ Shopping list");
     expect(RECIPE_MEAL_PLAN_BUTTON_LABEL).toBe("+ Meal plan");
+    expect(GENERATE_RECIPE_FROM_INGREDIENTS_LABEL).toBe("Generate Recipe from Ingredients");
   });
 
   it("builds share accessibility labels", () => {
