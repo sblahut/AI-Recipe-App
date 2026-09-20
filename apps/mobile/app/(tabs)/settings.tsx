@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
+import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Platform, StyleSheet, Text, View } from "react-native";
 
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { SettingsLinkRow, SettingsSwitchRow } from "@/components/ui/SettingsRow";
@@ -15,6 +16,7 @@ import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
 import { pickProfilePhoto, profilePhotoSourceOptions } from "@/lib/profilePhoto";
+import { serverUrlQrImageUri } from "@/lib/parseServerUrlFromQr";
 import { weeklyAdUrlForStore } from "@/lib/storeChains";
 import {
   STORE_CHAINS,
@@ -543,11 +545,25 @@ export default function SettingsScreen() {
       <Card>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Home server</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Your phone connects to the recipe server on the same Wi-Fi. Use port 8000.
+          This URL is the kitchen API on your PC (port 8000), not Expo Go. Use your LAN address at
+          home, or the Tailscale MagicDNS URL at home and away. The other iPhone can scan this QR
+          in Settings to use the same server.
         </Text>
+        <View style={styles.serverQrWrap}>
+          <Image
+            accessibilityLabel="QR code for the home server URL"
+            source={{ uri: serverUrlQrImageUri(draft || serverUrl) }}
+            style={styles.serverQr}
+          />
+        </View>
+        <AppButton
+          label="Scan server QR"
+          variant="secondary"
+          onPress={() => router.push({ pathname: "/scan", params: { target: "server_url" } })}
+        />
         <AppTextField
           label="Server address"
-          hint="Example: http://192.168.1.45:8000"
+          hint="Example: http://kitchen-pc.tailxxxxx.ts.net:8000"
           value={draft}
           onChangeText={setDraft}
           autoCapitalize="none"
@@ -630,4 +646,6 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   row: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, alignItems: "center" },
   flex: { flex: 1 },
+  serverQrWrap: { alignItems: "center", paddingVertical: spacing.sm },
+  serverQr: { width: 180, height: 180 },
 });

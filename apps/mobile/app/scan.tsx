@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -20,6 +20,7 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiJson } from "@/lib/api";
+import { parseServerUrlFromQr } from "@/lib/parseServerUrlFromQr";
 import {
   barcodeScanResponseSchema,
   productReadSchema,
@@ -40,7 +41,67 @@ type PendingScan = {
   resolving: boolean;
 };
 
+function ServerUrlQrScan() {
+  const { colors } = useAppTheme();
+  const { setServerUrl } = useServerSettings();
+  const [permission, requestPermission] = useCameraPermissions();
+  const handled = useRef(false);
+
+  if (!permission) {
+    return <View style={styles.container} />;
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.message, { color: colors.text }]}>
+          Camera access is needed to scan the home server QR.
+        </Text>
+        <AppButton label="Allow camera" onPress={() => void requestPermission()} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Stack.Screen options={{ title: "Scan server QR" }} />
+      <CameraView
+        style={styles.camera}
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={({ data }) => {
+          if (handled.current) {
+            return;
+          }
+          const url = parseServerUrlFromQr(data);
+          if (!url) {
+            return;
+          }
+          handled.current = true;
+          void setServerUrl(url).then(() => {
+            Alert.alert("Home server saved", url, [{ text: "OK", onPress: () => router.back() }]);
+          });
+        }}
+      />
+      <View style={[styles.frameHint, { borderColor: colors.primary }]} pointerEvents="none" />
+      <View style={[styles.hintBar, { backgroundColor: colors.surface + "EB" }]}>
+        <Text style={[styles.hintText, { color: colors.text }]}>
+          Scan the QR from the Windows home-stack page (or another phone’s Settings).
+        </Text>
+        <AppButton label="Cancel" variant="ghost" compact onPress={() => router.back()} />
+      </View>
+    </View>
+  );
+}
+
 export default function ScanScreen() {
+  const params = useLocalSearchParams<ScanParams>();
+  if (params.target === "server_url") {
+    return <ServerUrlQrScan />;
+  }
+  return <BarcodeScanScreen />;
+}
+
+function BarcodeScanScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { serverUrl } = useServerSettings();
