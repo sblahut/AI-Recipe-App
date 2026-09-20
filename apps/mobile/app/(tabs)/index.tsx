@@ -2,8 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  FlatList,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   RefreshControl,
@@ -250,157 +248,152 @@ export default function IngredientsScreen() {
   const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
 
   return (
-    <Screen padded={false}>
-      <KeyboardAvoidingView
-        style={styles.fill}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View style={styles.toolbar}>
-          <AppButton
-            label="+ Manual"
-            compact
-            onPress={() => {
-              dismissSearch();
-              setShowForm(true);
-            }}
-            style={styles.toolbarBtn}
-          />
-          <AppButton
-            label="Scan barcode"
-            variant="accent"
-            compact
-            style={styles.toolbarBtn}
-            onPress={() => {
-              dismissSearch();
-              void startIngredientScan();
-            }}
-          />
-        </View>
+    <Screen
+      scroll
+      padded={false}
+      contentContainerStyle={styles.scroll}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+      }
+    >
+      <View style={styles.toolbar}>
+        <AppButton
+          label="+ Manual"
+          compact
+          onPress={() => {
+            dismissSearch();
+            setShowForm(true);
+          }}
+          style={styles.toolbarBtn}
+        />
+        <AppButton
+          label="Scan barcode"
+          variant="accent"
+          compact
+          style={styles.toolbarBtn}
+          onPress={() => {
+            dismissSearch();
+            void startIngredientScan();
+          }}
+        />
+      </View>
 
-        <Pressable style={styles.filterSection} onPress={dismissSearch}>
-          <View style={styles.filterHeadingRow}>
-            <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
-            {!addingZone ? (
-              <AppButton
-                label="+ Add area / zone"
-                variant="secondary"
-                compact
-                onPress={() => {
-                  dismissSearch();
-                  setAddingZone(true);
-                }}
-              />
-            ) : null}
-          </View>
-          {storageFilters.map((filter) => (
-            <StorageFilterOption
-              key={filter.id}
-              label={filter.label}
-              icon={filter.icon}
-              selected={locationFilter === filter.id}
-              count={countByFilter.get(filter.id) ?? 0}
+      <Pressable style={styles.filterSection} onPress={dismissSearch}>
+        <View style={styles.filterHeadingRow}>
+          <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
+          {!addingZone ? (
+            <AppButton
+              label="+ Add area / zone"
+              variant="secondary"
+              compact
               onPress={() => {
                 dismissSearch();
-                setLocationFilter(filter.id);
+                setAddingZone(true);
               }}
-              {...(filter.kind === "custom"
-                ? { onLongPress: () => confirmRemoveZone(filter.id) }
-                : {})}
             />
-          ))}
-          {addingZone ? (
-            <View style={styles.zoneForm}>
-              <View style={styles.flex}>
-                <AppTextField
-                  placeholder="Garage, spice rack, basement…"
-                  value={newZoneName}
-                  onChangeText={setNewZoneName}
-                  onSubmitEditing={() => void submitZone()}
-                  autoFocus
-                />
-              </View>
-              <AppButton label="Save" compact onPress={() => void submitZone()} />
-              <AppButton
-                label="Cancel"
-                variant="ghost"
-                compact
-                onPress={() => {
-                  setAddingZone(false);
-                  setNewZoneName("");
-                }}
+          ) : null}
+        </View>
+        {storageFilters.map((filter) => (
+          <StorageFilterOption
+            key={filter.id}
+            label={filter.label}
+            icon={filter.icon}
+            selected={locationFilter === filter.id}
+            count={countByFilter.get(filter.id) ?? 0}
+            onPress={() => {
+              dismissSearch();
+              setLocationFilter(filter.id);
+            }}
+            {...(filter.kind === "custom"
+              ? { onLongPress: () => confirmRemoveZone(filter.id) }
+              : {})}
+          />
+        ))}
+        {addingZone ? (
+          <View style={styles.zoneForm}>
+            <View style={styles.flex}>
+              <AppTextField
+                placeholder="Garage, spice rack, basement…"
+                value={newZoneName}
+                onChangeText={setNewZoneName}
+                onSubmitEditing={() => void submitZone()}
+                autoFocus
               />
             </View>
-          ) : null}
-        </Pressable>
-
-        <Pressable style={styles.searchPad} onPress={dismissSearch}>
-          <SearchField
-            ref={searchInputRef}
-            placeholder="Search ingredients by name, location, notes, or barcode"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </Pressable>
-
-        <FlatList
-          style={styles.fill}
-          data={filteredItems}
-          keyExtractor={(item) => String(item.id)}
-          keyboardDismissMode="on-drag"
-          keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={dismissSearch}
-          contentContainerStyle={filteredItems.length === 0 ? styles.listEmpty : styles.list}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
-          }
-          ListEmptyComponent={
-            <EmptyState
-              title={
-                searchQuery.trim()
-                  ? "No matches"
-                  : locationFilter === "All"
-                    ? "No ingredients yet"
-                    : "Nothing in this location"
-              }
-              subtitle={
-                searchQuery.trim()
-                  ? "Try another search or clear the search field."
-                  : "Add manually, scan a barcode, or pick another storage filter."
-              }
+            <AppButton label="Save" compact onPress={() => void submitZone()} />
+            <AppButton
+              label="Cancel"
+              variant="ghost"
+              compact
+              onPress={() => {
+                setAddingZone(false);
+                setNewZoneName("");
+              }}
             />
-          }
-          renderItem={({ item }) => (
-          <SwipeableRow onDelete={() => deleteItem(item)}>
-            <Card style={styles.row}>
-              <Pressable
-                onPress={() => {
-                  dismissSearch();
-                  setEditing(item);
-                }}
-                style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
-              >
-                <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
-                <Text style={[styles.meta, { color: colors.textMuted }]}>
-                  {formatQty(item)} · {formatLocationLabel(item.location)}
-                </Text>
-              </Pressable>
-              {Platform.OS === "web" ? (
-                <Pressable
-                  accessibilityLabel={`Delete ${item.name}`}
-                  hitSlop={8}
-                  onPress={() => deleteItem(item)}
-                  style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
-                >
-                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
-                </Pressable>
-              ) : null}
-            </Card>
-          </SwipeableRow>
-        )}
+          </View>
+        ) : null}
+      </Pressable>
+
+      <View style={styles.searchPad}>
+        <SearchField
+          ref={searchInputRef}
+          placeholder="Search ingredients by name, location, notes, or barcode"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
         />
-      </KeyboardAvoidingView>
+      </View>
+
+      {filteredItems.length === 0 ? (
+        <View style={styles.list}>
+          <EmptyState
+            title={
+              searchQuery.trim()
+                ? "No matches"
+                : locationFilter === "All"
+                  ? "No ingredients yet"
+                  : "Nothing in this location"
+            }
+            subtitle={
+              searchQuery.trim()
+                ? "Try another search or clear the search field."
+                : "Add manually, scan a barcode, or pick another storage filter."
+            }
+          />
+        </View>
+      ) : (
+        <View style={styles.list}>
+          {filteredItems.map((item) => (
+            <SwipeableRow key={item.id} onDelete={() => deleteItem(item)}>
+              <Card style={styles.row}>
+                <Pressable
+                  onPress={() => {
+                    dismissSearch();
+                    setEditing(item);
+                  }}
+                  style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
+                >
+                  <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
+                  <Text style={[styles.meta, { color: colors.textMuted }]}>
+                    {formatQty(item)} · {formatLocationLabel(item.location)}
+                  </Text>
+                </Pressable>
+                {Platform.OS === "web" ? (
+                  <Pressable
+                    accessibilityLabel={`Delete ${item.name}`}
+                    hitSlop={8}
+                    onPress={() => deleteItem(item)}
+                    style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                  </Pressable>
+                ) : null}
+              </Card>
+            </SwipeableRow>
+          ))}
+        </View>
+      )}
     </Screen>
   );
 }
@@ -411,22 +404,20 @@ function formatQty(item: Ingredient): string {
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
+  scroll: { gap: spacing.sm },
   toolbar: {
     flexDirection: "row",
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md,
   },
   toolbarBtn: { flex: 1 },
   filterSection: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
     gap: 2,
   },
   searchPad: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
   },
   filterHeadingRow: {
     flexDirection: "row",
@@ -449,10 +440,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   flex: { flex: 1 },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
-  listEmpty: { flexGrow: 1 },
+  list: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
   row: {
-    marginBottom: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,

@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -16,6 +17,7 @@ type Props = ViewProps & {
   padded?: boolean;
   loading?: boolean;
   contentContainerStyle?: object;
+  refreshControl?: ReactElement;
 };
 
 export function Screen({
@@ -24,6 +26,7 @@ export function Screen({
   loading = false,
   style,
   contentContainerStyle,
+  refreshControl,
   children,
   ...rest
 }: Props) {
@@ -49,6 +52,7 @@ export function Screen({
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={() => Keyboard.dismiss()}
+          refreshControl={refreshControl}
           showsVerticalScrollIndicator={false}
         >
           {children}
