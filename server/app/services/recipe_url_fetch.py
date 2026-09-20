@@ -37,13 +37,7 @@ def _hostname_blocked(hostname: str) -> bool:
             ip = ipaddress.ip_address(ip_str)
         except ValueError:
             continue
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_multicast
-            or ip.is_reserved
-        ):
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
             return True
     return False
 
