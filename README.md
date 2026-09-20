@@ -156,7 +156,7 @@ Recipe **generate** and **paste import** need Ollama. Inventory, barcodes, and s
 
    Generate: **POST `/recipes/generate`** with `{ "use_all": true, "count": 2 }`.
 
-   Import: **POST `/recipes/import`** with `{ "text": "Title\\n\\nIngredients…\\n\\nSteps…" }`.
+   Import: **POST `/recipes/import`** with `{ "text": "…" }` or `{ "url": "https://…" }` (exactly one).
 
    Optional `persist` / `persist_generated` saves recipes on the server (non-favorite unless `favorite: true` on import). Default: `DEFAULT_PERSIST_GENERATED_RECIPES` in `.env`.
 
@@ -209,7 +209,7 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 | POST | `/products` | Register a barcode product in the family catalog |
 | POST | `/scan/barcode` | UPC lookup + add to inventory or shopping list |
 | POST | `/recipes/generate` | AI recipes from inventory (optional auto-save) |
-| POST | `/recipes/import` | Parse pasted recipe text via Ollama (optional save) |
+| POST | `/recipes/import` | Parse pasted text or fetch a recipe URL, then Ollama (optional save) |
 | GET/POST/DELETE | `/recipes/saved` | Store and browse family recipes |
 | GET/POST | `/shopping/lists` | Shopping trips and line items |
 | POST | `/shopping/from-recipe` | Missing recipe lines → list (skips pantry) |
@@ -265,7 +265,6 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 
 ## Roadmap (later)
 
-- Recipe import from **URLs** (not just paste).
 - **Meal plan** and multi-recipe shopping lists.
 - **HTTPS / Tailscale** for using the app off-LAN.
 
