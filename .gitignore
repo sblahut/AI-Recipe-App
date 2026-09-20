@@ -225,3 +225,6 @@ server/data/imports/*.jsonl
 server/.env
 apps/mobile/node_modules/
 apps/mobile/.expo/
+
+# Machine-local desktop launcher (hardcoded paths; see local/desktop-launcher/)
+local/
