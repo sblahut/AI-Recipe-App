@@ -12,6 +12,10 @@ import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import {
+  mealPlanShopAlertMessage,
+  mealPlanShopAlertTitle,
+} from "@/lib/shoppingFromMealPlanAlert";
+import {
   MEAL_SLOT_LABELS,
   MEAL_SLOTS,
   type MealSlot,
@@ -176,7 +180,10 @@ export default function MealPlanScreen() {
       Alert.alert("No lists", "Create a shopping list on the Shopping tab first.");
       return;
     }
-    Alert.alert("Shop this week", `${weekRange.start} → ${weekRange.end}`, [
+    Alert.alert(
+      "Shop this week",
+      `Adds missing ingredients from your meal plan (${weekRange.start} → ${weekRange.end}) to the list you pick. Items already in Ingredients are skipped.`,
+      [
       ...lists.map((list) => ({
         text: list.name,
         onPress: () => {
@@ -193,17 +200,16 @@ export default function MealPlanScreen() {
                 }),
               });
               const result = shoppingFromMealPlanResponseSchema.parse(raw);
-              const skipped = result.skipped_in_pantry.length;
-              const added = result.added.length;
-              const missing = result.missing_entry_ids.length;
-              let detail = `${added} line${added === 1 ? "" : "s"} updated on ${list.name}.`;
-              if (skipped > 0) {
-                detail += ` ${skipped} already in pantry.`;
-              }
-              if (missing > 0) {
-                detail += ` ${missing} planned meal(s) had missing recipes.`;
-              }
-              Alert.alert(added > 0 ? "List updated" : "Nothing to buy", detail);
+              const summary = {
+                addedCount: result.added.length,
+                skippedPantryCount: result.skipped_in_pantry.length,
+                missingEntryCount: result.missing_entry_ids.length,
+                mealsProcessed: result.meals_processed,
+              };
+              Alert.alert(
+                mealPlanShopAlertTitle(summary),
+                mealPlanShopAlertMessage(summary, list.name),
+              );
             } catch (e) {
               Alert.alert("Shop failed", e instanceof Error ? e.message : "Unknown error");
             } finally {
@@ -213,7 +219,8 @@ export default function MealPlanScreen() {
         },
       })),
       { text: "Cancel", style: "cancel" },
-    ]);
+      ],
+    );
   };
 
   return (

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -46,6 +47,7 @@ import {
 const defaultUnits = defaultUnitsByKind();
 
 export default function IngredientsScreen() {
+  const params = useLocalSearchParams<{ manualAdd?: string; location?: string }>();
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
   const { preferences, addZone, removeZone } = useUserPreferences();
@@ -59,7 +61,9 @@ export default function IngredientsScreen() {
   const [addingZone, setAddingZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [createDefaultLocation, setCreateDefaultLocation] = useState<string | undefined>();
   const searchInputRef = useRef<TextInput>(null);
+  const handledManualAdd = useRef(false);
 
   const storageFilters = useMemo(
     () => buildStorageFilters(preferences.customZones),
@@ -99,6 +103,25 @@ export default function IngredientsScreen() {
       void refresh();
     });
   }, [refresh]);
+
+  useEffect(() => {
+    if (handledManualAdd.current) {
+      return;
+    }
+    if (params.manualAdd !== "1" || !params.location?.trim()) {
+      return;
+    }
+    handledManualAdd.current = true;
+    const loc = params.location.trim();
+    queueMicrotask(() => {
+      setCreateDefaultLocation(loc);
+      setShowForm(true);
+      const filterMatch = storageFilters.find((row) => row.id === loc);
+      if (filterMatch) {
+        setLocationFilter(filterMatch.id);
+      }
+    });
+  }, [params.manualAdd, params.location, storageFilters]);
 
   const countByFilter = useMemo(() => {
     const counts = new Map<StorageFilterId, number>();
@@ -162,6 +185,7 @@ export default function IngredientsScreen() {
       }
       setShowForm(false);
       setEditing(null);
+      setCreateDefaultLocation(undefined);
       await loadInventory();
     } catch (e) {
       Alert.alert("Save failed", e instanceof Error ? e.message : "Unknown error");
@@ -235,11 +259,13 @@ export default function IngredientsScreen() {
     return (
       <PantryItemForm
         {...(editing ? { initial: editing } : {})}
+        {...(!editing && createDefaultLocation ? { defaultLocation: createDefaultLocation } : {})}
         unitsByKind={unitsByKind}
         onSubmit={saveItem}
         onCancel={() => {
           setShowForm(false);
           setEditing(null);
+          setCreateDefaultLocation(undefined);
         }}
         {...(editing ? { onDelete: () => deleteItem(editing) } : {})}
       />

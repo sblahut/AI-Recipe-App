@@ -14,6 +14,8 @@ import type { Ingredient, IngredientCreate, QuantityKind } from "@/lib/schemas";
 
 type Props = {
   initial?: Ingredient;
+  /** When creating a row, pre-select this storage area. */
+  defaultLocation?: string;
   unitsByKind: Record<QuantityKind, string[]>;
   onSubmit: (payload: IngredientCreate) => Promise<void>;
   onCancel: () => void;
@@ -43,13 +45,20 @@ function initialLocationState(
   return { preset: "Other", custom: location };
 }
 
-export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDelete }: Props) {
+export function PantryItemForm({
+  initial,
+  defaultLocation,
+  unitsByKind,
+  onSubmit,
+  onCancel,
+  onDelete,
+}: Props) {
   const { colors } = useAppTheme();
   const { preferences } = useUserPreferences();
   const resolvedUnits = useMemo(() => mergeQuantityUnitsFromApi(unitsByKind), [unitsByKind]);
   const locInit = useMemo(
-    () => initialLocationState(initial?.location, preferences.customZones),
-    [initial?.location, preferences.customZones],
+    () => initialLocationState(initial?.location ?? defaultLocation, preferences.customZones),
+    [initial?.location, defaultLocation, preferences.customZones],
   );
   const [name, setName] = useState(initial?.name ?? "");
   const [quantityKind, setQuantityKind] = useState<QuantityKind>(

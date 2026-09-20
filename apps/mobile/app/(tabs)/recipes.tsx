@@ -15,7 +15,9 @@ import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { promptAddRecipeToMealPlan } from "@/lib/addToMealPlan";
 import { apiFetch, apiJson } from "@/lib/api";
+import { findFavoriteMatch } from "@/lib/recipeFavorites";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
 import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
@@ -39,14 +41,6 @@ type GenerateReady = {
   ingredientCount: number;
 };
 
-function findFavoriteMatch(
-  favorites: SavedRecipe[],
-  recipe: GeneratedRecipe,
-): SavedRecipe | undefined {
-  const title = recipe.title.trim().toLowerCase();
-  return favorites.find((row) => row.recipe.title.trim().toLowerCase() === title);
-}
-
 export default function RecipesScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
@@ -54,6 +48,8 @@ export default function RecipesScreen() {
   const [favorites, setFavorites] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
+  const [aiSearchQuery, setAiSearchQuery] = useState("");
+  const [aiSearchLoading, setAiSearchLoading] = useState(false);
   const [importText, setImportText] = useState("");
   const [importUrl, setImportUrl] = useState("");
   const [importLoading, setImportLoading] = useState(false);
@@ -113,6 +109,44 @@ export default function RecipesScreen() {
     () => favorites.filter((row) => recipeMatchesSearch(row.recipe, searchQuery)),
     [favorites, searchQuery],
   );
+
+  const searchAiForRecipe = async () => {
+    const query = aiSearchQuery.trim();
+    if (query.length < 3) {
+      Alert.alert("Search AI", "Describe the recipe you want (at least 3 characters).");
+      return;
+    }
+    if (!ready.serverOk) {
+      Alert.alert("Server offline", "Check the home server URL in Settings.");
+      return;
+    }
+    if (ready.ollamaOk === false) {
+      Alert.alert("Ollama offline", "AI search uses the same Ollama model as generate.");
+      return;
+    }
+
+    setAiSearchLoading(true);
+    try {
+      const raw = await apiJson<unknown>("/recipes/search", {
+        baseUrl: serverUrl,
+        method: "POST",
+        body: JSON.stringify({
+          query,
+          count: preferences.defaultRecipeCount ?? 3,
+          persist_generated: preferences.autoPersistGeneratedRecipes,
+        }),
+      });
+      const parsed = recipeGenerateResponseSchema.parse(raw);
+      setGenerated(parsed.recipes);
+      if (parsed.saved_recipes.length > 0) {
+        await loadFavorites();
+      }
+    } catch (e) {
+      Alert.alert("Search failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setAiSearchLoading(false);
+    }
+  };
 
   const generate = async () => {
     if (!ready.serverOk) {
@@ -315,6 +349,27 @@ export default function RecipesScreen() {
       />
 
       <Card>
+        <Text style={[styles.importCardTitle, { color: colors.text }]}>Search AI for recipe</Text>
+        <Text style={[styles.importHint, { color: colors.textMuted }]}>
+          Ask Ollama for ideas without using your pantry list (e.g. &quot;easy Thai chicken curry&quot;).
+        </Text>
+        <AppTextField
+          placeholder="What do you want to cook?"
+          value={aiSearchQuery}
+          onChangeText={setAiSearchQuery}
+        />
+        <AppButton
+          label={aiSearchLoading ? "Searching…" : "Search AI for recipe"}
+          variant="secondary"
+          loading={aiSearchLoading}
+          onPress={() => {
+            dismissSearch();
+            void searchAiForRecipe();
+          }}
+        />
+      </Card>
+
+      <Card>
         <Text style={[styles.importCardTitle, { color: colors.text }]}>Import recipe</Text>
         <Text style={[styles.importHint, { color: colors.textMuted }]}>
           Paste text or paste a public recipe page URL. The server fetches the page and parses it with
@@ -382,6 +437,11 @@ export default function RecipesScreen() {
                   onToggleFavorite={() => void toggleFavorite(recipe)}
                   onAddShopping={() => void addRecipeToShoppingList(recipe)}
                   onAddToIngredients={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
+                  onAddToMealPlan={() =>
+                    void promptAddRecipeToMealPlan(recipe, serverUrl, favorites).then(() =>
+                      loadFavorites(),
+                    )
+                  }
                   onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
                 />
               );
@@ -418,6 +478,11 @@ export default function RecipesScreen() {
               onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
               onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
               onAddToIngredients={() => void stockFromSavedRecipe(item.id, serverUrl)}
+              onAddToMealPlan={() =>
+                void promptAddRecipeToMealPlan(item.recipe, serverUrl, favorites).then(() =>
+                  loadFavorites(),
+                )
+              }
               onShare={() => void shareText(item.title, formatRecipeShare(item.recipe))}
             />
           )}
@@ -445,6 +510,7 @@ type RecipeCardProps = {
   onToggleFavorite: () => void;
   onAddShopping: () => void;
   onAddToIngredients: () => void;
+  onAddToMealPlan: () => void;
   onShare: () => void;
 };
 
@@ -458,6 +524,7 @@ function RecipeCard({
   onToggleFavorite,
   onAddShopping,
   onAddToIngredients,
+  onAddToMealPlan,
   onShare,
 }: RecipeCardProps) {
   const title = titleOverride ?? recipe.title;
@@ -515,7 +582,15 @@ function RecipeCard({
           }}
         />
         <AppButton
-          label="+ Ingredients"
+          label="Plan"
+          compact
+          onPress={() => {
+            onDismissSearch();
+            onAddToMealPlan();
+          }}
+        />
+        <AppButton
+          label="+ Pantry"
           compact
           onPress={() => {
             onDismissSearch();

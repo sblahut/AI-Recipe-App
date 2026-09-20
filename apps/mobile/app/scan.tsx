@@ -258,7 +258,9 @@ export default function ScanScreen() {
       : storageLocation
         ? `Scan into ${storageLocation} · tap Done when finished`
         : "Scan each item · tap Done when finished"
-    : "Scan one barcode · confirm quantity · return to Ingredients";
+    : storageLocation
+      ? `Scan a barcode to add to ${storageLocation} · Cancel to leave without scanning`
+      : "Scan one barcode · confirm quantity · return to Ingredients";
 
   return (
     <View style={styles.container}>

@@ -121,6 +121,7 @@ export const shoppingFromMealPlanResponseSchema = z.object({
   added: z.array(shoppingListItemSchema),
   skipped_in_pantry: z.array(z.string()),
   missing_entry_ids: z.array(z.number()).optional().default([]),
+  meals_processed: z.number().optional().default(0),
 });
 export type ShoppingFromMealPlanResponse = z.infer<typeof shoppingFromMealPlanResponseSchema>;
 

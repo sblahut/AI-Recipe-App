@@ -49,13 +49,14 @@ def test_add_meal_plan_range_merges_recipes_into_list() -> None:
     )
     db.commit()
 
-    added, skipped, missing = add_meal_plan_range_to_shopping_list(
+    added, skipped, missing, meals = add_meal_plan_range_to_shopping_list(
         db,
         list_id=shopping.id,
         start_date="2026-04-07",
         end_date="2026-04-13",
     )
 
+    assert meals == 2
     assert missing == []
     assert skipped == []
     assert len(added) >= 1
@@ -64,12 +65,13 @@ def test_add_meal_plan_range_merges_recipes_into_list() -> None:
     db.add(Ingredient(name="carrots", quantity_kind="count"))
     db.commit()
 
-    added2, skipped2, missing2 = add_meal_plan_range_to_shopping_list(
+    added2, skipped2, missing2, meals2 = add_meal_plan_range_to_shopping_list(
         db,
         list_id=shopping.id,
         start_date="2026-04-07",
         end_date="2026-04-13",
     )
+    assert meals2 == 2
     assert missing2 == []
     assert "carrots" in skipped2
     assert added2 == []

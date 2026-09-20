@@ -209,6 +209,7 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 | POST | `/products` | Register a barcode product in the family catalog |
 | POST | `/scan/barcode` | UPC lookup + add to inventory or shopping list |
 | POST | `/recipes/generate` | AI recipes from inventory (optional auto-save) |
+| POST | `/recipes/search` | AI recipe ideas from a text query (ignores pantry) |
 | POST | `/recipes/import` | Parse pasted text or fetch a recipe URL, then Ollama (optional save) |
 | GET/POST/DELETE | `/recipes/saved` | Store and browse family recipes |
 | GET/POST/PATCH/DELETE | `/meal-plan` | Week plan entries (saved recipe + date + meal slot) |

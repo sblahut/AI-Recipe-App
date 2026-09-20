@@ -80,7 +80,7 @@ def shopping_from_meal_plan(
         raise HTTPException(status_code=404, detail="Shopping list not found")
 
     try:
-        added, skipped, missing = add_meal_plan_range_to_shopping_list(
+        added, skipped, missing, meals_processed = add_meal_plan_range_to_shopping_list(
             db,
             list_id=body.list_id,
             start_date=body.start_date,
@@ -93,6 +93,7 @@ def shopping_from_meal_plan(
         added=added,
         skipped_in_pantry=skipped,
         missing_entry_ids=missing,
+        meals_processed=meals_processed,
     )
 
 

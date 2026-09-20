@@ -153,6 +153,15 @@ class RecipeGenerateResponse(BaseModel):
     saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
 
 
+class RecipeSearchRequest(BaseModel):
+    query: str = Field(min_length=3, max_length=500)
+    count: int = Field(default=3, ge=1, le=10)
+    persist_generated: bool | None = Field(
+        default=None,
+        description="When true, save each result (non-favorite). When omitted, uses server default.",
+    )
+
+
 class RecipeImportRequest(BaseModel):
     text: str | None = Field(default=None, max_length=50_000)
     url: str | None = Field(default=None, max_length=2048)
@@ -327,6 +336,7 @@ class ShoppingFromMealPlanResponse(BaseModel):
         default_factory=list,
         description="Meal plan rows whose saved recipe was deleted",
     )
+    meals_processed: int = 0
 
 
 RecipeGenerateResponse.model_rebuild()

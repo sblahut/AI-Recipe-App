@@ -1,6 +1,7 @@
 import { Alert } from "react-native";
 
 import { apiFetch } from "@/lib/api";
+import { formatStockRecipeAlertMessage } from "@/lib/formatStockRecipeAlert";
 import { pickStorageLocation } from "@/lib/pickStorageLocation";
 import { recipeToIngredientCreates } from "@/lib/recipeIngredients";
 import type { GeneratedRecipe } from "@/lib/schemas";
@@ -16,25 +17,30 @@ export async function stockFromGeneratedRecipe(
   }
 
   const items = recipeToIngredientCreates(recipe, location);
-  if (items.length > 0) {
-    await apiFetch("/inventory/bulk", {
-      baseUrl: serverUrl,
-      method: "POST",
-      body: JSON.stringify({ items }),
-    });
+  try {
+    if (items.length > 0) {
+      await apiFetch("/inventory/bulk", {
+        baseUrl: serverUrl,
+        method: "POST",
+        body: JSON.stringify({ items }),
+      });
+    }
+  } catch (e) {
+    Alert.alert("Add failed", e instanceof Error ? e.message : "Could not save to ingredients");
+    return;
   }
 
-  Alert.alert(
-    "Added to ingredients",
-    `${items.length} lines added to ${location}. Scan barcodes for packaged items?`,
-    [
-      {
-        text: "Scan barcodes",
-        onPress: () => {
-          openIngredientScan({ location, continuous: true });
-        },
-      },
-      { text: "Done", style: "cancel" },
-    ],
-  );
+  Alert.alert("Ingredients", formatStockRecipeAlertMessage(items.length, location), [
+    ...(items.length > 0
+      ? [
+          {
+            text: "Scan barcodes",
+            onPress: () => {
+              openIngredientScan({ location, continuous: true });
+            },
+          },
+        ]
+      : []),
+    { text: "OK", style: "cancel" as const },
+  ]);
 }

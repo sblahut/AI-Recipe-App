@@ -11,6 +11,7 @@ from app.schemas import (
     RecipeGenerateResponse,
     RecipeImportRequest,
     RecipeImportResponse,
+    RecipeSearchRequest,
     SavedRecipeCreate,
     SavedRecipeRead,
 )
@@ -61,6 +62,36 @@ async def generate_recipes(
             constraints=body.constraints,
             prioritize_expiring=body.prioritize_expiring,
         )
+    except ollama.OllamaError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    persist = (
+        body.persist_generated
+        if body.persist_generated is not None
+        else settings.default_persist_generated_recipes
+    )
+    saved_reads: list[SavedRecipeRead] = []
+    if persist:
+        for recipe in recipes:
+            row = SavedRecipe(
+                title=recipe.title,
+                payload_json=recipe.model_dump_json(),
+                favorite=False,
+            )
+            db.add(row)
+            db.flush()
+            saved_reads.append(SavedRecipeRead.from_orm_row(row))
+        db.commit()
+
+    return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
+
+
+@router.post("/search", response_model=RecipeGenerateResponse)
+async def search_recipes(
+    body: RecipeSearchRequest, db: Session = Depends(get_db)
+) -> RecipeGenerateResponse:
+    try:
+        recipes = await ollama.search_recipes(query=body.query, count=body.count)
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 

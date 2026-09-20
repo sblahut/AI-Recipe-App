@@ -22,7 +22,7 @@ def add_meal_plan_range_to_shopping_list(
     list_id: int,
     start_date: str,
     end_date: str,
-) -> tuple[list[ShoppingListItemRead], list[str], list[int]]:
+) -> tuple[list[ShoppingListItemRead], list[str], list[int], int]:
     start_d, end_d = validate_plan_date_range(start_date, end_date)
 
     rows = db.query(MealPlanEntry).all()
@@ -56,4 +56,4 @@ def add_meal_plan_range_to_shopping_list(
         skipped.extend(batch_skipped)
 
     deduped_skipped = list(dict.fromkeys(skipped))
-    return added, deduped_skipped, missing_entry_ids
+    return added, deduped_skipped, missing_entry_ids, len(in_range)
