@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { z } from "zod";
 
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
+import { SearchField, dismissSearchKeyboard } from "@/components/ui/SearchField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
@@ -64,6 +65,8 @@ export default function RecipesScreen() {
   const [importLoading, setImportLoading] = useState(false);
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<TextInput>(null);
+  const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
   const [ready, setReady] = useState<GenerateReady>({
     serverOk: false,
     ollamaOk: null,
@@ -271,10 +274,13 @@ export default function RecipesScreen() {
 
   return (
     <Screen scroll contentContainerStyle={styles.scroll}>
-      <Text style={[styles.lead, { color: colors.textMuted }]}>
-        Uses ingredients at home and your Ollama server. Tap the star to add recipes to Favorites.
-      </Text>
+      <Pressable onPress={dismissSearch}>
+        <Text style={[styles.lead, { color: colors.textMuted }]}>
+          Uses ingredients at home and your Ollama server. Tap the star to add recipes to Favorites.
+        </Text>
+      </Pressable>
 
+      <Pressable onPress={dismissSearch}>
       <Card>
         <Text style={[styles.readyTitle, { color: colors.text }]}>Needed to generate</Text>
         <ReadyLine
@@ -303,11 +309,15 @@ export default function RecipesScreen() {
           }
         />
       </Card>
+      </Pressable>
 
       <AppButton
         label={loading ? "Generating…" : "Generate from ingredients"}
         loading={loading}
-        onPress={() => void generate()}
+        onPress={() => {
+          dismissSearch();
+          void generate();
+        }}
       />
 
       <Card>
@@ -340,11 +350,15 @@ export default function RecipesScreen() {
           label={importLoading ? "Importing…" : "Import with AI"}
           variant="secondary"
           loading={importLoading}
-          onPress={() => void importRecipe()}
+          onPress={() => {
+            dismissSearch();
+            void importRecipe();
+          }}
         />
       </Card>
 
-      <AppTextField
+      <SearchField
+        ref={searchInputRef}
         placeholder="Search recipes by title or ingredient"
         value={searchQuery}
         onChangeText={setSearchQuery}
@@ -354,9 +368,13 @@ export default function RecipesScreen() {
 
       {generated.length > 0 ? (
         <>
-          <Text style={[styles.section, { color: colors.text }]}>Generated ideas</Text>
+          <Pressable onPress={dismissSearch}>
+            <Text style={[styles.section, { color: colors.text }]}>Generated ideas</Text>
+          </Pressable>
           {filteredGenerated.length === 0 ? (
-            <EmptyState title="No matches" subtitle="Try a different search term." />
+            <Pressable onPress={dismissSearch}>
+              <EmptyState title="No matches" subtitle="Try a different search term." />
+            </Pressable>
           ) : (
             filteredGenerated.map((recipe) => {
               const isFavorite = findFavoriteMatch(favorites, recipe) != null;
@@ -366,6 +384,7 @@ export default function RecipesScreen() {
                   recipe={recipe}
                   colors={colors}
                   isFavorite={isFavorite}
+                  onDismissSearch={dismissSearch}
                   onToggleFavorite={() => void toggleFavorite(recipe)}
                   onAddShopping={() => void addRecipeToShoppingList(recipe)}
                   onAddToIngredients={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
@@ -377,10 +396,10 @@ export default function RecipesScreen() {
         </>
       ) : null}
 
-      <View style={styles.favoritesHeading}>
+      <Pressable style={styles.favoritesHeading} onPress={dismissSearch}>
         <Ionicons name="star" size={20} color={colors.primary} />
         <Text style={[styles.section, styles.favoritesTitle, { color: colors.text }]}>Favorites</Text>
-      </View>
+      </Pressable>
       {favorites.length === 0 ? (
         <EmptyState
           title="No favorites yet"
@@ -401,6 +420,7 @@ export default function RecipesScreen() {
               meta={`Favorited ${new Date(item.created_at).toLocaleDateString()}`}
               colors={colors}
               isFavorite
+              onDismissSearch={dismissSearch}
               onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
               onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
               onAddToIngredients={() => void stockFromSavedRecipe(item.id, serverUrl)}
@@ -427,6 +447,7 @@ type RecipeCardProps = {
   meta?: string;
   colors: ThemeColors;
   isFavorite: boolean;
+  onDismissSearch: () => void;
   onToggleFavorite: () => void;
   onAddShopping: () => void;
   onAddToIngredients: () => void;
@@ -439,6 +460,7 @@ function RecipeCard({
   meta,
   colors,
   isFavorite,
+  onDismissSearch,
   onToggleFavorite,
   onAddShopping,
   onAddToIngredients,
@@ -450,6 +472,7 @@ function RecipeCard({
     `${recipe.prep_minutes ?? "?"} min · serves ${recipe.servings ?? "?"} · ${recipe.ingredients.length} ingredients`;
 
   return (
+    <Pressable onPress={onDismissSearch}>
     <Card>
       <View style={styles.titleRow}>
         <View style={styles.titleBlock}>
@@ -460,7 +483,10 @@ function RecipeCard({
           accessibilityRole="button"
           accessibilityLabel={isFavorite ? `Remove ${title} from favorites` : `Add ${title} to favorites`}
           hitSlop={10}
-          onPress={onToggleFavorite}
+          onPress={() => {
+            onDismissSearch();
+            onToggleFavorite();
+          }}
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
           <Ionicons
@@ -476,11 +502,35 @@ function RecipeCard({
         </Text>
       ))}
       <View style={styles.actions}>
-        <AppButton label="Share" variant="secondary" compact onPress={onShare} />
-        <AppButton label="Shopping" variant="accent" compact onPress={onAddShopping} />
-        <AppButton label="+ Ingredients" compact onPress={onAddToIngredients} />
+        <AppButton
+          label="Share"
+          variant="secondary"
+          compact
+          onPress={() => {
+            onDismissSearch();
+            onShare();
+          }}
+        />
+        <AppButton
+          label="Shopping"
+          variant="accent"
+          compact
+          onPress={() => {
+            onDismissSearch();
+            onAddShopping();
+          }}
+        />
+        <AppButton
+          label="+ Ingredients"
+          compact
+          onPress={() => {
+            onDismissSearch();
+            onAddToIngredients();
+          }}
+        />
       </View>
     </Card>
+    </Pressable>
   );
 }
 

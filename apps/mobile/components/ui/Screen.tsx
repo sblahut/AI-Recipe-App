@@ -1,4 +1,11 @@
-import { ActivityIndicator, ScrollView, StyleSheet, View, type ViewProps } from "react-native";
+import {
+  ActivityIndicator,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  View,
+  type ViewProps,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { spacing } from "@/constants/theme";
@@ -39,7 +46,9 @@ export function Screen({
       <SafeAreaView style={[styles.fill, { backgroundColor: colors.background }]} edges={["bottom"]}>
         <ScrollView
           contentContainerStyle={[pad, styles.scrollContent, contentContainerStyle]}
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={() => Keyboard.dismiss()}
           showsVerticalScrollIndicator={false}
         >
           {children}
