@@ -22,6 +22,10 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { findFavoriteMatch } from "@/lib/recipeFavorites";
 import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
+import {
+  RECIPE_SHOPPING_LIST_BUTTON_LABEL,
+  shareRecipeAccessibilityLabel,
+} from "@/lib/uiActionLabels";
 import { recipeListKey } from "@/lib/recipeListKey";
 import { recipeMatchesSearch } from "@/lib/recipeSearch";
 import {
@@ -548,22 +552,38 @@ function RecipeCard({
           <Text style={[styles.meta, { color: colors.textMuted }]}>{subtitle}</Text>
           <Text style={[styles.tapHint, { color: colors.primary }]}>Tap for full recipe</Text>
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isFavorite ? `Remove ${title} from favorites` : `Add ${title} to favorites`}
-          hitSlop={10}
-          onPress={() => {
-            onDismissSearch();
-            onToggleFavorite();
-          }}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Ionicons
-            name={isFavorite ? "star" : "star-outline"}
-            size={26}
-            color={isFavorite ? colors.primary : colors.textMuted}
-          />
-        </Pressable>
+        <View style={styles.titleIcons}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={shareRecipeAccessibilityLabel(title)}
+            hitSlop={10}
+            onPress={() => {
+              onDismissSearch();
+              onShare();
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="share-outline" size={24} color={colors.textMuted} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              isFavorite ? `Remove ${title} from favorites` : `Add ${title} to favorites`
+            }
+            hitSlop={10}
+            onPress={() => {
+              onDismissSearch();
+              onToggleFavorite();
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons
+              name={isFavorite ? "star" : "star-outline"}
+              size={26}
+              color={isFavorite ? colors.primary : colors.textMuted}
+            />
+          </Pressable>
+        </View>
       </View>
       <Pressable onPress={onViewRecipe}>
         {recipe.steps.slice(0, 2).map((step, i) => (
@@ -579,17 +599,8 @@ function RecipeCard({
       </Pressable>
       <View style={styles.actions}>
         <AppButton
-          label="Share"
+          label={RECIPE_SHOPPING_LIST_BUTTON_LABEL}
           variant="secondary"
-          compact
-          onPress={() => {
-            onDismissSearch();
-            onShare();
-          }}
-        />
-        <AppButton
-          label="Shopping list"
-          variant="accent"
           compact
           onPress={() => {
             onDismissSearch();
@@ -629,6 +640,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  titleIcons: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   titleBlock: { flex: 1 },

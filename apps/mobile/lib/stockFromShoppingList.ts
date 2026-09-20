@@ -4,10 +4,11 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { pickStorageLocation } from "@/lib/pickStorageLocation";
 import { shoppingListDetailSchema } from "@/lib/schemas";
 import { openIngredientScan } from "@/lib/startIngredientScan";
+import { SHOPPING_STOCK_FROM_LIST_LABEL } from "@/lib/uiActionLabels";
 
 /** Add shopping list lines to ingredients, then scan barcodes for packaged goods. */
 export async function stockFromShoppingList(listId: number, serverUrl: string): Promise<void> {
-  const location = await pickStorageLocation("Add cart to ingredients");
+  const location = await pickStorageLocation(SHOPPING_STOCK_FROM_LIST_LABEL);
   if (!location) {
     return;
   }

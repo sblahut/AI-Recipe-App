@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
@@ -10,7 +11,7 @@ import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
-import { spacing, typography } from "@/constants/theme";
+import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -18,6 +19,11 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
 import { formatShoppingListShare, shareText } from "@/lib/shareContent";
 import { stockFromShoppingList } from "@/lib/stockFromShoppingList";
+import {
+  SHOPPING_OPEN_LIST_LABEL,
+  SHOPPING_STOCK_FROM_LIST_LABEL,
+  shareShoppingListAccessibilityLabel,
+} from "@/lib/uiActionLabels";
 import {
   weeklyAdChainForStore,
   weeklyAdChainsForPicker,
@@ -286,25 +292,31 @@ export default function ShoppingScreen() {
 
           <View style={[styles.sectionPad, styles.actionsRow]}>
             <AppButton
-              label="Share list"
-              variant="secondary"
-              compact
-              style={styles.actionBtn}
-              onPress={() => void shareList()}
-            />
-            <AppButton
-              label="Add cart to ingredients"
-              compact
-              style={styles.actionBtn}
-              onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
-            />
-            <AppButton
-              label="Open list"
-              variant="secondary"
+              label={SHOPPING_OPEN_LIST_LABEL}
+              variant="primary"
               compact
               style={styles.actionBtn}
               onPress={openShoppingList}
             />
+            <AppButton
+              label={SHOPPING_STOCK_FROM_LIST_LABEL}
+              variant="secondary"
+              compact
+              style={styles.actionBtn}
+              onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={shareShoppingListAccessibilityLabel(selectedList?.name ?? "list")}
+              onPress={() => void shareList()}
+              style={({ pressed }) => [
+                styles.shareIconBtn,
+                { backgroundColor: colors.overlay },
+                pressed && { opacity: 0.88 },
+              ]}
+            >
+              <Ionicons name="share-outline" size={22} color={colors.text} />
+            </Pressable>
           </View>
 
           <View style={styles.sectionPad}>
@@ -400,8 +412,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   itemToolbar: { marginBottom: spacing.sm },
-  actionsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md, alignItems: "stretch" },
+  actionsRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    alignItems: "stretch",
+  },
   actionBtn: { flex: 1, minWidth: 0 },
+  shareIconBtn: {
+    minHeight: 40,
+    minWidth: 44,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+  },
   dealTitle: typography.headline,
   dealHint: { ...typography.caption, lineHeight: 18, marginTop: spacing.xs },
   chainRow: {
