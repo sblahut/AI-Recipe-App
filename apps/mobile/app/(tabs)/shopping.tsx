@@ -195,7 +195,6 @@ export default function ShoppingScreen() {
   };
 
   const selectedList = lists.find((list) => list.id === selectedId);
-  const itemCount = detail?.items.length ?? 0;
 
   if (loading) {
     return <Screen loading />;
@@ -275,14 +274,21 @@ export default function ShoppingScreen() {
               label="Share list"
               variant="secondary"
               compact
-              style={styles.flex}
+              style={styles.actionBtn}
               onPress={() => void shareList()}
             />
             <AppButton
               label="Stock into ingredients"
               compact
-              style={styles.flex}
+              style={styles.actionBtn}
               onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
+            />
+            <AppButton
+              label="Open list"
+              variant="secondary"
+              compact
+              style={styles.actionBtn}
+              onPress={openShoppingList}
             />
           </View>
 
@@ -331,23 +337,6 @@ export default function ShoppingScreen() {
               )}
             </Card>
           </View>
-
-          <View style={styles.filterSection}>
-            <View style={styles.browseHeader}>
-              <Text style={[styles.filterHeading, styles.browseHeading, { color: colors.textMuted }]}>
-                Browse items
-                {itemCount > 0 ? ` (${itemCount})` : ""}
-              </Text>
-              <Pressable
-                onPress={openShoppingList}
-                hitSlop={8}
-                accessibilityRole="link"
-                accessibilityLabel="Open shopping list"
-              >
-                <Text style={[styles.openListLink, { color: colors.primary }]}>Open shopping list</Text>
-              </Pressable>
-            </View>
-          </View>
         </>
       ) : (
         <EmptyState
@@ -373,7 +362,8 @@ const styles = StyleSheet.create({
   allListsLink: { ...typography.caption, fontWeight: "600", marginTop: spacing.xs },
   deleteList: { ...typography.caption, fontWeight: "600" },
   itemToolbar: { marginBottom: spacing.sm },
-  actionsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
+  actionsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md, alignItems: "stretch" },
+  actionBtn: { flex: 1, minWidth: 0 },
   dealTitle: typography.headline,
   dealHint: { ...typography.caption, lineHeight: 18, marginTop: spacing.xs },
   chainRow: {
@@ -395,12 +385,4 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  browseHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-  },
-  browseHeading: { marginBottom: 0, flex: 1 },
-  openListLink: { ...typography.caption, fontWeight: "600" },
 });
