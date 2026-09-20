@@ -30,20 +30,17 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { startIngredientScan } from "@/lib/startIngredientScan";
 import { formatExpirationLabel } from "@/lib/expirationDate";
+import { formatUnitLabel } from "@/lib/quantityUnits";
 import { textMatchesSearch } from "@/lib/textSearch";
+import { defaultUnitsByKind, mergeQuantityUnitsFromApi } from "@/lib/quantityUnits";
 import {
   ingredientSchema,
   quantityUnitsSchema,
   type Ingredient,
   type IngredientCreate,
-  type QuantityKind,
 } from "@/lib/schemas";
 
-const defaultUnits: Record<QuantityKind, string[]> = {
-  count: ["each"],
-  weight: ["g"],
-  volume: ["ml"],
-};
+const defaultUnits = defaultUnitsByKind();
 
 export default function IngredientsScreen() {
   const { colors } = useAppTheme();
@@ -70,9 +67,9 @@ export default function IngredientsScreen() {
     try {
       const raw = await apiJson<unknown>("/meta/quantity-units", { baseUrl: serverUrl });
       const parsed = quantityUnitsSchema.parse(raw);
-      setUnitsByKind({ ...defaultUnits, ...parsed.kinds });
+      setUnitsByKind(mergeQuantityUnitsFromApi(parsed.kinds));
     } catch {
-      setUnitsByKind(defaultUnits);
+      setUnitsByKind(defaultUnitsByKind());
     }
   }, [serverUrl]);
 
@@ -401,7 +398,8 @@ export default function IngredientsScreen() {
 
 function formatQty(item: Ingredient): string {
   if (item.quantity == null) return "No quantity set";
-  return `${item.quantity} ${item.unit ?? ""}`.trim();
+  const unitLabel = item.unit ? formatUnitLabel(item.unit) : "";
+  return `${item.quantity} ${unitLabel}`.trim();
 }
 
 function formatIngredientMeta(item: Ingredient): string {

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-
 import { ExpirationDateField } from "@/components/ExpirationDateField";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -10,6 +9,7 @@ import { INVENTORY_LOCATIONS } from "@/constants/inventoryLocations";
 import { spacing, typography } from "@/constants/theme";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { formatUnitLabel, mergeQuantityUnitsFromApi, unitsForKind } from "@/lib/quantityUnits";
 import type { Ingredient, IngredientCreate, QuantityKind } from "@/lib/schemas";
 
 type Props = {
@@ -46,6 +46,7 @@ function initialLocationState(
 export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDelete }: Props) {
   const { colors } = useAppTheme();
   const { preferences } = useUserPreferences();
+  const resolvedUnits = useMemo(() => mergeQuantityUnitsFromApi(unitsByKind), [unitsByKind]);
   const locInit = useMemo(
     () => initialLocationState(initial?.location, preferences.customZones),
     [initial?.location, preferences.customZones],
@@ -54,18 +55,24 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDel
   const [quantityKind, setQuantityKind] = useState<QuantityKind>(
     initial?.quantity_kind ?? "count",
   );
-  const [unit, setUnit] = useState(initial?.unit ?? unitsByKind.count[0] ?? "each");
+  const [unit, setUnit] = useState(initial?.unit ?? resolvedUnits.count[0] ?? "each");
   const [quantity, setQuantity] = useState(initial?.quantity?.toString() ?? "");
   const [locationPreset, setLocationPreset] = useState(locInit.preset);
   const [customLocation, setCustomLocation] = useState(locInit.custom);
   const [expiresAt, setExpiresAt] = useState<string | null>(initial?.expires_at ?? null);
   const [saving, setSaving] = useState(false);
 
+  const unitOptions = useMemo(
+    () => unitsForKind(quantityKind, resolvedUnits, unit),
+    [quantityKind, resolvedUnits, unit],
+  );
+
   const selectKind = (kind: QuantityKind) => {
     setQuantityKind(kind);
-    const units = unitsByKind[kind];
-    if (units.length > 0) {
-      setUnit(units[0] ?? "each");
+    const options = unitsForKind(kind, resolvedUnits, unit);
+    const keep = unit && options.includes(unit) ? unit : options[0];
+    if (keep) {
+      setUnit(keep);
     }
   };
 
@@ -168,8 +175,13 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDel
 
       <Text style={[styles.label, { color: colors.text }]}>Unit</Text>
       <View style={styles.chipRowWrap}>
-        {unitsByKind[quantityKind].map((u) => (
-          <Chip key={u} label={u} selected={unit === u} onPress={() => setUnit(u)} />
+        {unitOptions.map((u) => (
+          <Chip
+            key={u}
+            label={formatUnitLabel(u)}
+            selected={unit === u}
+            onPress={() => setUnit(u)}
+          />
         ))}
       </View>
 
