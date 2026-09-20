@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Platform, StyleSheet, Text, View } from "react-native";
 
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { SettingsLinkRow, SettingsSwitchRow } from "@/components/ui/SettingsRow";
@@ -15,6 +15,9 @@ import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
 import { pickProfilePhoto, profilePhotoSourceOptions } from "@/lib/profilePhoto";
+import { apiJson } from "@/lib/api";
+import { expoGoDisplayUrl, qrCodeImageUri } from "@/lib/expoGoDevUrl";
+import { homeNetworkSchema } from "@/lib/schemas";
 import { weeklyAdUrlForStore } from "@/lib/storeChains";
 import {
   STORE_CHAINS,
@@ -43,7 +46,7 @@ const RECIPE_COUNT_OPTIONS = [1, 2, 3, 5, 10] as const;
 
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
-  const { serverUrl, setServerUrl, loading, testConnection } = useServerSettings();
+  const { serverUrl, loading } = useServerSettings();
   const {
     preferences,
     setUsername,
@@ -61,12 +64,9 @@ export default function SettingsScreen() {
     setProfilePhotoUri,
   } = useUserPreferences();
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [draft, setDraft] = useState(serverUrl);
   const [usernameDraft, setUsernameDraft] = useState(preferences.username);
   const [editingProfile, setEditingProfile] = useState(false);
   const [zoneDraft, setZoneDraft] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
   const [storeDraft, setStoreDraft] = useState<StoreDraft | null>(null);
 
   const storageLocations = useMemo(
@@ -75,12 +75,27 @@ export default function SettingsScreen() {
   );
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+  const [networkExpoUrl, setNetworkExpoUrl] = useState<string | null>(null);
+  const [lanHost, setLanHost] = useState<string | null>(null);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      setDraft(serverUrl);
-    });
+    void (async () => {
+      try {
+        const raw = await apiJson<unknown>("/meta/home-network", { baseUrl: serverUrl });
+        const network = homeNetworkSchema.parse(raw);
+        setLanHost(network.lan_host);
+        setNetworkExpoUrl(network.expo_go_url);
+      } catch {
+        setLanHost(null);
+        setNetworkExpoUrl(null);
+      }
+    })();
   }, [serverUrl]);
+
+  const expoGoUrl = useMemo(
+    () => expoGoDisplayUrl(lanHost) ?? networkExpoUrl,
+    [lanHost, networkExpoUrl],
+  );
 
   useEffect(() => {
     if (!editingProfile) {
@@ -93,13 +108,6 @@ export default function SettingsScreen() {
   if (loading) {
     return <Screen loading />;
   }
-
-  const resultColor =
-    result?.startsWith("✓") === true
-      ? colors.success
-      : result?.startsWith("✗") === true
-        ? colors.danger
-        : colors.textSecondary;
 
   const saveProfile = async () => {
     await setUsername(usernameDraft);
@@ -238,18 +246,15 @@ export default function SettingsScreen() {
 
   return (
     <Screen scroll>
-      <Text style={[styles.lead, { color: colors.textMuted }]}>
-        Profile, appearance, and kitchen defaults for your pantry.
-      </Text>
-
+      {/* Profile */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Profile</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Profile</Text>
         <View style={styles.profilePhotoBlock}>
           <ProfileAvatar
             colors={colors}
             username={preferences.username}
             photoUri={preferences.profilePhotoUri}
-            size={88}
+            size={80}
             onPress={openProfilePhotoMenu}
           />
           <AppButton
@@ -286,7 +291,7 @@ export default function SettingsScreen() {
               </Text>
             </View>
             <AppButton
-              label={preferences.username.trim() ? "Edit name" : "Add name"}
+              label={preferences.username.trim() ? "Edit" : "Add name"}
               variant="secondary"
               compact
               onPress={() => setEditingProfile(true)}
@@ -296,7 +301,7 @@ export default function SettingsScreen() {
           <View style={styles.profileEdit}>
             <AppTextField
               label="Display name"
-              hint="How you want to be shown in the app."
+              hint="How you appear in the app."
               value={usernameDraft}
               onChangeText={setUsernameDraft}
               autoCapitalize="words"
@@ -317,10 +322,11 @@ export default function SettingsScreen() {
         )}
       </Card>
 
+      {/* Appearance */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Appearance</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Override light or dark mode, or follow your phone.
+          Choose light or dark mode, or follow your phone.
         </Text>
         <View style={styles.chipRow}>
           {THEME_OPTIONS.map(({ mode, label }) => (
@@ -335,12 +341,13 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
+      {/* Kitchen defaults */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Kitchen</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Kitchen</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Default storage when stocking from recipes or scans.
+          Default storage when adding items from scans or recipes.
         </Text>
-        <Text style={[styles.chainLabel, { color: colors.text }]}>Default location</Text>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Default location</Text>
         <View style={styles.chipRow}>
           <Chip
             label="None"
@@ -361,17 +368,17 @@ export default function SettingsScreen() {
         <SettingsSwitchRow
           colors={colors}
           label="Ask every time"
-          hint="When off, uses your default location without prompting."
+          hint="When off, uses your default location without asking."
           value={preferences.promptForStorageLocation ?? true}
           onValueChange={(next) => void setPromptForStorageLocation(next)}
           disabled={!preferences.defaultStorageLocation}
         />
 
-        <Text style={[styles.chainLabel, { color: colors.text, marginTop: spacing.sm }]}>
+        <Text style={[styles.fieldLabel, { color: colors.text, marginTop: spacing.md }]}>
           Custom storage areas
         </Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Same areas as on the Ingredients tab. Removing one does not delete items.
+          Same areas as on the Pantry tab. Removing one doesn't delete items.
         </Text>
         {preferences.customZones.length === 0 ? (
           <Text style={[styles.empty, { color: colors.textMuted }]}>No custom areas yet.</Text>
@@ -399,12 +406,13 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
+      {/* Recipes */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Recipes</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipes</Text>
         <SettingsSwitchRow
           colors={colors}
           label="Auto-save generated recipes"
-          hint="Saves each generate run on the server (not favorites)."
+          hint="Saves each generate run on the server (not as favorites)."
           value={preferences.autoPersistGeneratedRecipes}
           onValueChange={(next) => void setAutoPersistGeneratedRecipes(next)}
         />
@@ -415,7 +423,7 @@ export default function SettingsScreen() {
           value={preferences.prioritizeExpiringWhenGenerating ?? true}
           onValueChange={(next) => void setPrioritizeExpiringWhenGenerating(next)}
         />
-        <Text style={[styles.chainLabel, { color: colors.text }]}>Recipes per generate</Text>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Recipes per generate</Text>
         <View style={styles.chipRow}>
           {RECIPE_COUNT_OPTIONS.map((count) => (
             <Chip
@@ -429,10 +437,11 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
+      {/* Stores */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Favorite grocery stores</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Grocery stores</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Save stores you shop at. Open an address in your phone’s default maps app.
+          Save the stores you shop at. Open directions in your phone's maps app.
         </Text>
 
         {preferences.stores.length === 0 && storeDraft == null ? (
@@ -466,7 +475,7 @@ export default function SettingsScreen() {
                 onPress={() => setStoreDraft(store)}
               />
               <AppButton
-                label="Weekly ad"
+                label="Ad"
                 variant="secondary"
                 compact
                 onPress={() => openStoreWeeklyAd(store)}
@@ -486,12 +495,12 @@ export default function SettingsScreen() {
             />
             <AppTextField
               label="Address"
-              hint="Used to open Apple Maps, Google Maps, or your default GPS app."
+              hint="Used for directions in your maps app."
               placeholder="123 Main St, Locust Grove, VA"
               value={storeDraft.address}
               onChangeText={(address) => setStoreDraft({ ...storeDraft, address })}
             />
-            <Text style={[styles.chainLabel, { color: colors.text }]}>Chain</Text>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Chain</Text>
             <View style={styles.chipRow}>
               {STORE_CHAINS.map((chain) => (
                 <Chip
@@ -517,17 +526,18 @@ export default function SettingsScreen() {
         )}
       </Card>
 
+      {/* About */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>About</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           AI Recipe · version {appVersion}
         </Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Pantry, barcodes, and local recipe generation on your home network.
+          Your family's cooking assistant, running on your home network.
         </Text>
         <SettingsLinkRow
           colors={colors}
-          label="Open API docs in browser"
+          label="Open API docs"
           hint={`${serverUrl}/docs`}
           onPress={() => {
             void openExternalUrl(`${serverUrl.replace(/\/+$/, "")}/docs`).catch((e: unknown) => {
@@ -537,60 +547,42 @@ export default function SettingsScreen() {
         />
       </Card>
 
+      {/* Dev + server connection */}
       <Card>
-        <Text style={[styles.section, { color: colors.text }]}>Home server</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Connect this phone</Text>
+
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Dev / LAN setup: recipe API on port 8000 (not Metro on 8081). Same Wi‑Fi as this phone.
+          Scan with the iPhone Camera to open this project in Expo Go (same Wi‑Fi as the PC). Works
+          from this phone, from the PC status page, or while previewing on http://localhost:8081 —
+          the QR always uses your PC's LAN address, not localhost.
         </Text>
-        <AppTextField
-          label="Home server URL"
-          hint="Example: http://192.168.1.45:8000"
-          value={draft}
-          onChangeText={setDraft}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-        />
-
-        <AppButton
-          label="Save URL"
-          onPress={() => {
-            void (async () => {
-              await setServerUrl(draft);
-              setResult("Saved.");
-            })();
-          }}
-        />
-
-        <AppButton
-          label={testing ? "Testing…" : "Test connection"}
-          variant="secondary"
-          loading={testing}
-          onPress={() => {
-            void (async () => {
-              setTesting(true);
-              setResult(null);
-              const out = await testConnection();
-              setResult(out.ok ? `✓ ${out.message}` : `✗ ${out.message}`);
-              setTesting(false);
-            })();
-          }}
-        />
-
-        {result ? (
-          <Text style={[styles.result, { color: resultColor }]}>{result}</Text>
-        ) : null}
+        {expoGoUrl ? (
+          <View style={styles.serverQrWrap}>
+            <Image
+              accessibilityLabel="QR code to open this app in Expo Go"
+              source={{ uri: qrCodeImageUri(expoGoUrl) }}
+              style={styles.serverQr}
+            />
+            <Text style={[styles.hint, { color: colors.textMuted }]} selectable>
+              {expoGoUrl}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            Start the API on your PC (port 8000) and Metro (port 8081), then reopen Settings to load
+            the Expo QR.
+          </Text>
+        )}
       </Card>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  lead: { ...typography.caption, lineHeight: 20 },
-  section: typography.headline,
+  sectionTitle: typography.headline,
   hint: { ...typography.caption, lineHeight: 18 },
-  result: { ...typography.body, marginTop: spacing.xs },
-  empty: typography.caption,
+  empty: { ...typography.caption, paddingVertical: spacing.xs },
+  fieldLabel: { ...typography.label, marginTop: spacing.sm },
   profilePhotoBlock: {
     alignItems: "center",
     gap: spacing.sm,
@@ -602,7 +594,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   profileText: { flex: 1, gap: 2 },
-  displayName: typography.label,
+  displayName: typography.bodyMedium,
   profileEdit: { gap: spacing.sm },
   storeRow: {
     borderWidth: 1,
@@ -621,11 +613,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   zoneAdd: { gap: spacing.sm, marginTop: spacing.sm },
-  storeName: typography.label,
+  storeName: typography.bodyMedium,
   storeActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   storeForm: { gap: spacing.sm },
-  chainLabel: typography.label,
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   row: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, alignItems: "center" },
   flex: { flex: 1 },
+  serverQrWrap: { alignItems: "center", paddingVertical: spacing.sm },
+  serverQr: { width: 180, height: 180 },
 });

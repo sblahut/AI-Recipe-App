@@ -22,7 +22,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
 import type { ThemeColors } from "@/constants/theme";
-import { spacing, typography } from "@/constants/theme";
+import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -227,7 +227,7 @@ export default function RecipesScreen() {
       return;
     }
     if (ready.ingredientCount === 0) {
-      Alert.alert("No ingredients", "Add items on the Ingredients tab first. Generation uses what you have at home.");
+      Alert.alert("No ingredients", "Add items on the Pantry tab first. Generation uses what you have at home.");
       return;
     }
     if (ready.ollamaOk === false) {
@@ -352,45 +352,41 @@ export default function RecipesScreen() {
           setDetailTitle(undefined);
         }}
       />
+
+      {/* Status indicators */}
       <Pressable onPress={dismissSearch}>
-        <Text style={[styles.lead, { color: colors.textMuted }]}>
-          Uses ingredients at home and your Ollama server. Tap the star to add recipes to Favorites.
-        </Text>
+        <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <ReadyLine
+            ok={ready.serverOk}
+            colors={colors}
+            label={ready.serverOk ? "Home server connected" : "Home server offline"}
+          />
+          <ReadyLine
+            ok={ready.ollamaOk === true}
+            colors={colors}
+            label={
+              ready.ollamaOk === true
+                ? "AI model ready"
+                : ready.ollamaOk === false
+                  ? "AI model offline"
+                  : "AI model status unknown"
+            }
+          />
+          <ReadyLine
+            ok={ready.ingredientCount > 0}
+            colors={colors}
+            label={
+              ready.ingredientCount > 0
+                ? `${ready.ingredientCount} ingredient${ready.ingredientCount === 1 ? "" : "s"} available`
+                : "Add ingredients on the Pantry tab"
+            }
+          />
+        </View>
       </Pressable>
 
-      <Pressable onPress={dismissSearch}>
-      <Card>
-        <Text style={[styles.readyTitle, { color: colors.text }]}>Needed to generate</Text>
-        <ReadyLine
-          ok={ready.serverOk}
-          colors={colors}
-          label={ready.serverOk ? "Home server is reachable" : "Home server offline — check Settings"}
-        />
-        <ReadyLine
-          ok={ready.ollamaOk === true}
-          colors={colors}
-          label={
-            ready.ollamaOk === true
-              ? "Ollama is running"
-              : ready.ollamaOk === false
-                ? "Ollama is offline on the PC"
-                : "Ollama status unknown"
-          }
-        />
-        <ReadyLine
-          ok={ready.ingredientCount > 0}
-          colors={colors}
-          label={
-            ready.ingredientCount > 0
-              ? `${ready.ingredientCount} ingredient${ready.ingredientCount === 1 ? "" : "s"} at home`
-              : "Add ingredients on the Ingredients tab"
-          }
-        />
-      </Card>
-      </Pressable>
-
+      {/* Primary generate CTA */}
       <AppButton
-        label={loading ? "Generating…" : GENERATE_RECIPE_FROM_INGREDIENTS_LABEL}
+        label={loading ? "Finding recipes…" : GENERATE_RECIPE_FROM_INGREDIENTS_LABEL}
         loading={loading}
         onPress={() => {
           dismissSearch();
@@ -398,22 +394,22 @@ export default function RecipesScreen() {
         }}
       />
 
+      {/* AI Search */}
       <CollapsibleSection
-        title="Search AI for recipe"
+        title="Search for a recipe idea"
         expanded={aiSearchExpanded}
         onToggle={() => setAiSearchExpanded((open) => !open)}
       >
-        <Text style={[styles.importHint, { color: colors.textMuted }]}>
-          Ask Ollama for up to {preferences.defaultRecipeCount ?? 3} ideas without using your
-          ingredients list (count matches Settings → Recipes).
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Describe what you want to cook and the AI will suggest ideas.
         </Text>
         <AppTextField
-          placeholder="What do you want to cook?"
+          placeholder="e.g. quick weeknight pasta, comfort soup…"
           value={aiSearchQuery}
           onChangeText={setAiSearchQuery}
         />
         <AppButton
-          label={aiSearchLoading ? "Searching…" : "Search AI for recipe"}
+          label={aiSearchLoading ? "Searching…" : "Search for recipe"}
           variant="secondary"
           loading={aiSearchLoading}
           onPress={() => {
@@ -423,14 +419,14 @@ export default function RecipesScreen() {
         />
       </CollapsibleSection>
 
+      {/* Import */}
       <CollapsibleSection
-        title="Import recipe"
+        title="Import a recipe"
         expanded={importExpanded}
         onToggle={() => setImportExpanded((open) => !open)}
       >
-        <Text style={[styles.importHint, { color: colors.textMuted }]}>
-          Paste text or paste a public recipe page URL. The server fetches the page and parses it with
-          Ollama (HTTPS only, no LAN URLs).
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Paste recipe text or a public recipe page URL.
         </Text>
         <AppTextField
           label="Recipe URL"
@@ -453,7 +449,7 @@ export default function RecipesScreen() {
           autoCapitalize="sentences"
         />
         <AppButton
-          label={importLoading ? "Importing…" : "Import with AI"}
+          label={importLoading ? "Importing…" : "Import recipe"}
           variant="secondary"
           loading={importLoading}
           onPress={() => {
@@ -463,15 +459,17 @@ export default function RecipesScreen() {
         />
       </CollapsibleSection>
 
+      {/* Search filter */}
       <SearchField
         ref={searchInputRef}
-        placeholder="Search recipes by title or ingredient"
+        placeholder="Filter recipes by title or ingredient"
         value={searchQuery}
         onChangeText={setSearchQuery}
         autoCapitalize="none"
         autoCorrect={false}
       />
 
+      {/* Generated recipes */}
       <View
         collapsable={false}
         onLayout={onGeneratedSectionLayout}
@@ -480,13 +478,13 @@ export default function RecipesScreen() {
         {generated.length > 0 ? (
           <>
             <Pressable onPress={dismissSearch}>
-              <Text style={[styles.section, { color: colors.text }]}>
-                Generated ideas ({filteredGenerated.length})
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Recipe ideas ({filteredGenerated.length})
               </Text>
             </Pressable>
             {filteredGenerated.length === 0 ? (
               <Pressable onPress={dismissSearch}>
-                <EmptyState title="No matches" subtitle="Try a different search term." />
+                <EmptyState icon="search-outline" title="No matches" subtitle="Try a different search term." />
               </Pressable>
             ) : (
               filteredGenerated.map((recipe, index) => {
@@ -515,19 +513,21 @@ export default function RecipesScreen() {
         ) : null}
       </View>
 
+      {/* Favorites */}
       <CollapsibleSection
-        title={`Favorites (${favorites.length})`}
+        title={`Family favorites (${favorites.length})`}
         expanded={favoritesExpanded}
         onToggle={() => setFavoritesExpanded((open) => !open)}
         leadingIcon="star"
       >
         {favorites.length === 0 ? (
           <EmptyState
+            icon="star-outline"
             title="No favorites yet"
-            subtitle="Generate ideas above, then tap the star on any recipe to save it here."
+            subtitle="Generate recipe ideas above, then tap the star to save the ones your family loves."
           />
         ) : filteredFavorites.length === 0 ? (
-          <EmptyState title="No matches in favorites" subtitle="Try a different search term." />
+          <EmptyState icon="search-outline" title="No matches in favorites" subtitle="Try a different search term." />
         ) : (
           <FlatList
             data={filteredFavorites}
@@ -538,7 +538,7 @@ export default function RecipesScreen() {
               <RecipeCard
                 recipe={item.recipe}
                 titleOverride={item.title}
-                meta={`Favorited ${new Date(item.created_at).toLocaleDateString()}`}
+                meta={`Saved ${new Date(item.created_at).toLocaleDateString()}`}
                 colors={colors}
                 isFavorite
                 onDismissSearch={dismissSearch}
@@ -562,9 +562,12 @@ export default function RecipesScreen() {
 
 function ReadyLine({ ok, label, colors }: { ok: boolean; label: string; colors: ThemeColors }) {
   return (
-    <Text style={[styles.readyLine, { color: ok ? colors.success : colors.textMuted }]}>
-      {ok ? "✓" : "○"} {label}
-    </Text>
+    <View style={styles.readyRow}>
+      <View style={[styles.readyDot, { backgroundColor: ok ? colors.success : colors.textMuted }]} />
+      <Text style={[styles.readyLabel, { color: ok ? colors.text : colors.textMuted }]}>
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -598,20 +601,26 @@ function RecipeCard({
   const title = titleOverride ?? recipe.title;
   const subtitle =
     meta ??
-    `${recipe.prep_minutes ?? "?"} min · serves ${recipe.servings ?? "?"} · ${recipe.ingredients.length} ingredients`;
+    [
+      recipe.prep_minutes != null ? `${recipe.prep_minutes} min` : null,
+      recipe.servings != null ? `Serves ${recipe.servings}` : null,
+      `${recipe.ingredients.length} ingredients`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
   return (
     <Card>
+      {/* Title + icons row */}
       <View style={styles.titleRow}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`View full recipe for ${title}`}
           onPress={onViewRecipe}
-          style={({ pressed }) => [styles.titleBlock, { opacity: pressed ? 0.88 : 1 }]}
+          style={({ pressed }) => [styles.titleBlock, { opacity: pressed ? 0.85 : 1 }]}
         >
-          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-          <Text style={[styles.meta, { color: colors.textMuted }]}>{subtitle}</Text>
-          <Text style={[styles.tapHint, { color: colors.primary }]}>Tap for full recipe</Text>
+          <Text style={[styles.recipeTitle, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.recipeMeta, { color: colors.textMuted }]}>{subtitle}</Text>
         </Pressable>
         <View style={styles.titleIcons}>
           <Pressable
@@ -622,9 +631,9 @@ function RecipeCard({
               onDismissSearch();
               onShare();
             }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
           >
-            <Ionicons name="share-outline" size={24} color={colors.textMuted} />
+            <Ionicons name="share-outline" size={22} color={colors.textMuted} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -636,28 +645,37 @@ function RecipeCard({
               onDismissSearch();
               onToggleFavorite();
             }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
           >
             <Ionicons
               name={isFavorite ? "star" : "star-outline"}
-              size={26}
+              size={24}
               color={isFavorite ? colors.primary : colors.textMuted}
             />
           </Pressable>
         </View>
       </View>
+
+      {/* Preview steps */}
       <Pressable onPress={onViewRecipe}>
         {recipe.steps.slice(0, 2).map((step, i) => (
-          <Text key={`${title}-step-${i}`} style={[styles.step, { color: colors.textSecondary }]}>
+          <Text key={`${title}-step-${i}`} style={[styles.stepPreview, { color: colors.textSecondary }]}>
             {i + 1}. {step}
           </Text>
         ))}
         {recipe.steps.length > 2 ? (
           <Text style={[styles.moreSteps, { color: colors.textMuted }]}>
-            +{recipe.steps.length - 2} more steps…
+            +{recipe.steps.length - 2} more steps
           </Text>
         ) : null}
       </Pressable>
+
+      {/* View full recipe link */}
+      <Pressable onPress={onViewRecipe} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+        <Text style={[styles.viewFull, { color: colors.primary }]}>View full recipe</Text>
+      </Pressable>
+
+      {/* Action buttons */}
       <View style={styles.actions}>
         <AppButton
           label={RECIPE_SHOPPING_LIST_BUTTON_LABEL}
@@ -682,39 +700,69 @@ function RecipeCard({
 }
 
 const styles = StyleSheet.create({
-  scroll: { gap: spacing.md },
-  generatedSection: { gap: spacing.md },
-  lead: { ...typography.caption, lineHeight: 20 },
-  readyTitle: typography.headline,
-  readyLine: { ...typography.caption, lineHeight: 20 },
-  section: { ...typography.title, marginTop: spacing.md },
-  importCardTitle: typography.headline,
-  importHint: { ...typography.caption, lineHeight: 18, marginBottom: spacing.sm },
-  importInput: { minHeight: 140, paddingTop: spacing.sm },
-  favoritesHeading: {
+  scroll: { gap: spacing.lg },
+  generatedSection: { gap: spacing.lg },
+  statusCard: {
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  readyRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    marginTop: spacing.md,
   },
-  favoritesTitle: { marginTop: 0 },
+  readyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  readyLabel: {
+    ...typography.caption,
+  },
+  sectionTitle: {
+    ...typography.title,
+  },
+  hint: { ...typography.caption, lineHeight: 18 },
+  importInput: { minHeight: 140, paddingTop: spacing.sm },
+  favoritesList: { gap: spacing.md },
   titleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   titleIcons: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   titleBlock: { flex: 1 },
-  title: typography.headline,
-  meta: typography.caption,
-  step: { ...typography.caption, lineHeight: 20 },
-  tapHint: { ...typography.caption, marginTop: 4, fontWeight: "600" },
-  moreSteps: { ...typography.caption, marginTop: 2, fontStyle: "italic" },
-  favoritesList: { gap: spacing.sm },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
+  recipeTitle: {
+    ...typography.headline,
+    lineHeight: 22,
+  },
+  recipeMeta: {
+    ...typography.caption,
+    marginTop: 2,
+  },
+  stepPreview: {
+    ...typography.caption,
+    lineHeight: 20,
+  },
+  moreSteps: {
+    ...typography.caption,
+    marginTop: 2,
+    fontStyle: "italic",
+  },
+  viewFull: {
+    ...typography.captionMedium,
+  },
+  actions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
 });

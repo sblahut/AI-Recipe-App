@@ -218,6 +218,12 @@ class QuantityUnitsResponse(BaseModel):
     kinds: dict[QuantityKind, list[str]]
 
 
+class HomeNetworkResponse(BaseModel):
+    lan_host: str | None = None
+    api_base_url: str | None = None
+    expo_go_url: str | None = None
+
+
 class ProductCatalogStats(BaseModel):
     product_count: int
     sample_seeded: bool

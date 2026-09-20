@@ -21,7 +21,7 @@ export function Chip({ label, selected = false, onPress, capitalize = true }: Pr
         {
           backgroundColor: selected ? colors.primaryMuted : colors.overlay,
           borderColor: selected ? colors.primary : colors.border,
-          opacity: pressed ? 0.9 : 1,
+          opacity: pressed ? 0.85 : 1,
         },
       ]}
     >
@@ -41,13 +41,12 @@ export function Chip({ label, selected = false, onPress, capitalize = true }: Pr
 const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 6,
     borderRadius: radius.pill,
     borderWidth: 1,
   },
   text: {
-    ...typography.caption,
-    fontWeight: "600",
+    ...typography.captionMedium,
   },
   capitalize: {
     textTransform: "capitalize",

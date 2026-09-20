@@ -10,8 +10,9 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { InfoHint } from "@/components/ui/InfoHint";
 import { Screen } from "@/components/ui/Screen";
-import { radius, spacing, typography } from "@/constants/theme";
+import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -22,6 +23,7 @@ import { stockFromShoppingList } from "@/lib/stockFromShoppingList";
 import {
   SHOPPING_OPEN_LIST_LABEL,
   SHOPPING_STOCK_FROM_LIST_LABEL,
+  SHOPPING_STOCK_FROM_LIST_HINT,
   shareShoppingListAccessibilityLabel,
 } from "@/lib/uiActionLabels";
 import {
@@ -47,6 +49,8 @@ export default function ShoppingScreen() {
   const [newListName, setNewListName] = useState("");
   const [addingList, setAddingList] = useState(false);
   const [newItemName, setNewItemName] = useState("");
+  const [showAddItemForm, setShowAddItemForm] = useState(false);
+  const [addItemSaving, setAddItemSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const weeklyAdChains = useMemo(
@@ -105,6 +109,7 @@ export default function ShoppingScreen() {
     setSelectedId(null);
     setDetail(null);
     setNewItemName("");
+    setShowAddItemForm(false);
   };
 
   const selectList = (id: number) => {
@@ -167,10 +172,14 @@ export default function ShoppingScreen() {
     ]);
   };
 
-  const addItem = async () => {
+  const addItem = async (nameOverride?: string) => {
     if (selectedId == null) return;
-    const name = newItemName.trim();
-    if (!name) return;
+    const name = (nameOverride ?? newItemName).trim();
+    if (!name) {
+      Alert.alert("Name required", "Enter an item name.");
+      return;
+    }
+    setAddItemSaving(true);
     try {
       await apiFetch(`/shopping/lists/${selectedId}/items`, {
         baseUrl: serverUrl,
@@ -178,10 +187,18 @@ export default function ShoppingScreen() {
         body: JSON.stringify({ name, quantity_kind: "count", quantity: 1, unit: "each" }),
       });
       setNewItemName("");
+      setShowAddItemForm(false);
       await loadDetail(selectedId);
     } catch (e) {
       Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setAddItemSaving(false);
     }
+  };
+
+  const cancelAddItem = () => {
+    setNewItemName("");
+    setShowAddItemForm(false);
   };
 
   const shareList = async () => {
@@ -212,15 +229,43 @@ export default function ShoppingScreen() {
     return <Screen loading />;
   }
 
+  if (showAddItemForm && selectedId != null) {
+    const listName = selectedList?.name ?? "Shopping list";
+    return (
+      <Screen scroll>
+        <Text style={[styles.addItemHeading, { color: colors.text }]}>Add item</Text>
+        <Text style={[styles.addItemHint, { color: colors.textMuted }]}>Adding to {listName}</Text>
+        <AppTextField
+          label="Item name"
+          value={newItemName}
+          onChangeText={setNewItemName}
+          placeholder="Milk, eggs, bread…"
+          autoFocus
+          onSubmitEditing={() => void addItem()}
+        />
+        <View style={styles.addItemActions}>
+          <AppButton label="Cancel" variant="ghost" onPress={cancelAddItem} />
+          <AppButton
+            label="Save"
+            loading={addItemSaving}
+            onPress={() => void addItem()}
+            style={styles.addItemSaveBtn}
+          />
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen scroll padded={false}>
+      {/* Lists filter section */}
       <View style={styles.filterSection}>
         <View style={styles.filterHeadingRow}>
           <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Your lists</Text>
           {!addingList ? (
             <AppButton
               label="+ New list"
-              variant="secondary"
+              variant="ghost"
               compact
               onPress={() => setAddingList(true)}
             />
@@ -263,67 +308,123 @@ export default function ShoppingScreen() {
 
       {selectedId != null ? (
         <>
+          {/* List header */}
           <View style={[styles.sectionPad, styles.listHeader]}>
             <Text style={[styles.listTitle, { color: colors.text }]}>{selectedList?.name}</Text>
           </View>
 
-          <View style={[styles.sectionPad, styles.row, styles.itemToolbar]}>
-            <View style={styles.flex}>
-              <AppTextField
-                placeholder="Add item"
-                value={newItemName}
-                onChangeText={setNewItemName}
-                onSubmitEditing={() => void addItem()}
-              />
-            </View>
-            <AppButton label="Add" compact onPress={() => void addItem()} />
-            <AppButton
-              label="Scan"
-              variant="accent"
-              compact
+          {/* Quick actions — same pattern as Pantry tab */}
+          <View style={[styles.sectionPad, styles.actionRow]}>
+            <Pressable
+              onPress={() => setShowAddItemForm(true)}
+              style={({ pressed }) => [
+                styles.actionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="add-outline" size={22} color={colors.primary} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>Add item</Text>
+            </Pressable>
+            <Pressable
               onPress={() =>
                 router.push({
                   pathname: "/scan",
                   params: { target: "shopping_list", listId: String(selectedId) },
                 })
               }
-            />
+              style={({ pressed }) => [
+                styles.actionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="barcode-outline" size={22} color={colors.accent} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>Scan barcode</Text>
+            </Pressable>
           </View>
 
-          <View style={[styles.sectionPad, styles.actionsRow]}>
-            <AppButton
-              label={SHOPPING_OPEN_LIST_LABEL}
-              variant="primary"
-              compact
-              style={styles.actionBtn}
+          <View style={[styles.sectionPad, styles.actionRow]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={SHOPPING_OPEN_LIST_LABEL}
               onPress={openShoppingList}
-            />
-            <AppButton
-              label={SHOPPING_STOCK_FROM_LIST_LABEL}
-              variant="secondary"
-              compact
-              style={styles.actionBtn}
-              onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
-            />
+              style={({ pressed }) => [
+                styles.actionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="checkbox-outline" size={22} color={colors.primary} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>
+                {SHOPPING_OPEN_LIST_LABEL}
+              </Text>
+            </Pressable>
+            <View style={styles.actionCardWithHint}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={SHOPPING_STOCK_FROM_LIST_LABEL}
+                onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  styles.actionCardInWrap,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <Ionicons name="nutrition-outline" size={22} color={colors.accent} />
+                <Text style={[styles.actionLabel, { color: colors.text }]}>
+                  {SHOPPING_STOCK_FROM_LIST_LABEL}
+                </Text>
+              </Pressable>
+              <InfoHint
+                title={SHOPPING_STOCK_FROM_LIST_LABEL}
+                message={SHOPPING_STOCK_FROM_LIST_HINT}
+                accessibilityLabel={`About ${SHOPPING_STOCK_FROM_LIST_LABEL}`}
+                style={styles.cardInfoHint}
+                iconSize={16}
+              />
+            </View>
+          </View>
+
+          <View style={styles.sectionPad}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={shareShoppingListAccessibilityLabel(selectedList?.name ?? "list")}
               onPress={() => void shareList()}
               style={({ pressed }) => [
-                styles.shareIconBtn,
-                { backgroundColor: colors.overlay },
-                pressed && { opacity: 0.88 },
+                styles.actionCard,
+                styles.actionCardFull,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
               ]}
             >
-              <Ionicons name="share-outline" size={22} color={colors.text} />
+              <Ionicons name="share-outline" size={22} color={colors.textSecondary} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>Share list</Text>
             </Pressable>
           </View>
 
+          {/* Weekly ad card */}
           <View style={styles.sectionPad}>
             <Card>
-              <Text style={[styles.dealTitle, { color: colors.text }]}>Weekly ad</Text>
+              <Text style={[styles.dealTitle, { color: colors.text }]}>Weekly deals</Text>
               <Text style={[styles.dealHint, { color: colors.textMuted }]}>
-                Pick a chain, then open its weekly ad. Add stores in Settings for directions links.
+                Pick a chain to open their weekly ad. Add stores in Settings for directions.
               </Text>
               <View style={styles.chainRow}>
                 {weeklyAdChains.map((chain) => (
@@ -357,6 +458,7 @@ export default function ShoppingScreen() {
             </Card>
           </View>
 
+          {/* Delete list */}
           {selectedList ? (
             <View style={[styles.sectionPad, styles.deleteListSection]}>
               <Pressable
@@ -364,15 +466,16 @@ export default function ShoppingScreen() {
                 onPress={() => deleteList(selectedList)}
                 style={({ pressed }) => [styles.deleteListPress, pressed && { opacity: 0.7 }]}
               >
-                <Text style={[styles.deleteList, { color: colors.danger }]}>Delete list</Text>
+                <Text style={[styles.deleteList, { color: colors.danger }]}>Delete this list</Text>
               </Pressable>
             </View>
           ) : null}
         </>
       ) : (
         <EmptyState
+          icon="cart-outline"
           title="Select or create a list"
-          subtitle="Tap a list again to close it. Long-press to delete."
+          subtitle="Tap a list to open it. Long-press to delete."
         />
       )}
     </Screen>
@@ -380,23 +483,23 @@ export default function ShoppingScreen() {
 }
 
 const styles = StyleSheet.create({
-  sectionPad: { paddingHorizontal: spacing.lg },
+  sectionPad: { paddingHorizontal: spacing.xl },
   row: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-end" },
   flex: { flex: 1 },
   listHeader: {
     paddingBottom: spacing.sm,
   },
-  listTitle: typography.headline,
+  listTitle: typography.title,
   deleteListSection: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxxl,
     alignItems: "center",
   },
   deleteListPress: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
-  deleteList: { ...typography.label, fontWeight: "600" },
+  deleteList: { ...typography.label },
   newListForm: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -411,21 +514,50 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.xs,
   },
-  itemToolbar: { marginBottom: spacing.sm },
-  actionsRow: {
+  actionRow: {
     flexDirection: "row",
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-    alignItems: "stretch",
+    gap: spacing.md,
+    marginBottom: spacing.sm,
   },
-  actionBtn: { flex: 1, minWidth: 0 },
-  shareIconBtn: {
-    minHeight: 40,
-    minWidth: 44,
-    borderRadius: radius.md,
+  actionCard: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.sm,
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  actionCardWithHint: {
+    flex: 1,
+    position: "relative",
+  },
+  actionCardInWrap: {
+    flex: undefined,
+    width: "100%",
+  },
+  cardInfoHint: {
+    position: "absolute",
+    top: spacing.xs,
+    right: spacing.xs,
+    zIndex: 2,
+  },
+  actionLabel: {
+    ...typography.button,
+  },
+  addItemHeading: { ...typography.h1, marginBottom: spacing.xs },
+  addItemHint: { ...typography.body, marginBottom: spacing.lg },
+  addItemActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  addItemSaveBtn: { minWidth: 100 },
+  actionCardFull: {
+    marginBottom: spacing.lg,
   },
   dealTitle: typography.headline,
   dealHint: { ...typography.caption, lineHeight: 18, marginTop: spacing.xs },
@@ -436,16 +568,15 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
   },
   filterSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
     gap: 2,
   },
   filterHeading: {
-    ...typography.caption,
-    fontWeight: "600",
+    ...typography.captionMedium,
     flex: 1,
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
 });

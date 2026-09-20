@@ -37,7 +37,7 @@ export function CollapsibleSection({
         </View>
         <Ionicons
           name={expanded ? "chevron-up" : "chevron-down"}
-          size={22}
+          size={20}
           color={colors.textMuted}
         />
       </Pressable>
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   title: { ...typography.headline, flex: 1 },
   body: {
     marginTop: spacing.md,
-    gap: spacing.sm,
+    gap: spacing.md,
   },
-  pressed: { opacity: 0.85 },
+  pressed: { opacity: 0.8 },
 });

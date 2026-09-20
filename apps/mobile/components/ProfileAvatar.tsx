@@ -27,13 +27,13 @@ export function ProfileAvatar({
   size = 72,
   onPress,
 }: ProfileAvatarProps) {
-  const radius = size / 2;
+  const borderRadius = size / 2;
   const initial = profileInitial(username);
 
   const content = photoUri ? (
     <Image
       source={{ uri: photoUri }}
-      style={{ width: size, height: size, borderRadius: radius }}
+      style={{ width: size, height: size, borderRadius }}
       accessibilityLabel="Profile photo"
     />
   ) : (
@@ -43,12 +43,13 @@ export function ProfileAvatar({
         {
           width: size,
           height: size,
-          borderRadius: radius,
+          borderRadius,
           backgroundColor: colors.primaryMuted,
+          borderColor: colors.border,
         },
       ]}
     >
-      <Text style={[styles.initial, { color: colors.primary, fontSize: size * 0.38 }]}>
+      <Text style={[styles.initial, { color: colors.primary, fontSize: size * 0.36 }]}>
         {initial}
       </Text>
     </View>
@@ -75,7 +76,11 @@ export function ProfileAvatar({
 
 const styles = StyleSheet.create({
   wrap: { position: "relative" },
-  fallback: { alignItems: "center", justifyContent: "center" },
+  fallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   initial: { ...typography.headline },
   badge: {
     position: "absolute",

@@ -6,8 +6,9 @@ import { z } from "zod";
 import { AppButton } from "@/components/ui/AppButton";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { InfoHint } from "@/components/ui/InfoHint";
 import { Screen } from "@/components/ui/Screen";
-import { spacing, typography } from "@/constants/theme";
+import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
@@ -16,6 +17,7 @@ import {
   mealPlanShopAlertTitle,
   mealPlanShopResultFromApi,
 } from "@/lib/shoppingFromMealPlanAlert";
+import { MEAL_PLAN_SHOP_WEEK_HINT } from "@/lib/uiActionLabels";
 import {
   MEAL_SLOT_LABELS,
   MEAL_SLOTS,
@@ -178,12 +180,12 @@ export default function MealPlanScreen() {
       return;
     }
     if (lists.length === 0) {
-      Alert.alert("No lists", "Create a shopping list on the Shopping tab first.");
+      Alert.alert("No lists", "Create a shopping list on the Shop tab first.");
       return;
     }
     Alert.alert(
-      "Add to shopping list",
-      `For ${weekRange.start} – ${weekRange.end}: add grocery lines from your planned meals to the list you choose. Items you already have on Ingredients are not duplicated.`,
+      "Shop for this week",
+      "Choose which list to add missing groceries to. Items you already have won't be duplicated.",
       [
       ...lists.map((list) => ({
         text: list.name,
@@ -222,80 +224,107 @@ export default function MealPlanScreen() {
     );
   };
 
+  const today = formatPlanDate(new Date());
+
   return (
     <Screen scroll contentContainerStyle={styles.scroll}>
-      <View
-        style={[
-          styles.leadBanner,
-          { borderColor: colors.accent, backgroundColor: colors.accentMuted },
-        ]}
-      >
-        <Text style={[styles.leadBannerText, { color: colors.text }]}>
-          Schedule saved recipes by day. Use the green button to copy missing groceries onto a
-          shopping list (skips what you already track on Ingredients).
-        </Text>
-      </View>
-
+      {/* Week navigation */}
       <View style={styles.weekNav}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Previous week"
           onPress={() => setWeekStart((current) => addDays(current, -7))}
           style={({ pressed }) => [styles.weekArrow, pressed && styles.pressed]}
+          hitSlop={12}
         >
           <Ionicons name="chevron-back" size={22} color={colors.primary} />
         </Pressable>
-        <Text style={[styles.weekLabel, { color: colors.text }]}>
-          {weekRange.start} — {weekRange.end}
-        </Text>
+        <View style={styles.weekCenter}>
+          <Text style={[styles.weekLabel, { color: colors.text }]}>
+            {weekRange.start} — {weekRange.end}
+          </Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Next week"
           onPress={() => setWeekStart((current) => addDays(current, 7))}
           style={({ pressed }) => [styles.weekArrow, pressed && styles.pressed]}
+          hitSlop={12}
         >
           <Ionicons name="chevron-forward" size={22} color={colors.primary} />
         </Pressable>
       </View>
 
-      <AppButton
-        label={shopLoading ? "Adding…" : "Add missing items to shopping list"}
-        variant="accent"
-        loading={shopLoading}
-        onPress={shopThisWeek}
-      />
+      <View style={styles.shopWeekRow}>
+        <View style={styles.shopWeekButtonWrap}>
+          <AppButton
+            label={shopLoading ? "Adding groceries…" : "Shop for this week"}
+            variant="accent"
+            loading={shopLoading}
+            onPress={shopThisWeek}
+          />
+        </View>
+        <InfoHint
+          title="Shop for this week"
+          message={MEAL_PLAN_SHOP_WEEK_HINT}
+          accessibilityLabel="About Shop for this week"
+        />
+      </View>
 
+      {/* Day cards */}
       {loading ? (
-        <Text style={[styles.loading, { color: colors.textMuted }]}>Loading…</Text>
+        <View style={styles.loadingWrap}>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading your plan…</Text>
+        </View>
       ) : (
         weekDays.map((day) => {
           const planDate = formatPlanDate(day);
           const dayEntries = entriesByDate.get(planDate) ?? [];
+          const isToday = planDate === today;
           return (
-            <Card key={planDate}>
+            <Card
+              key={planDate}
+              style={isToday ? [styles.todayCard, { borderColor: colors.primary }] : undefined}
+            >
               <View style={styles.dayHeader}>
-                <Text style={[styles.dayTitle, { color: colors.text }]}>{weekdayLabel(day)}</Text>
+                <View style={styles.dayTitleRow}>
+                  <Text style={[styles.dayTitle, { color: colors.text }]}>{weekdayLabel(day)}</Text>
+                  {isToday ? (
+                    <View style={[styles.todayBadge, { backgroundColor: colors.primaryMuted }]}>
+                      <Text style={[styles.todayBadgeText, { color: colors.primary }]}>Today</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Add meal on ${planDate}`}
                   onPress={() => promptAddMeal(planDate)}
                   style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+                  hitSlop={8}
                 >
-                  <Ionicons name="add-circle-outline" size={26} color={colors.primary} />
+                  <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
                 </Pressable>
               </View>
               {dayEntries.length === 0 ? (
-                <Text style={[styles.emptyDay, { color: colors.textMuted }]}>No meals planned</Text>
+                <Text style={[styles.emptyDay, { color: colors.textMuted }]}>
+                  No meals planned — tap + to add
+                </Text>
               ) : (
                 dayEntries.map((entry) => (
                   <Pressable
                     key={entry.id}
                     onLongPress={() => removeEntry(entry)}
-                    style={({ pressed }) => [styles.entryRow, pressed && styles.pressed]}
+                    style={({ pressed }) => [
+                      styles.entryRow,
+                      { borderTopColor: colors.borderSubtle },
+                      pressed && styles.pressed,
+                    ]}
                   >
-                    <Text style={[styles.entrySlot, { color: colors.textMuted }]}>
-                      {MEAL_SLOT_LABELS[entry.meal_slot]}
-                    </Text>
+                    <View style={[styles.slotTag, { backgroundColor: colors.overlay }]}>
+                      <Text style={[styles.slotTagText, { color: colors.textMuted }]}>
+                        {MEAL_SLOT_LABELS[entry.meal_slot]}
+                      </Text>
+                    </View>
                     <Text style={[styles.entryTitle, { color: colors.text }]}>{entry.recipe_title}</Text>
                   </Pressable>
                 ))
@@ -307,8 +336,9 @@ export default function MealPlanScreen() {
 
       {!loading && savedRecipes.length === 0 ? (
         <EmptyState
+          icon="star-outline"
           title="Save recipes first"
-          subtitle="Star or save recipes on the Recipes tab, then assign them to your plan."
+          subtitle="Star or save recipes on the Recipes tab, then assign them to your weekly plan."
         />
       ) : null}
 
@@ -319,49 +349,66 @@ export default function MealPlanScreen() {
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
-  },
-  leadBanner: {
-    marginHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 2,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  leadBannerText: {
-    ...typography.body,
-    textAlign: "center",
-    lineHeight: 22,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.lg,
   },
   weekNav: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.sm,
   },
   weekArrow: {
     padding: spacing.sm,
   },
+  weekCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
   weekLabel: {
     ...typography.headline,
-    fontSize: 16,
   },
-  loading: {
+  shopWeekRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  shopWeekButtonWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  loadingWrap: {
+    paddingVertical: spacing.xxxl,
+    alignItems: "center",
+  },
+  loadingText: {
     ...typography.body,
-    textAlign: "center",
-    paddingVertical: spacing.lg,
+  },
+  todayCard: {
+    borderWidth: 1.5,
   },
   dayHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: spacing.sm,
+  },
+  dayTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
   dayTitle: {
     ...typography.headline,
-    fontSize: 17,
+  },
+  todayBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  todayBadgeText: {
+    ...typography.captionMedium,
+    fontSize: 11,
+    fontWeight: "700",
   },
   addButton: {
     padding: spacing.xs,
@@ -371,18 +418,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   entryRow: {
-    paddingVertical: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(128,128,128,0.25)",
   },
-  entrySlot: {
+  slotTag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  slotTagText: {
     ...typography.caption,
     textTransform: "uppercase",
     letterSpacing: 0.4,
+    fontWeight: "600",
+    fontSize: 11,
   },
   entryTitle: {
-    ...typography.body,
-    fontWeight: "600",
+    ...typography.bodyMedium,
+    flex: 1,
   },
   hint: {
     ...typography.caption,

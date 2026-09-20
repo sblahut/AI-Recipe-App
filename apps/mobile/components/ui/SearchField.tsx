@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { forwardRef, useImperativeHandle, useRef, type RefObject } from "react";
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import {
   Keyboard,
   Pressable,
@@ -8,8 +8,9 @@ import {
   type TextInput,
   type TextInputProps,
 } from "react-native";
+import type { RefObject } from "react";
 
-import { spacing } from "@/constants/theme";
+import { radius, spacing } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 import { AppTextField } from "./AppTextField";
@@ -37,6 +38,9 @@ export const SearchField = forwardRef<TextInput, Props>(function SearchField(
 
   return (
     <View style={styles.wrap}>
+      <View style={styles.iconWrap} pointerEvents="none">
+        <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+      </View>
       <AppTextField
         ref={inputRef}
         value={value}
@@ -55,7 +59,7 @@ export const SearchField = forwardRef<TextInput, Props>(function SearchField(
           onPress={() => onChangeText("")}
           style={({ pressed }) => [styles.clearBtn, { opacity: pressed ? 0.65 : 1 }]}
         >
-          <Ionicons name="close-circle" size={22} color={colors.textMuted} />
+          <Ionicons name="close-circle" size={20} color={colors.textMuted} />
         </Pressable>
       ) : null}
     </View>
@@ -69,7 +73,18 @@ export function dismissSearchKeyboard(inputRef: RefObject<TextInput | null>): vo
 
 const styles = StyleSheet.create({
   wrap: { position: "relative" },
-  input: {},
+  iconWrap: {
+    position: "absolute",
+    left: spacing.md,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  input: {
+    paddingLeft: spacing.xl + spacing.md,
+    borderRadius: radius.lg,
+  },
   inputWithClear: { paddingRight: spacing.xl + spacing.md },
   clearBtn: {
     position: "absolute",

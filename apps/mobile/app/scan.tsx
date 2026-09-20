@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -20,6 +20,7 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiJson } from "@/lib/api";
+import { parseServerUrlFromQr, phoneUnreachableHomeServerReason } from "@/lib/parseServerUrlFromQr";
 import {
   barcodeScanResponseSchema,
   productReadSchema,
@@ -40,7 +41,76 @@ type PendingScan = {
   resolving: boolean;
 };
 
+function ServerUrlQrScan() {
+  const { colors } = useAppTheme();
+  const { setServerUrl } = useServerSettings();
+  const [permission, requestPermission] = useCameraPermissions();
+  const handled = useRef(false);
+
+  if (!permission) {
+    return <View style={styles.container} />;
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.message, { color: colors.text }]}>
+          Camera access is needed to scan the home server QR.
+        </Text>
+        <AppButton label="Allow camera" onPress={() => void requestPermission()} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Stack.Screen options={{ title: "Scan server QR" }} />
+      <CameraView
+        style={styles.camera}
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={({ data }) => {
+          if (handled.current) {
+            return;
+          }
+          const url = parseServerUrlFromQr(data);
+          if (!url) {
+            return;
+          }
+          const blocked = phoneUnreachableHomeServerReason(url);
+          if (blocked) {
+            handled.current = true;
+            Alert.alert("Not a phone-reachable API", blocked, [
+              { text: "Scan again", onPress: () => { handled.current = false; } },
+              { text: "Cancel", onPress: () => router.back() },
+            ]);
+            return;
+          }
+          handled.current = true;
+          void setServerUrl(url).then(() => {
+            Alert.alert("Home server saved", url, [{ text: "OK", onPress: () => router.back() }]);
+          });
+        }}
+      />
+      <View style={[styles.frameHint, { borderColor: colors.primary }]} pointerEvents="none" />
+      <View style={[styles.hintBar, { backgroundColor: colors.surface + "EB" }]}>
+        <Text style={[styles.hintText, { color: colors.text }]}>
+          Scan the QR from the Windows home-stack page (or another phone’s Settings).
+        </Text>
+        <AppButton label="Cancel" variant="ghost" compact onPress={() => router.back()} />
+      </View>
+    </View>
+  );
+}
+
 export default function ScanScreen() {
+  const params = useLocalSearchParams<ScanParams>();
+  if (params.target === "server_url") {
+    return <ServerUrlQrScan />;
+  }
+  return <BarcodeScanScreen />;
+}
+
+function BarcodeScanScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { serverUrl } = useServerSettings();
@@ -98,7 +168,7 @@ export default function ScanScreen() {
         ? ` in ${storageLocation}`
         : target === "shopping_list"
           ? " to your shopping list"
-          : " to ingredients";
+          : " to your pantry";
 
     if (continuous) {
       setLastAdded(`${qty} × ${label}`);
@@ -106,7 +176,7 @@ export default function ScanScreen() {
       return;
     }
 
-    const backLabel = target === "shopping_list" ? "Back to shopping" : "Back to ingredients";
+    const backLabel = target === "shopping_list" ? "Back to shopping" : "Back to pantry";
     Alert.alert(
       "Added",
       `${qty} × ${label}${where}.`,
@@ -153,7 +223,7 @@ export default function ScanScreen() {
         setPending(null);
         Alert.alert(
           "Unknown barcode",
-          "Not in your UPC catalog yet. Enter a name to add and save it for next time.",
+          "Not in your catalog yet. Enter a name to add and save it for next time.",
         );
         return;
       }
@@ -236,7 +306,9 @@ export default function ScanScreen() {
   if (!permission) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.textSecondary }}>Requesting camera permission…</Text>
+        <Text style={[styles.message, { color: colors.textSecondary }]}>
+          Requesting camera permission…
+        </Text>
       </View>
     );
   }
@@ -245,7 +317,7 @@ export default function ScanScreen() {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text style={[styles.message, { color: colors.textSecondary }]}>
-          Camera access is required to scan barcodes.
+          Camera access is needed to scan barcodes.
         </Text>
         <AppButton label="Allow camera" onPress={() => void requestPermission()} />
       </View>
@@ -256,11 +328,11 @@ export default function ScanScreen() {
     ? busy && lastAdded
       ? `Added ${lastAdded} — scan next item`
       : storageLocation
-        ? `Scan into ${storageLocation} · tap Done when finished`
-        : "Scan each item · tap Done when finished"
+        ? `Scanning into ${storageLocation} — tap Done when finished`
+        : "Scan each item — tap Done when finished"
     : storageLocation
-      ? `Scan a barcode to add to ${storageLocation} · Cancel to leave without scanning`
-      : "Scan one barcode · confirm quantity · return to Ingredients";
+      ? `Scan a barcode to add to ${storageLocation}`
+      : "Point your camera at a barcode";
 
   return (
     <View style={styles.container}>
@@ -269,8 +341,11 @@ export default function ScanScreen() {
         barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128"] }}
         onBarcodeScanned={scannerPaused ? undefined : ({ data }) => onBarcodeDetected(data)}
       />
+
+      {/* Scan frame guide */}
       <View style={[styles.frameHint, { borderColor: colors.primary }]} pointerEvents="none" />
 
+      {/* Recipe checklist overlay */}
       {checklist.length > 0 && !pending && !lastBarcode ? (
         <View style={[styles.checklistWrap, { top: insets.top + spacing.sm }]}>
           <Card padded style={styles.checklistCard}>
@@ -286,20 +361,21 @@ export default function ScanScreen() {
         </View>
       ) : null}
 
+      {/* Confirm known product */}
       {pending ? (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={[styles.sheetWrapTop, { paddingTop: insets.top + spacing.sm }]}
+          style={[styles.sheetWrapTop, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.background + "F7" }]}
           keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
         >
           <Card>
-            <Text style={[styles.manualTitle, { color: colors.text }]}>
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>
               {pending.resolving ? "Looking up product…" : pending.productName ?? "Product"}
             </Text>
             {!pending.resolving && pending.productName ? (
               <>
-                <Text style={[styles.meta, { color: colors.textMuted }]}>
-                  {storageLocation ? `Add to ${storageLocation}` : "Add to ingredients"}
+                <Text style={[styles.sheetMeta, { color: colors.textMuted }]}>
+                  {storageLocation ? `Add to ${storageLocation}` : "Add to pantry"}
                 </Text>
                 <AppTextField
                   label="Quantity"
@@ -324,19 +400,21 @@ export default function ScanScreen() {
         </KeyboardAvoidingView>
       ) : null}
 
+      {/* Unknown barcode entry */}
       {lastBarcode && !pending ? (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={[styles.sheetWrapTop, { paddingTop: insets.top + spacing.sm }]}
+          style={[styles.sheetWrapTop, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.background + "F7" }]}
           keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
         >
           <Card>
-            <Text style={[styles.manualTitle, { color: colors.text }]}>Unknown barcode</Text>
-            <Text style={[styles.manualCode, { color: colors.textMuted }]}>{lastBarcode}</Text>
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>Unknown barcode</Text>
+            <Text style={[styles.barcodeText, { color: colors.textMuted }]}>{lastBarcode}</Text>
             <AppTextField
               placeholder="Product name"
               value={manualName}
               onChangeText={setManualName}
+              autoFocus
             />
             <AppTextField
               label="Quantity"
@@ -348,7 +426,7 @@ export default function ScanScreen() {
               <ExpirationDateField value={expiresAt} onChange={setExpiresAt} />
             ) : null}
             <AppButton
-              label="Add & save to UPC catalog"
+              label="Add & save to catalog"
               loading={busy}
               onPress={() => {
                 if (!manualName.trim()) return;
@@ -373,8 +451,9 @@ export default function ScanScreen() {
         </KeyboardAvoidingView>
       ) : null}
 
+      {/* Bottom hint bar */}
       {!pending && !lastBarcode ? (
-        <View style={styles.hintBar}>
+        <View style={[styles.hintBar, { backgroundColor: colors.surface + "EB" }]}>
           <Text style={[styles.hintText, { color: colors.text }]}>{hint}</Text>
           {continuous ? (
             <AppButton label="Done scanning" variant="secondary" compact onPress={() => router.back()} />
@@ -394,16 +473,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: spacing.lg,
-    gap: spacing.md,
+    padding: spacing.xl,
+    gap: spacing.lg,
   },
   message: { textAlign: "center", ...typography.body },
   frameHint: {
     position: "absolute",
     top: "42%",
     alignSelf: "center",
-    width: "72%",
-    height: 120,
+    width: "70%",
+    height: 110,
     borderWidth: 2,
     borderRadius: radius.lg,
     borderStyle: "dashed",
@@ -415,7 +494,7 @@ const styles = StyleSheet.create({
     maxHeight: 140,
   },
   checklistCard: { gap: spacing.xs },
-  checklistTitle: { ...typography.caption, fontWeight: "700" },
+  checklistTitle: { ...typography.captionMedium, fontWeight: "700" },
   checklistScroll: { maxHeight: 100 },
   checklistLine: { ...typography.caption, lineHeight: 18 },
   sheetWrapTop: {
@@ -425,7 +504,6 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
-    backgroundColor: "rgba(247, 245, 240, 0.97)",
     zIndex: 10,
     elevation: 10,
   },
@@ -440,13 +518,12 @@ const styles = StyleSheet.create({
     bottom: spacing.xl,
     left: spacing.lg,
     right: spacing.lg,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     gap: spacing.sm,
   },
-  hintText: { textAlign: "center", ...typography.label },
-  manualTitle: typography.headline,
-  manualCode: { ...typography.caption, fontFamily: "monospace" },
-  meta: typography.caption,
+  hintText: { textAlign: "center", ...typography.bodyMedium },
+  sheetTitle: typography.headline,
+  sheetMeta: typography.caption,
+  barcodeText: { ...typography.caption, fontFamily: "monospace" },
 });

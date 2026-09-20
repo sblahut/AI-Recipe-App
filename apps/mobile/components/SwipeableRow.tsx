@@ -33,7 +33,7 @@ export function SwipeableRow({ children, onDelete, enabled = true, label = "Dele
           onPress={onDelete}
           style={[styles.action, { backgroundColor: colors.danger }]}
         >
-          <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+          <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
           <Text style={styles.actionLabel}>{label}</Text>
         </Pressable>
       )}
@@ -45,7 +45,7 @@ export function SwipeableRow({ children, onDelete, enabled = true, label = "Dele
 
 const styles = StyleSheet.create({
   action: {
-    width: 88,
+    width: 80,
     marginBottom: spacing.sm,
     borderRadius: radius.lg,
     alignItems: "center",

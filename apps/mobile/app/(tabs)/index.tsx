@@ -274,6 +274,10 @@ export default function IngredientsScreen() {
 
   const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
 
+  const greeting = preferences.username.trim()
+    ? `${preferences.username.trim()}'s kitchen`
+    : "Your kitchen";
+
   return (
     <Screen
       scroll
@@ -283,35 +287,54 @@ export default function IngredientsScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
       }
     >
-      <View style={styles.toolbar}>
-        <AppButton
-          label="+ Manual"
-          compact
+      {/* Greeting + summary header */}
+      <View style={styles.header}>
+        <Text style={[styles.greeting, { color: colors.text }]}>{greeting}</Text>
+        <Text style={[styles.summary, { color: colors.textMuted }]}>
+          {items.length === 0
+            ? "Add your first ingredient to get started"
+            : `${items.length} ingredient${items.length === 1 ? "" : "s"} on hand`}
+        </Text>
+      </View>
+
+      {/* Quick actions */}
+      <View style={styles.actionRow}>
+        <Pressable
           onPress={() => {
             dismissSearch();
             setShowForm(true);
           }}
-          style={styles.toolbarBtn}
-        />
-        <AppButton
-          label="Scan barcode"
-          variant="accent"
-          compact
-          style={styles.toolbarBtn}
+          style={({ pressed }) => [
+            styles.actionCard,
+            { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Ionicons name="add-outline" size={22} color={colors.primary} />
+          <Text style={[styles.actionLabel, { color: colors.text }]}>Add item</Text>
+        </Pressable>
+        <Pressable
           onPress={() => {
             dismissSearch();
             void startIngredientScan();
           }}
-        />
+          style={({ pressed }) => [
+            styles.actionCard,
+            { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Ionicons name="barcode-outline" size={22} color={colors.accent} />
+          <Text style={[styles.actionLabel, { color: colors.text }]}>Scan barcode</Text>
+        </Pressable>
       </View>
 
+      {/* Storage filters */}
       <Pressable style={styles.filterSection} onPress={dismissSearch}>
         <View style={styles.filterHeadingRow}>
           <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
           {!addingZone ? (
             <AppButton
-              label="+ Add area / zone"
-              variant="secondary"
+              label="+ Add area"
+              variant="ghost"
               compact
               onPress={() => {
                 dismissSearch();
@@ -361,10 +384,11 @@ export default function IngredientsScreen() {
         ) : null}
       </Pressable>
 
+      {/* Search */}
       <View style={styles.searchPad}>
         <SearchField
           ref={searchInputRef}
-          placeholder="Search ingredients by name, location, notes, or barcode"
+          placeholder="Search by name, location, or barcode"
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCapitalize="none"
@@ -372,9 +396,17 @@ export default function IngredientsScreen() {
         />
       </View>
 
+      {/* Ingredient list */}
       {filteredItems.length === 0 ? (
         <View style={styles.list}>
           <EmptyState
+            icon={
+              searchQuery.trim()
+                ? "search-outline"
+                : locationFilter === "All"
+                  ? "nutrition-outline"
+                  : "folder-open-outline"
+            }
             title={
               searchQuery.trim()
                 ? "No matches"
@@ -384,8 +416,8 @@ export default function IngredientsScreen() {
             }
             subtitle={
               searchQuery.trim()
-                ? "Try another search or clear the search field."
-                : "Add manually, scan a barcode, or pick another storage filter."
+                ? "Try a different search term."
+                : "Add items manually or scan a barcode to start building your pantry."
             }
           />
         </View>
@@ -401,7 +433,7 @@ export default function IngredientsScreen() {
                     dismissSearch();
                     setEditing(item);
                   }}
-                  style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
+                  style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.88 : 1 }]}
                 >
                   <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
                   <Text style={styles.meta}>
@@ -454,19 +486,39 @@ function formatIngredientMetaBase(item: Ingredient): string {
 
 const styles = StyleSheet.create({
   scroll: { gap: spacing.sm },
-  toolbar: {
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    gap: spacing.xs,
+  },
+  greeting: {
+    ...typography.h1,
+  },
+  summary: {
+    ...typography.body,
+  },
+  actionRow: {
     flexDirection: "row",
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+  },
+  actionCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  toolbarBtn: { flex: 1 },
+  actionLabel: {
+    ...typography.button,
+  },
   filterSection: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
     gap: 2,
-  },
-  searchPad: {
-    paddingHorizontal: spacing.lg,
   },
   filterHeadingRow: {
     flexDirection: "row",
@@ -476,11 +528,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   filterHeading: {
-    ...typography.caption,
-    fontWeight: "600",
+    ...typography.captionMedium,
     flex: 1,
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
   zoneForm: {
     flexDirection: "row",
@@ -489,8 +540,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   flex: { flex: 1 },
+  searchPad: {
+    paddingHorizontal: spacing.xl,
+  },
   list: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
     gap: spacing.sm,
   },
   row: {
@@ -500,6 +554,6 @@ const styles = StyleSheet.create({
   },
   rowMain: { flex: 1 },
   deleteIcon: { padding: spacing.sm },
-  name: typography.headline,
+  name: { ...typography.headline },
   meta: { ...typography.caption, marginTop: 2 },
 });

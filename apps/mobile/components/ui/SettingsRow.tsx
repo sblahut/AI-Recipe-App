@@ -12,7 +12,6 @@ type SettingsRowProps = {
   disabled?: boolean;
 };
 
-/** Label + optional hint with a trailing switch (common settings pattern). */
 export function SettingsSwitchRow({
   colors,
   label,
@@ -22,7 +21,7 @@ export function SettingsSwitchRow({
   disabled,
 }: SettingsRowProps) {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, { borderBottomColor: colors.borderSubtle }]}>
       <View style={styles.textBlock}>
         <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
         {hint ? <Text style={[styles.hint, { color: colors.textMuted }]}>{hint}</Text> : null}
@@ -49,7 +48,11 @@ export function SettingsLinkRow({ colors, label, hint, onPress }: SettingsLinkRo
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [
+        styles.row,
+        { borderBottomColor: colors.borderSubtle },
+        pressed && { opacity: 0.7 },
+      ]}
       accessibilityRole="button"
     >
       <View style={styles.textBlock}>
@@ -66,7 +69,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "transparent",
   },
   textBlock: { flex: 1, gap: 2 },
   label: typography.body,

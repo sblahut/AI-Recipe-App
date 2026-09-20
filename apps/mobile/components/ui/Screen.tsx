@@ -79,6 +79,6 @@ export function Screen({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   padded: { paddingHorizontal: spacing.lg },
-  scrollContent: { paddingBottom: spacing.xxl, gap: spacing.md },
+  scrollContent: { paddingBottom: spacing.xxxl, gap: spacing.lg },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

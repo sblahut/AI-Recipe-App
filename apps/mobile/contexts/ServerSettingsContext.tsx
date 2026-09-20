@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { apiJson } from "@/lib/api";
+import { discoverHomeServerApiUrl } from "@/lib/discoverHomeServerUrl";
 import { healthSchema } from "@/lib/schemas";
 import { DEFAULT_SERVER_URL, getStoredServerUrl, setStoredServerUrl } from "@/lib/storage";
 
@@ -28,7 +29,11 @@ export function ServerSettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void (async () => {
       const stored = await getStoredServerUrl();
-      if (stored) {
+      const discovered = await discoverHomeServerApiUrl(stored);
+      if (discovered) {
+        await setStoredServerUrl(discovered);
+        setServerUrlState(discovered);
+      } else if (stored) {
         setServerUrlState(stored);
       } else {
         await setStoredServerUrl(DEFAULT_SERVER_URL);

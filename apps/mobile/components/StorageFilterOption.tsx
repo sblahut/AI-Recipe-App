@@ -34,14 +34,14 @@ export function StorageFilterOption({
         styles.row,
         {
           backgroundColor: selected ? colors.primaryMuted : "transparent",
-          opacity: pressed ? 0.88 : 1,
+          opacity: pressed ? 0.82 : 1,
         },
       ]}
     >
       <View style={styles.pill}>
         <Ionicons
           name={icon}
-          size={18}
+          size={17}
           color={selected ? colors.primary : colors.textMuted}
         />
         <Text
@@ -53,7 +53,14 @@ export function StorageFilterOption({
           {label}
         </Text>
         {count != null ? (
-          <Text style={[styles.count, { color: colors.textMuted }]}>{count}</Text>
+          <Text
+            style={[
+              styles.count,
+              { color: selected ? colors.primary : colors.textMuted },
+            ]}
+          >
+            {count}
+          </Text>
         ) : null}
       </View>
     </Pressable>
@@ -71,15 +78,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
   },
   label: {
-    ...typography.caption,
-    fontWeight: "600",
+    ...typography.captionMedium,
   },
   count: {
     ...typography.caption,
-    fontWeight: "500",
   },
 });

@@ -17,7 +17,11 @@ React Native client for the home LAN FastAPI server.
 
    Use **`npm start`** (not `npm expo start`). If Metro complains about a missing `expo-*` package, run `npx expo install --fix` again.
 
-4. Open **Settings** and set your PC URL (e.g. `http://192.168.1.50:8000`), then **Test connection**.
+4. Open **Settings** and set your PC URL, then **Test connection**.
+   - Same Wi‑Fi: `http://192.168.x.x:8000`
+   - Dedicated Tailscale name (home or away): `http://<machine>.<tailnet>.ts.net:8000`
+
+   The Windows launcher (`scripts/start-home-stack.ps1`) prints this URL and a QR. See the repo README **Off-LAN with Tailscale**.
 
 Use **Expo Go** on the same Wi‑Fi as the PC. Android allows cleartext HTTP via `app.json`; iOS allows local networking.
 
