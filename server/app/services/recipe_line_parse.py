@@ -1,7 +1,7 @@
 import re
 from typing import Literal
 
-from app.units import default_unit
+from app.units import canonical_unit_for_kind, default_unit
 
 QuantityKindField = Literal["count", "weight", "volume"]
 
@@ -48,12 +48,19 @@ def parse_recipe_ingredient_line(name: str, quantity_text: str | None) -> Parsed
     unit = match.group(2).lower() if match.group(2) else None
 
     if unit and unit in _WEIGHT_UNITS:
-        return ParsedRecipeLine(trimmed_name, amount, "weight", unit)
+        return ParsedRecipeLine(
+            trimmed_name, amount, "weight", canonical_unit_for_kind("weight", unit)
+        )
     if unit and unit in _VOLUME_UNITS:
-        return ParsedRecipeLine(trimmed_name, amount, "volume", unit)
+        return ParsedRecipeLine(
+            trimmed_name, amount, "volume", canonical_unit_for_kind("volume", unit)
+        )
 
-    return ParsedRecipeLine(trimmed_name, amount, "count", unit or "each")
+    count_unit = canonical_unit_for_kind("count", unit) if unit else "each"
+    return ParsedRecipeLine(trimmed_name, amount, "count", count_unit)
 
 
 def effective_unit(kind: QuantityKindField, unit: str | None) -> str:
-    return unit if unit else default_unit(kind)
+    if not unit:
+        return default_unit(kind)
+    return canonical_unit_for_kind(kind, unit) or default_unit(kind)

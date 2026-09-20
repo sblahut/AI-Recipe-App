@@ -68,6 +68,11 @@ export const recipeGenerateResponseSchema = z.object({
   saved_recipes: z.array(savedRecipeReadSchema).optional().default([]),
 });
 
+export const recipeImportResponseSchema = z.object({
+  recipe: generatedRecipeSchema,
+  saved_recipe: savedRecipeReadSchema.nullable().optional(),
+});
+
 export const shoppingListSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -98,6 +103,27 @@ export const shoppingFromRecipeResponseSchema = z.object({
   skipped_in_pantry: z.array(z.string()),
 });
 export type ShoppingFromRecipeResponse = z.infer<typeof shoppingFromRecipeResponseSchema>;
+
+export const mealSlotSchema = z.enum(["breakfast", "lunch", "dinner", "snack"]);
+export type MealSlot = z.infer<typeof mealSlotSchema>;
+
+export const mealPlanEntrySchema = z.object({
+  id: z.number(),
+  plan_date: z.string(),
+  meal_slot: mealSlotSchema,
+  saved_recipe_id: z.number(),
+  recipe_title: z.string(),
+  created_at: z.string(),
+});
+export type MealPlanEntry = z.infer<typeof mealPlanEntrySchema>;
+
+export const shoppingFromMealPlanResponseSchema = z.object({
+  added: z.array(shoppingListItemSchema),
+  skipped_in_pantry: z.array(z.string()),
+  missing_entry_ids: z.array(z.number()).optional().default([]),
+  meals_processed: z.number().optional().default(0),
+});
+export type ShoppingFromMealPlanResponse = z.infer<typeof shoppingFromMealPlanResponseSchema>;
 
 export const productReadSchema = z.object({
   barcode: z.string(),

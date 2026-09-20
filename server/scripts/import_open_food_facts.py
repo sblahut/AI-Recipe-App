@@ -33,6 +33,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from app.database import SessionLocal, init_db
 from app.models import Product
 from app.services.barcode import normalize_barcode
+from app.services.off_quantity_kind import infer_default_quantity_kind
 
 BATCH_SIZE = 2000
 
@@ -112,7 +113,7 @@ def import_file(
                         "barcode": barcode,
                         "name": name[:512],
                         "brand": brand[:256] if brand else None,
-                        "default_quantity_kind": None,
+                        "default_quantity_kind": infer_default_quantity_kind(record),
                         "source": "open_food_facts",
                     }
                 )
@@ -145,6 +146,7 @@ def _flush_batch(session, batch: list[dict], dry_run: bool) -> int:
             "name": stmt.excluded.name,
             "brand": stmt.excluded.brand,
             "source": stmt.excluded.source,
+            "default_quantity_kind": stmt.excluded.default_quantity_kind,
         },
     )
     session.execute(stmt)

@@ -14,9 +14,44 @@ DEFAULT_UNIT_BY_KIND: dict[QuantityKind, str] = {
     "volume": "ml",
 }
 
+# Recipe / LLM text often uses plural or informal units.
+UNIT_ALIASES: dict[str, str] = {
+    "cups": "cup",
+    "lbs": "lb",
+    "pounds": "lb",
+    "pound": "lb",
+    "ounces": "oz",
+    "ounce": "oz",
+    "grams": "g",
+    "gram": "g",
+    "kilograms": "kg",
+    "kilogram": "kg",
+    "milliliters": "ml",
+    "milliliter": "ml",
+    "liters": "l",
+    "liter": "l",
+    "tablespoons": "tbsp",
+    "tablespoon": "tbsp",
+    "teaspoons": "tsp",
+    "teaspoon": "tsp",
+    "pieces": "piece",
+}
+
 
 def normalize_unit(unit: str) -> str:
     return unit.strip().lower().replace(" ", "_")
+
+
+def canonical_unit_for_kind(kind: QuantityKind, unit: str | None) -> str | None:
+    """Map aliases to allowed units; fall back to kind default when unknown."""
+    if unit is None:
+        return None
+    token = normalize_unit(unit)
+    token = UNIT_ALIASES.get(token, token)
+    try:
+        return validate_unit_for_kind(kind, token)
+    except ValueError:
+        return default_unit(kind)
 
 
 def units_for_kind(kind: QuantityKind) -> tuple[str, ...]:

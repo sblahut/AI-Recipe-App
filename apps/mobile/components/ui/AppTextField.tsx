@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
 
 import { radius, spacing, typography } from "@/constants/theme";
@@ -8,7 +9,10 @@ type Props = TextInputProps & {
   hint?: string;
 };
 
-export function AppTextField({ label, hint, style, ...rest }: Props) {
+export const AppTextField = forwardRef<TextInput, Props>(function AppTextField(
+  { label, hint, style, ...rest },
+  ref,
+) {
   const { colors } = useAppTheme();
 
   return (
@@ -16,6 +20,7 @@ export function AppTextField({ label, hint, style, ...rest }: Props) {
       {label ? <Text style={[styles.label, { color: colors.text }]}>{label}</Text> : null}
       {hint ? <Text style={[styles.hint, { color: colors.textMuted }]}>{hint}</Text> : null}
       <TextInput
+        ref={ref}
         placeholderTextColor={colors.textMuted}
         style={[
           styles.input,
@@ -30,7 +35,7 @@ export function AppTextField({ label, hint, style, ...rest }: Props) {
       />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },

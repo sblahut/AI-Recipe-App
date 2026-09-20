@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ExpirationDateField } from "@/components/ExpirationDateField";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
@@ -58,6 +59,7 @@ export default function ScanScreen() {
   const [checklist, setChecklist] = useState<string[]>([]);
   const [pending, setPending] = useState<PendingScan | null>(null);
   const [quantity, setQuantity] = useState("1");
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const handled = useRef<string | null>(null);
   const cooldown = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -115,7 +117,7 @@ export default function ScanScreen() {
 
   const submitBarcode = async (
     barcode: string,
-    options?: { nameOverride?: string; quantity?: number },
+    options?: { nameOverride?: string; quantity?: number; expiresAt?: string | null },
   ) => {
     const qty = options?.quantity ?? 1;
     setBusy(true);
@@ -134,6 +136,9 @@ export default function ScanScreen() {
       }
       if (target === "inventory" && storageLocation) {
         body.location = storageLocation;
+      }
+      if (target === "inventory" && options?.expiresAt) {
+        body.expires_at = options.expiresAt;
       }
 
       const raw = await apiJson<unknown>("/scan/barcode", {
@@ -159,6 +164,7 @@ export default function ScanScreen() {
       setManualName("");
       setPending(null);
       setQuantity("1");
+      setExpiresAt(null);
       handled.current = barcode;
 
       finishAdded(label, qty);
@@ -172,6 +178,7 @@ export default function ScanScreen() {
 
   const beginConfirmScan = (barcode: string) => {
     setQuantity("1");
+    setExpiresAt(null);
     setPending({ barcode, productName: null, resolving: true });
     void (async () => {
       try {
@@ -213,12 +220,16 @@ export default function ScanScreen() {
       Alert.alert("Quantity", "Enter a number greater than zero.");
       return;
     }
-    void submitBarcode(pending.barcode, { quantity: parsedQty });
+    void submitBarcode(pending.barcode, {
+      quantity: parsedQty,
+      expiresAt: target === "inventory" ? expiresAt : null,
+    });
   };
 
   const cancelPending = () => {
     setPending(null);
     setQuantity("1");
+    setExpiresAt(null);
     handled.current = null;
   };
 
@@ -247,7 +258,9 @@ export default function ScanScreen() {
       : storageLocation
         ? `Scan into ${storageLocation} · tap Done when finished`
         : "Scan each item · tap Done when finished"
-    : "Scan one barcode · confirm quantity · return to Ingredients";
+    : storageLocation
+      ? `Scan a barcode to add to ${storageLocation} · Cancel to leave without scanning`
+      : "Scan one barcode · confirm quantity · return to Ingredients";
 
   return (
     <View style={styles.container}>
@@ -294,6 +307,9 @@ export default function ScanScreen() {
                   onChangeText={setQuantity}
                   keyboardType="decimal-pad"
                 />
+                {target === "inventory" ? (
+                  <ExpirationDateField value={expiresAt} onChange={setExpiresAt} />
+                ) : null}
                 <View style={styles.sheetActions}>
                   <AppButton label="Cancel" variant="ghost" onPress={cancelPending} />
                   <AppButton
@@ -328,6 +344,9 @@ export default function ScanScreen() {
               onChangeText={setQuantity}
               keyboardType="decimal-pad"
             />
+            {target === "inventory" ? (
+              <ExpirationDateField value={expiresAt} onChange={setExpiresAt} />
+            ) : null}
             <AppButton
               label="Add & save to UPC catalog"
               loading={busy}
@@ -341,11 +360,13 @@ export default function ScanScreen() {
                 void submitBarcode(lastBarcode, {
                   nameOverride: manualName.trim(),
                   quantity: parsedQty,
+                  expiresAt: target === "inventory" ? expiresAt : null,
                 });
               }}
             />
             <AppButton label="Cancel" variant="ghost" onPress={() => {
               setLastBarcode(null);
+              setExpiresAt(null);
               handled.current = null;
             }} />
           </Card>

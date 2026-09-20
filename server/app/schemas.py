@@ -98,6 +98,7 @@ class BarcodeScanRequest(QuantityFieldsMixin):
         default=False,
         description="When barcode is unknown, save manual_name to the local product catalog",
     )
+    expires_at: datetime | None = None
 
 
 class BarcodeScanResponse(BaseModel):
@@ -133,7 +134,7 @@ class RecipeIngredient(BaseModel):
             return value
         if isinstance(value, bool):
             raise ValueError("quantity must be a string or number")
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return str(value)
         return str(value)
 
@@ -150,6 +151,40 @@ class GeneratedRecipe(BaseModel):
 class RecipeGenerateResponse(BaseModel):
     recipes: list[GeneratedRecipe]
     saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
+
+
+class RecipeSearchRequest(BaseModel):
+    query: str = Field(min_length=3, max_length=500)
+    count: int = Field(default=3, ge=1, le=10)
+    persist_generated: bool | None = Field(
+        default=None,
+        description="When true, save each result (non-favorite). When omitted, uses server default.",
+    )
+
+
+class RecipeImportRequest(BaseModel):
+    text: str | None = Field(default=None, max_length=50_000)
+    url: str | None = Field(default=None, max_length=2048)
+    persist: bool | None = Field(
+        default=None,
+        description="Save on server when true. When omitted, uses DEFAULT_PERSIST_GENERATED_RECIPES.",
+    )
+    favorite: bool = False
+
+    @model_validator(mode="after")
+    def exactly_one_import_source(self) -> "RecipeImportRequest":
+        text = (self.text or "").strip()
+        url = (self.url or "").strip()
+        if bool(text) == bool(url):
+            raise ValueError("Provide exactly one of text or url")
+        if text and len(text) < 20:
+            raise ValueError("text must be at least 20 characters")
+        return self
+
+
+class RecipeImportResponse(BaseModel):
+    recipe: GeneratedRecipe
+    saved_recipe: "SavedRecipeRead | None" = None
 
 
 class SavedRecipeCreate(BaseModel):
@@ -237,4 +272,72 @@ class ShoppingFromRecipeResponse(BaseModel):
     skipped_in_pantry: list[str]
 
 
+MealSlotField = Literal["breakfast", "lunch", "dinner", "snack"]
+
+
+class MealPlanEntryCreate(BaseModel):
+    plan_date: str = Field(max_length=10)
+    meal_slot: MealSlotField
+    saved_recipe_id: int
+
+    @field_validator("plan_date")
+    @classmethod
+    def validate_plan_date(cls, value: str) -> str:
+        from app.services.meal_plan_range import parse_plan_date
+
+        parse_plan_date(value)
+        return value
+
+
+class MealPlanEntryUpdate(BaseModel):
+    plan_date: str | None = Field(default=None, max_length=10)
+    meal_slot: MealSlotField | None = None
+    saved_recipe_id: int | None = None
+
+    @field_validator("plan_date")
+    @classmethod
+    def validate_plan_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        from app.services.meal_plan_range import parse_plan_date
+
+        parse_plan_date(value)
+        return value
+
+
+class MealPlanEntryRead(BaseModel):
+    id: int
+    plan_date: str
+    meal_slot: MealSlotField
+    saved_recipe_id: int
+    recipe_title: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ShoppingFromMealPlanRequest(BaseModel):
+    list_id: int
+    start_date: str = Field(max_length=10)
+    end_date: str = Field(max_length=10)
+
+    @model_validator(mode="after")
+    def validate_range(self) -> "ShoppingFromMealPlanRequest":
+        from app.services.meal_plan_range import validate_plan_date_range
+
+        validate_plan_date_range(self.start_date, self.end_date)
+        return self
+
+
+class ShoppingFromMealPlanResponse(BaseModel):
+    added: list[ShoppingListItemRead]
+    skipped_in_pantry: list[str]
+    missing_entry_ids: list[int] = Field(
+        default_factory=list,
+        description="Meal plan rows whose saved recipe was deleted",
+    )
+    meals_processed: int = 0
+
+
 RecipeGenerateResponse.model_rebuild()
+RecipeImportResponse.model_rebuild()

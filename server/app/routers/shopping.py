@@ -7,6 +7,8 @@ from app.database import get_db
 from app.models import SavedRecipe, ShoppingList, ShoppingListItem
 from app.schemas import (
     GeneratedRecipe,
+    ShoppingFromMealPlanRequest,
+    ShoppingFromMealPlanResponse,
     ShoppingFromRecipeRequest,
     ShoppingFromRecipeResponse,
     ShoppingListCreate,
@@ -15,7 +17,11 @@ from app.schemas import (
     ShoppingListItemRead,
     ShoppingListRead,
 )
-from app.services.shopping_from_recipe import add_recipe_to_shopping_list
+from app.services.shopping_from_meal_plan import add_meal_plan_range_to_shopping_list
+from app.services.shopping_from_recipe import (
+    add_recipe_to_shopping_list,
+    heal_shopping_list_item_units,
+)
 
 router = APIRouter(prefix="/shopping", tags=["shopping"])
 
@@ -44,6 +50,7 @@ def get_shopping_list(list_id: int, db: Session = Depends(get_db)) -> ShoppingLi
     )
     if not row:
         raise HTTPException(status_code=404, detail="Shopping list not found")
+    heal_shopping_list_item_units(db, list(row.items))
     return row
 
 
@@ -67,6 +74,31 @@ def shopping_from_recipe(
 
     added, skipped = add_recipe_to_shopping_list(db, list_id=body.list_id, recipe=recipe)
     return ShoppingFromRecipeResponse(added=added, skipped_in_pantry=skipped)
+
+
+@router.post("/from-meal-plan", response_model=ShoppingFromMealPlanResponse)
+def shopping_from_meal_plan(
+    body: ShoppingFromMealPlanRequest, db: Session = Depends(get_db)
+) -> ShoppingFromMealPlanResponse:
+    if not db.get(ShoppingList, body.list_id):
+        raise HTTPException(status_code=404, detail="Shopping list not found")
+
+    try:
+        added, skipped, missing, meals_processed = add_meal_plan_range_to_shopping_list(
+            db,
+            list_id=body.list_id,
+            start_date=body.start_date,
+            end_date=body.end_date,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return ShoppingFromMealPlanResponse(
+        added=added,
+        skipped_in_pantry=skipped,
+        missing_entry_ids=missing,
+        meals_processed=meals_processed,
+    )
 
 
 @router.post("/lists/{list_id}/items", response_model=ShoppingListItemRead, status_code=201)

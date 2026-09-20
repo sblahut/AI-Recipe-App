@@ -43,6 +43,26 @@ class SavedRecipe(Base):
     favorite: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    meal_plan_entries: Mapped[list["MealPlanEntry"]] = relationship(
+        back_populates="saved_recipe",
+        cascade="all, delete-orphan",
+    )
+
+
+class MealPlanEntry(Base):
+    __tablename__ = "meal_plan_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    plan_date: Mapped[str] = mapped_column(String(10), index=True)
+    meal_slot: Mapped[str] = mapped_column(String(16))
+    saved_recipe_id: Mapped[int] = mapped_column(
+        ForeignKey("saved_recipes.id", ondelete="CASCADE"),
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    saved_recipe: Mapped["SavedRecipe"] = relationship(back_populates="meal_plan_entries")
+
 
 class ShoppingList(Base):
     __tablename__ = "shopping_lists"

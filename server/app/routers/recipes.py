@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -7,10 +9,14 @@ from app.models import Ingredient, SavedRecipe
 from app.schemas import (
     RecipeGenerateRequest,
     RecipeGenerateResponse,
+    RecipeImportRequest,
+    RecipeImportResponse,
+    RecipeSearchRequest,
     SavedRecipeCreate,
     SavedRecipeRead,
 )
 from app.services import ollama
+from app.services.recipe_url_fetch import RecipeFetchError, fetch_recipe_text_from_url
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
 
@@ -22,7 +28,9 @@ def _format_line(row: Ingredient) -> str:
         kind = row.quantity_kind or "count"
         parts.append(f"({row.quantity} {unit}, {kind})".strip())
     if row.expires_at:
-        parts.append(f"expires {row.expires_at.date().isoformat()}")
+        exp_date = row.expires_at.date()
+        verb = "expired" if exp_date <= date.today() else "expires"
+        parts.append(f"{verb} {exp_date.isoformat()}")
     return " ".join(parts)
 
 
@@ -76,6 +84,70 @@ async def generate_recipes(
         db.commit()
 
     return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
+
+
+@router.post("/search", response_model=RecipeGenerateResponse)
+async def search_recipes(
+    body: RecipeSearchRequest, db: Session = Depends(get_db)
+) -> RecipeGenerateResponse:
+    try:
+        recipes = await ollama.search_recipes(query=body.query, count=body.count)
+    except ollama.OllamaError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    persist = (
+        body.persist_generated
+        if body.persist_generated is not None
+        else settings.default_persist_generated_recipes
+    )
+    saved_reads: list[SavedRecipeRead] = []
+    if persist:
+        for recipe in recipes:
+            row = SavedRecipe(
+                title=recipe.title,
+                payload_json=recipe.model_dump_json(),
+                favorite=False,
+            )
+            db.add(row)
+            db.flush()
+            saved_reads.append(SavedRecipeRead.from_orm_row(row))
+        db.commit()
+
+    return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
+
+
+@router.post("/import", response_model=RecipeImportResponse)
+async def import_recipe(
+    body: RecipeImportRequest, db: Session = Depends(get_db)
+) -> RecipeImportResponse:
+    source_text = (body.text or "").strip()
+    if body.url:
+        try:
+            source_text = await fetch_recipe_text_from_url(body.url.strip())
+        except RecipeFetchError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    try:
+        recipe = await ollama.import_recipe_from_text(source_text)
+    except ollama.OllamaError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    persist = (
+        body.persist if body.persist is not None else settings.default_persist_generated_recipes
+    )
+    saved: SavedRecipeRead | None = None
+    if persist or body.favorite:
+        row = SavedRecipe(
+            title=recipe.title,
+            payload_json=recipe.model_dump_json(),
+            favorite=body.favorite,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        saved = SavedRecipeRead.from_orm_row(row)
+
+    return RecipeImportResponse(recipe=recipe, saved_recipe=saved)
 
 
 @router.get("/saved", response_model=list[SavedRecipeRead])

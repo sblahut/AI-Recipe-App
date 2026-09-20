@@ -1,4 +1,13 @@
-import { ActivityIndicator, ScrollView, StyleSheet, View, type ViewProps } from "react-native";
+import type { ReactElement, RefObject } from "react";
+import {
+  ActivityIndicator,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  View,
+  type RefreshControlProps,
+  type ViewProps,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { spacing } from "@/constants/theme";
@@ -9,6 +18,8 @@ type Props = ViewProps & {
   padded?: boolean;
   loading?: boolean;
   contentContainerStyle?: object;
+  refreshControl?: ReactElement<RefreshControlProps>;
+  scrollRef?: RefObject<ScrollView | null>;
 };
 
 export function Screen({
@@ -17,6 +28,8 @@ export function Screen({
   loading = false,
   style,
   contentContainerStyle,
+  refreshControl,
+  scrollRef,
   children,
   ...rest
 }: Props) {
@@ -38,8 +51,12 @@ export function Screen({
     return (
       <SafeAreaView style={[styles.fill, { backgroundColor: colors.background }]} edges={["bottom"]}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[pad, styles.scrollContent, contentContainerStyle]}
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={() => Keyboard.dismiss()}
+          refreshControl={refreshControl}
           showsVerticalScrollIndicator={false}
         >
           {children}

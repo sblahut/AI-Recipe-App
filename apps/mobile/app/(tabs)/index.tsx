@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  FlatList,
   Platform,
   Pressable,
   RefreshControl,
@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import type { TextInput } from "react-native";
 import { z } from "zod";
 
 import { PantryItemForm } from "@/components/PantryItemForm";
@@ -17,6 +18,7 @@ import { StorageFilterOption } from "@/components/StorageFilterOption";
 import { SwipeableRow } from "@/components/SwipeableRow";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
+import { SearchField, dismissSearchKeyboard } from "@/components/ui/SearchField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
@@ -29,20 +31,23 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { startIngredientScan } from "@/lib/startIngredientScan";
 import {
+  formatIngredientExpirationPhrase,
+  isExpirationDue,
+} from "@/lib/expirationDate";
+import { formatUnitLabel } from "@/lib/quantityUnits";
+import { textMatchesSearch } from "@/lib/textSearch";
+import { defaultUnitsByKind, mergeQuantityUnitsFromApi } from "@/lib/quantityUnits";
+import {
   ingredientSchema,
   quantityUnitsSchema,
   type Ingredient,
   type IngredientCreate,
-  type QuantityKind,
 } from "@/lib/schemas";
 
-const defaultUnits: Record<QuantityKind, string[]> = {
-  count: ["each"],
-  weight: ["g"],
-  volume: ["ml"],
-};
+const defaultUnits = defaultUnitsByKind();
 
 export default function IngredientsScreen() {
+  const params = useLocalSearchParams<{ manualAdd?: string; location?: string }>();
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
   const { preferences, addZone, removeZone } = useUserPreferences();
@@ -55,6 +60,10 @@ export default function IngredientsScreen() {
   const [locationFilter, setLocationFilter] = useState<StorageFilterId>("All");
   const [addingZone, setAddingZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [createDefaultLocation, setCreateDefaultLocation] = useState<string | undefined>();
+  const searchInputRef = useRef<TextInput>(null);
+  const handledManualAdd = useRef(false);
 
   const storageFilters = useMemo(
     () => buildStorageFilters(preferences.customZones),
@@ -65,9 +74,9 @@ export default function IngredientsScreen() {
     try {
       const raw = await apiJson<unknown>("/meta/quantity-units", { baseUrl: serverUrl });
       const parsed = quantityUnitsSchema.parse(raw);
-      setUnitsByKind({ ...defaultUnits, ...parsed.kinds });
+      setUnitsByKind(mergeQuantityUnitsFromApi(parsed.kinds));
     } catch {
-      setUnitsByKind(defaultUnits);
+      setUnitsByKind(defaultUnitsByKind());
     }
   }, [serverUrl]);
 
@@ -95,6 +104,25 @@ export default function IngredientsScreen() {
     });
   }, [refresh]);
 
+  useEffect(() => {
+    if (handledManualAdd.current) {
+      return;
+    }
+    if (params.manualAdd !== "1" || !params.location?.trim()) {
+      return;
+    }
+    handledManualAdd.current = true;
+    const loc = params.location.trim();
+    queueMicrotask(() => {
+      setCreateDefaultLocation(loc);
+      setShowForm(true);
+      const filterMatch = storageFilters.find((row) => row.id === loc);
+      if (filterMatch) {
+        setLocationFilter(filterMatch.id);
+      }
+    });
+  }, [params.manualAdd, params.location, storageFilters]);
+
   const countByFilter = useMemo(() => {
     const counts = new Map<StorageFilterId, number>();
     for (const filter of storageFilters) {
@@ -116,7 +144,7 @@ export default function IngredientsScreen() {
     return counts;
   }, [items, preferences.customZones, storageFilters]);
 
-  const filteredItems = useMemo(() => {
+  const locationFilteredItems = useMemo(() => {
     if (locationFilter === "All") {
       return items;
     }
@@ -131,6 +159,14 @@ export default function IngredientsScreen() {
       return loc === locationFilter;
     });
   }, [items, locationFilter, preferences.customZones]);
+
+  const filteredItems = useMemo(
+    () =>
+      locationFilteredItems.filter((item) =>
+        textMatchesSearch(searchQuery, item.name, item.location, item.notes, item.barcode),
+      ),
+    [locationFilteredItems, searchQuery],
+  );
 
   const saveItem = async (payload: IngredientCreate) => {
     try {
@@ -149,6 +185,7 @@ export default function IngredientsScreen() {
       }
       setShowForm(false);
       setEditing(null);
+      setCreateDefaultLocation(undefined);
       await loadInventory();
     } catch (e) {
       Alert.alert("Save failed", e instanceof Error ? e.message : "Unknown error");
@@ -222,32 +259,67 @@ export default function IngredientsScreen() {
     return (
       <PantryItemForm
         {...(editing ? { initial: editing } : {})}
+        {...(!editing && createDefaultLocation ? { defaultLocation: createDefaultLocation } : {})}
         unitsByKind={unitsByKind}
         onSubmit={saveItem}
         onCancel={() => {
           setShowForm(false);
           setEditing(null);
+          setCreateDefaultLocation(undefined);
         }}
         {...(editing ? { onDelete: () => deleteItem(editing) } : {})}
       />
     );
   }
 
+  const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
+
   return (
-    <Screen padded={false}>
+    <Screen
+      scroll
+      padded={false}
+      contentContainerStyle={styles.scroll}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+      }
+    >
       <View style={styles.toolbar}>
-        <AppButton label="+ Manual" compact onPress={() => setShowForm(true)} style={styles.toolbarBtn} />
+        <AppButton
+          label="+ Manual"
+          compact
+          onPress={() => {
+            dismissSearch();
+            setShowForm(true);
+          }}
+          style={styles.toolbarBtn}
+        />
         <AppButton
           label="Scan barcode"
           variant="accent"
           compact
           style={styles.toolbarBtn}
-          onPress={() => void startIngredientScan()}
+          onPress={() => {
+            dismissSearch();
+            void startIngredientScan();
+          }}
         />
       </View>
 
-      <View style={styles.filterSection}>
-        <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
+      <Pressable style={styles.filterSection} onPress={dismissSearch}>
+        <View style={styles.filterHeadingRow}>
+          <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
+          {!addingZone ? (
+            <AppButton
+              label="+ Add area / zone"
+              variant="secondary"
+              compact
+              onPress={() => {
+                dismissSearch();
+                setAddingZone(true);
+              }}
+            />
+          ) : null}
+        </View>
         {storageFilters.map((filter) => (
           <StorageFilterOption
             key={filter.id}
@@ -255,7 +327,10 @@ export default function IngredientsScreen() {
             icon={filter.icon}
             selected={locationFilter === filter.id}
             count={countByFilter.get(filter.id) ?? 0}
-            onPress={() => setLocationFilter(filter.id)}
+            onPress={() => {
+              dismissSearch();
+              setLocationFilter(filter.id);
+            }}
             {...(filter.kind === "custom"
               ? { onLongPress: () => confirmRemoveZone(filter.id) }
               : {})}
@@ -283,86 +358,130 @@ export default function IngredientsScreen() {
               }}
             />
           </View>
-        ) : (
-          <AppButton
-            label="+ Add area / zone"
-            variant="secondary"
-            compact
-            style={styles.addZoneBtn}
-            onPress={() => setAddingZone(true)}
-          />
-        )}
+        ) : null}
+      </Pressable>
+
+      <View style={styles.searchPad}>
+        <SearchField
+          ref={searchInputRef}
+          placeholder="Search ingredients by name, location, notes, or barcode"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
       </View>
 
-      <FlatList
-        data={filteredItems}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={filteredItems.length === 0 ? styles.listEmpty : styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
-        }
-        ListEmptyComponent={
+      {filteredItems.length === 0 ? (
+        <View style={styles.list}>
           <EmptyState
-            title={locationFilter === "All" ? "No ingredients yet" : "Nothing in this location"}
-            subtitle="Add manually, scan a barcode, or pick another storage filter."
+            title={
+              searchQuery.trim()
+                ? "No matches"
+                : locationFilter === "All"
+                  ? "No ingredients yet"
+                  : "Nothing in this location"
+            }
+            subtitle={
+              searchQuery.trim()
+                ? "Try another search or clear the search field."
+                : "Add manually, scan a barcode, or pick another storage filter."
+            }
           />
-        }
-        renderItem={({ item }) => (
-          <SwipeableRow onDelete={() => deleteItem(item)}>
-            <Card style={styles.row}>
-              <Pressable
-                onPress={() => setEditing(item)}
-                style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
-              >
-                <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
-                <Text style={[styles.meta, { color: colors.textMuted }]}>
-                  {formatQty(item)} · {formatLocationLabel(item.location)}
-                </Text>
-              </Pressable>
-              {Platform.OS === "web" ? (
+        </View>
+      ) : (
+        <View style={styles.list}>
+          {filteredItems.map((item) => {
+            const expirationPhrase = formatIngredientExpirationPhrase(item.expires_at);
+            return (
+            <SwipeableRow key={item.id} onDelete={() => deleteItem(item)}>
+              <Card style={styles.row}>
                 <Pressable
-                  accessibilityLabel={`Delete ${item.name}`}
-                  hitSlop={8}
-                  onPress={() => deleteItem(item)}
-                  style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => {
+                    dismissSearch();
+                    setEditing(item);
+                  }}
+                  style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
                 >
-                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                  <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
+                  <Text style={styles.meta}>
+                    <Text style={{ color: colors.textMuted }}>{formatIngredientMetaBase(item)}</Text>
+                    {expirationPhrase ? (
+                      <>
+                        <Text style={{ color: colors.textMuted }}> · </Text>
+                        <Text
+                          style={{
+                            color: isExpirationDue(item.expires_at)
+                              ? colors.danger
+                              : colors.textMuted,
+                          }}
+                        >
+                          {expirationPhrase}
+                        </Text>
+                      </>
+                    ) : null}
+                  </Text>
                 </Pressable>
-              ) : null}
-            </Card>
-          </SwipeableRow>
-        )}
-      />
+                {Platform.OS === "web" ? (
+                  <Pressable
+                    accessibilityLabel={`Delete ${item.name}`}
+                    hitSlop={8}
+                    onPress={() => deleteItem(item)}
+                    style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                  </Pressable>
+                ) : null}
+              </Card>
+            </SwipeableRow>
+            );
+          })}
+        </View>
+      )}
     </Screen>
   );
 }
 
 function formatQty(item: Ingredient): string {
   if (item.quantity == null) return "No quantity set";
-  return `${item.quantity} ${item.unit ?? ""}`.trim();
+  const unitLabel = item.unit ? formatUnitLabel(item.unit) : "";
+  return `${item.quantity} ${unitLabel}`.trim();
+}
+
+function formatIngredientMetaBase(item: Ingredient): string {
+  return [formatQty(item), formatLocationLabel(item.location)].join(" · ");
 }
 
 const styles = StyleSheet.create({
+  scroll: { gap: spacing.sm },
   toolbar: {
     flexDirection: "row",
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md,
   },
   toolbarBtn: { flex: 1 },
   filterSection: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
     gap: 2,
+  },
+  searchPad: {
+    paddingHorizontal: spacing.lg,
+  },
+  filterHeadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
   },
   filterHeading: {
     ...typography.caption,
     fontWeight: "600",
-    marginBottom: spacing.xs,
+    flex: 1,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  addZoneBtn: { alignSelf: "flex-start", marginTop: spacing.sm },
   zoneForm: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -370,10 +489,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   flex: { flex: 1 },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
-  listEmpty: { flexGrow: 1 },
+  list: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
   row: {
-    marginBottom: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,

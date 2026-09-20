@@ -46,6 +46,10 @@ export default function TabLayout() {
         options={{ title: "Recipes", tabBarIcon: tabIcon("restaurant-outline") }}
       />
       <Tabs.Screen
+        name="meal-plan"
+        options={{ title: "Plan", tabBarIcon: tabIcon("calendar-outline") }}
+      />
+      <Tabs.Screen
         name="shopping"
         options={{ title: "Shopping", tabBarIcon: tabIcon("cart-outline") }}
       />

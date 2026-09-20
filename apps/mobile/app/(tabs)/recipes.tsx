@@ -1,10 +1,23 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type ScrollView,
+} from "react-native";
+import type { TextInput } from "react-native";
 import { z } from "zod";
 
+import { RecipeDetailModal } from "@/components/RecipeDetailModal";
 import { AppButton } from "@/components/ui/AppButton";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { AppTextField } from "@/components/ui/AppTextField";
+import { SearchField, dismissSearchKeyboard } from "@/components/ui/SearchField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
@@ -13,18 +26,25 @@ import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { promptAddRecipeToMealPlan } from "@/lib/addToMealPlan";
 import { apiFetch, apiJson } from "@/lib/api";
-import { pickStorageLocation } from "@/lib/pickStorageLocation";
-import { recipeToIngredientCreates } from "@/lib/recipeIngredients";
+import { findFavoriteMatch } from "@/lib/recipeFavorites";
+import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
-import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
-import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
+import {
+  GENERATE_RECIPE_FROM_INGREDIENTS_LABEL,
+  RECIPE_MEAL_PLAN_BUTTON_LABEL,
+  RECIPE_SHOPPING_LIST_BUTTON_LABEL,
+  shareRecipeAccessibilityLabel,
+} from "@/lib/uiActionLabels";
+import { recipeListKey } from "@/lib/recipeListKey";
+import { recipeMatchesSearch } from "@/lib/recipeSearch";
 import {
   healthSchema,
   ingredientSchema,
   recipeGenerateResponseSchema,
+  recipeImportResponseSchema,
   savedRecipeReadSchema,
-  shoppingFromRecipeResponseSchema,
   shoppingListSchema,
   type GeneratedRecipe,
   type SavedRecipe,
@@ -37,25 +57,6 @@ type GenerateReady = {
   ingredientCount: number;
 };
 
-function recipeMatchesSearch(recipe: GeneratedRecipe, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) {
-    return true;
-  }
-  if (recipe.title.toLowerCase().includes(q)) {
-    return true;
-  }
-  return recipe.ingredients.some((line) => line.name.toLowerCase().includes(q));
-}
-
-function findFavoriteMatch(
-  favorites: SavedRecipe[],
-  recipe: GeneratedRecipe,
-): SavedRecipe | undefined {
-  const title = recipe.title.trim().toLowerCase();
-  return favorites.find((row) => row.recipe.title.trim().toLowerCase() === title);
-}
-
 export default function RecipesScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
@@ -63,13 +64,63 @@ export default function RecipesScreen() {
   const [favorites, setFavorites] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
+  const [aiSearchQuery, setAiSearchQuery] = useState("");
+  const [aiSearchLoading, setAiSearchLoading] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importUrl, setImportUrl] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
   const [lists, setLists] = useState<ShoppingList[]>([]);
+  const [detailRecipe, setDetailRecipe] = useState<GeneratedRecipe | null>(null);
+  const [detailTitle, setDetailTitle] = useState<string | undefined>();
+  const [aiSearchExpanded, setAiSearchExpanded] = useState(true);
+  const [importExpanded, setImportExpanded] = useState(true);
+  const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [ready, setReady] = useState<GenerateReady>({
     serverOk: false,
     ollamaOk: null,
     ingredientCount: 0,
   });
+  const searchInputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const generatedSectionY = useRef(0);
+  const scrollToGeneratedPending = useRef(false);
+  const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
+
+  const markScrollToGenerated = useCallback(() => {
+    scrollToGeneratedPending.current = true;
+  }, []);
+
+  const performScrollToGenerated = useCallback(() => {
+    const y = generatedSectionY.current;
+    if (y <= 0) {
+      return false;
+    }
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: true });
+    scrollToGeneratedPending.current = false;
+    return true;
+  }, []);
+
+  const onGeneratedSectionLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      generatedSectionY.current = event.nativeEvent.layout.y;
+      if (scrollToGeneratedPending.current && generated.length > 0) {
+        performScrollToGenerated();
+      }
+    },
+    [generated.length, performScrollToGenerated],
+  );
+
+  useEffect(() => {
+    if (!scrollToGeneratedPending.current || generated.length === 0) {
+      return;
+    }
+    if (!performScrollToGenerated()) {
+      requestAnimationFrame(() => {
+        performScrollToGenerated();
+      });
+    }
+  }, [generated, performScrollToGenerated]);
 
   const loadFavorites = useCallback(async () => {
     const raw = await apiJson<unknown>("/recipes/saved", { baseUrl: serverUrl });
@@ -118,6 +169,55 @@ export default function RecipesScreen() {
     [favorites, searchQuery],
   );
 
+  const searchAiForRecipe = async () => {
+    const query = aiSearchQuery.trim();
+    if (query.length < 3) {
+      Alert.alert("Search AI", "Describe the recipe you want (at least 3 characters).");
+      return;
+    }
+    if (!ready.serverOk) {
+      Alert.alert("Server offline", "Check the home server URL in Settings.");
+      return;
+    }
+    if (ready.ollamaOk === false) {
+      Alert.alert("Ollama offline", "AI search uses the same Ollama model as generate.");
+      return;
+    }
+
+    setAiSearchLoading(true);
+    try {
+      const raw = await apiJson<unknown>("/recipes/search", {
+        baseUrl: serverUrl,
+        method: "POST",
+        body: JSON.stringify({
+          query,
+          count: preferences.defaultRecipeCount ?? 3,
+          persist_generated: preferences.autoPersistGeneratedRecipes,
+        }),
+      });
+      const parsed = recipeGenerateResponseSchema.parse(raw);
+      if (parsed.recipes.length > 0) {
+        markScrollToGenerated();
+      }
+      setGenerated(parsed.recipes);
+      if (parsed.recipes.length === 0) {
+        Alert.alert("Search AI", "No recipes came back — try a different description.");
+      } else if (parsed.recipes.length < (preferences.defaultRecipeCount ?? 3)) {
+        Alert.alert(
+          "Search AI",
+          `Got ${parsed.recipes.length} recipe${parsed.recipes.length === 1 ? "" : "s"} (model sometimes returns fewer than ${preferences.defaultRecipeCount ?? 3}).`,
+        );
+      }
+      if (parsed.saved_recipes.length > 0) {
+        await loadFavorites();
+      }
+    } catch (e) {
+      Alert.alert("Search failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setAiSearchLoading(false);
+    }
+  };
+
   const generate = async () => {
     if (!ready.serverOk) {
       Alert.alert(
@@ -151,6 +251,9 @@ export default function RecipesScreen() {
         }),
       });
       const parsed = recipeGenerateResponseSchema.parse(raw);
+      if (parsed.recipes.length > 0) {
+        markScrollToGenerated();
+      }
       setGenerated(parsed.recipes);
       if (parsed.saved_recipes.length > 0) {
         await loadFavorites();
@@ -160,6 +263,54 @@ export default function RecipesScreen() {
     } finally {
       setLoading(false);
       void loadReady();
+    }
+  };
+
+  const importRecipe = async () => {
+    const text = importText.trim();
+    const url = importUrl.trim();
+    if (!url && text.length < 20) {
+      Alert.alert(
+        "Add a recipe",
+        "Paste recipe text (20+ characters) or enter a recipe page URL.",
+      );
+      return;
+    }
+    if (url && text.length > 0) {
+      Alert.alert("Import recipe", "Use either pasted text or a URL, not both.");
+      return;
+    }
+    if (!ready.serverOk) {
+      Alert.alert("Server offline", "Check the home server URL in Settings.");
+      return;
+    }
+    if (ready.ollamaOk === false) {
+      Alert.alert("Ollama offline", "Recipe import uses the same Ollama model as generate.");
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      const raw = await apiJson<unknown>("/recipes/import", {
+        baseUrl: serverUrl,
+        method: "POST",
+        body: JSON.stringify({
+          ...(url ? { url } : { text }),
+          persist: preferences.autoPersistGeneratedRecipes,
+        }),
+      });
+      const parsed = recipeImportResponseSchema.parse(raw);
+      setGenerated((prev) => [parsed.recipe, ...prev.filter((r) => r.title !== parsed.recipe.title)]);
+      setImportText("");
+      setImportUrl("");
+      if (parsed.saved_recipe) {
+        await loadFavorites();
+      }
+      Alert.alert("Imported", parsed.recipe.title);
+    } catch (e) {
+      Alert.alert("Import failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setImportLoading(false);
     }
   };
 
@@ -184,72 +335,30 @@ export default function RecipesScreen() {
     }
   };
 
-  const addRecipeToIngredients = async (recipe: GeneratedRecipe) => {
-    const location = await pickStorageLocation("Add to ingredients");
-    if (!location) {
-      return;
-    }
-    const items = recipeToIngredientCreates(recipe, location);
-    if (items.length === 0) {
-      Alert.alert("No ingredients", "This recipe has no ingredient lines to add.");
-      return;
-    }
-    try {
-      await apiFetch("/inventory/bulk", {
-        baseUrl: serverUrl,
-        method: "POST",
-        body: JSON.stringify({ items }),
-      });
-      Alert.alert("Added", `${items.length} items added to ${location}.`);
-    } catch (e) {
-      Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
-    }
-  };
-
-  const addRecipeToShoppingList = (recipe: GeneratedRecipe) => {
-    if (lists.length === 0) {
-      Alert.alert("No lists", "Create a shopping list on the Shopping tab first.");
-      return;
-    }
-    Alert.alert(
-      "Add to shopping list",
-      recipe.title,
-      [
-        ...lists.map((list) => ({
-          text: list.name,
-          onPress: () => {
-            void (async () => {
-              try {
-                const raw = await apiJson<unknown>("/shopping/from-recipe", {
-                  baseUrl: serverUrl,
-                  method: "POST",
-                  body: JSON.stringify({ list_id: list.id, recipe }),
-                });
-                const result = shoppingFromRecipeResponseSchema.parse(raw);
-                const skipped = result.skipped_in_pantry.length;
-                const added = result.added.length;
-                const detail =
-                  skipped > 0
-                    ? `${added} added to ${list.name}. ${skipped} already in your pantry.`
-                    : `${added} items added to ${list.name}.`;
-                Alert.alert(added > 0 ? "Added" : "Nothing to buy", detail);
-              } catch (e) {
-                Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
-              }
-            })();
-          },
-        })),
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
+  const openRecipeDetail = (recipe: GeneratedRecipe, titleOverride?: string) => {
+    dismissSearch();
+    setDetailRecipe(recipe);
+    setDetailTitle(titleOverride);
   };
 
   return (
-    <Screen scroll contentContainerStyle={styles.scroll}>
-      <Text style={[styles.lead, { color: colors.textMuted }]}>
-        Uses ingredients at home and your Ollama server. Tap the star to add recipes to Favorites.
-      </Text>
+    <Screen scroll scrollRef={scrollRef} contentContainerStyle={styles.scroll}>
+      <RecipeDetailModal
+        visible={detailRecipe != null}
+        recipe={detailRecipe}
+        {...(detailTitle ? { titleOverride: detailTitle } : {})}
+        onClose={() => {
+          setDetailRecipe(null);
+          setDetailTitle(undefined);
+        }}
+      />
+      <Pressable onPress={dismissSearch}>
+        <Text style={[styles.lead, { color: colors.textMuted }]}>
+          Uses ingredients at home and your Ollama server. Tap the star to add recipes to Favorites.
+        </Text>
+      </Pressable>
 
+      <Pressable onPress={dismissSearch}>
       <Card>
         <Text style={[styles.readyTitle, { color: colors.text }]}>Needed to generate</Text>
         <ReadyLine
@@ -278,14 +387,84 @@ export default function RecipesScreen() {
           }
         />
       </Card>
+      </Pressable>
 
       <AppButton
-        label={loading ? "Generating…" : "Generate from ingredients"}
+        label={loading ? "Generating…" : GENERATE_RECIPE_FROM_INGREDIENTS_LABEL}
         loading={loading}
-        onPress={() => void generate()}
+        onPress={() => {
+          dismissSearch();
+          void generate();
+        }}
       />
 
-      <AppTextField
+      <CollapsibleSection
+        title="Search AI for recipe"
+        expanded={aiSearchExpanded}
+        onToggle={() => setAiSearchExpanded((open) => !open)}
+      >
+        <Text style={[styles.importHint, { color: colors.textMuted }]}>
+          Ask Ollama for up to {preferences.defaultRecipeCount ?? 3} ideas without using your
+          ingredients list (count matches Settings → Recipes).
+        </Text>
+        <AppTextField
+          placeholder="What do you want to cook?"
+          value={aiSearchQuery}
+          onChangeText={setAiSearchQuery}
+        />
+        <AppButton
+          label={aiSearchLoading ? "Searching…" : "Search AI for recipe"}
+          variant="secondary"
+          loading={aiSearchLoading}
+          onPress={() => {
+            dismissSearch();
+            void searchAiForRecipe();
+          }}
+        />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Import recipe"
+        expanded={importExpanded}
+        onToggle={() => setImportExpanded((open) => !open)}
+      >
+        <Text style={[styles.importHint, { color: colors.textMuted }]}>
+          Paste text or paste a public recipe page URL. The server fetches the page and parses it with
+          Ollama (HTTPS only, no LAN URLs).
+        </Text>
+        <AppTextField
+          label="Recipe URL"
+          value={importUrl}
+          onChangeText={setImportUrl}
+          placeholder="https://…"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+        />
+        <AppTextField
+          label="Recipe text"
+          value={importText}
+          onChangeText={setImportText}
+          placeholder="Title, ingredients, and steps…"
+          multiline
+          numberOfLines={8}
+          textAlignVertical="top"
+          style={styles.importInput}
+          autoCapitalize="sentences"
+        />
+        <AppButton
+          label={importLoading ? "Importing…" : "Import with AI"}
+          variant="secondary"
+          loading={importLoading}
+          onPress={() => {
+            dismissSearch();
+            void importRecipe();
+          }}
+        />
+      </CollapsibleSection>
+
+      <SearchField
+        ref={searchInputRef}
         placeholder="Search recipes by title or ingredient"
         value={searchQuery}
         onChangeText={setSearchQuery}
@@ -293,65 +472,90 @@ export default function RecipesScreen() {
         autoCorrect={false}
       />
 
-      {generated.length > 0 ? (
-        <>
-          <Text style={[styles.section, { color: colors.text }]}>Generated ideas</Text>
-          {filteredGenerated.length === 0 ? (
-            <EmptyState title="No matches" subtitle="Try a different search term." />
-          ) : (
-            filteredGenerated.map((recipe) => {
-              const isFavorite = findFavoriteMatch(favorites, recipe) != null;
-              return (
-                <RecipeCard
-                  key={recipe.title}
-                  recipe={recipe}
-                  colors={colors}
-                  isFavorite={isFavorite}
-                  onToggleFavorite={() => void toggleFavorite(recipe)}
-                  onAddIngredients={() => void addRecipeToIngredients(recipe)}
-                  onAddShopping={() => void addRecipeToShoppingList(recipe)}
-                  onStock={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
-                  onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
-                />
-              );
-            })
-          )}
-        </>
-      ) : null}
-
-      <View style={styles.favoritesHeading}>
-        <Ionicons name="star" size={20} color={colors.primary} />
-        <Text style={[styles.section, styles.favoritesTitle, { color: colors.text }]}>Favorites</Text>
+      <View
+        collapsable={false}
+        onLayout={onGeneratedSectionLayout}
+        style={styles.generatedSection}
+      >
+        {generated.length > 0 ? (
+          <>
+            <Pressable onPress={dismissSearch}>
+              <Text style={[styles.section, { color: colors.text }]}>
+                Generated ideas ({filteredGenerated.length})
+              </Text>
+            </Pressable>
+            {filteredGenerated.length === 0 ? (
+              <Pressable onPress={dismissSearch}>
+                <EmptyState title="No matches" subtitle="Try a different search term." />
+              </Pressable>
+            ) : (
+              filteredGenerated.map((recipe, index) => {
+                const isFavorite = findFavoriteMatch(favorites, recipe) != null;
+                return (
+                  <RecipeCard
+                    key={recipeListKey(recipe, index)}
+                    recipe={recipe}
+                    colors={colors}
+                    isFavorite={isFavorite}
+                    onDismissSearch={dismissSearch}
+                    onViewRecipe={() => openRecipeDetail(recipe)}
+                    onToggleFavorite={() => void toggleFavorite(recipe)}
+                    onAddToShoppingList={() => promptAddRecipeToShoppingList(recipe, lists, serverUrl)}
+                    onAddToMealPlan={() =>
+                      void promptAddRecipeToMealPlan(recipe, serverUrl, favorites).then(() =>
+                        loadFavorites(),
+                      )
+                    }
+                    onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
+                  />
+                );
+              })
+            )}
+          </>
+        ) : null}
       </View>
-      {favorites.length === 0 ? (
-        <EmptyState
-          title="No favorites yet"
-          subtitle="Generate ideas above, then tap the star on any recipe to save it here."
-        />
-      ) : filteredFavorites.length === 0 ? (
-        <EmptyState title="No matches in favorites" subtitle="Try a different search term." />
-      ) : (
-        <FlatList
-          data={filteredFavorites}
-          scrollEnabled={false}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.favoritesList}
-          renderItem={({ item }) => (
-            <RecipeCard
-              recipe={item.recipe}
-              titleOverride={item.title}
-              meta={`Favorited ${new Date(item.created_at).toLocaleDateString()}`}
-              colors={colors}
-              isFavorite
-              onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
-              onAddIngredients={() => void addRecipeToIngredients(item.recipe)}
-              onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
-              onStock={() => void stockFromSavedRecipe(item.id, serverUrl)}
-              onShare={() => void shareText(item.title, formatRecipeShare(item.recipe))}
-            />
-          )}
-        />
-      )}
+
+      <CollapsibleSection
+        title={`Favorites (${favorites.length})`}
+        expanded={favoritesExpanded}
+        onToggle={() => setFavoritesExpanded((open) => !open)}
+        leadingIcon="star"
+      >
+        {favorites.length === 0 ? (
+          <EmptyState
+            title="No favorites yet"
+            subtitle="Generate ideas above, then tap the star on any recipe to save it here."
+          />
+        ) : filteredFavorites.length === 0 ? (
+          <EmptyState title="No matches in favorites" subtitle="Try a different search term." />
+        ) : (
+          <FlatList
+            data={filteredFavorites}
+            scrollEnabled={false}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.favoritesList}
+            renderItem={({ item }) => (
+              <RecipeCard
+                recipe={item.recipe}
+                titleOverride={item.title}
+                meta={`Favorited ${new Date(item.created_at).toLocaleDateString()}`}
+                colors={colors}
+                isFavorite
+                onDismissSearch={dismissSearch}
+                onViewRecipe={() => openRecipeDetail(item.recipe, item.title)}
+                onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
+                onAddToShoppingList={() => promptAddRecipeToShoppingList(item.recipe, lists, serverUrl)}
+                onAddToMealPlan={() =>
+                  void promptAddRecipeToMealPlan(item.recipe, serverUrl, favorites).then(() =>
+                    loadFavorites(),
+                  )
+                }
+                onShare={() => void shareText(item.title, formatRecipeShare(item.recipe))}
+              />
+            )}
+          />
+        )}
+      </CollapsibleSection>
     </Screen>
   );
 }
@@ -370,10 +574,11 @@ type RecipeCardProps = {
   meta?: string;
   colors: ThemeColors;
   isFavorite: boolean;
+  onDismissSearch: () => void;
+  onViewRecipe: () => void;
   onToggleFavorite: () => void;
-  onAddIngredients: () => void;
-  onAddShopping: () => void;
-  onStock: () => void;
+  onAddToShoppingList: () => void;
+  onAddToMealPlan: () => void;
   onShare: () => void;
 };
 
@@ -383,10 +588,11 @@ function RecipeCard({
   meta,
   colors,
   isFavorite,
+  onDismissSearch,
+  onViewRecipe,
   onToggleFavorite,
-  onAddIngredients,
-  onAddShopping,
-  onStock,
+  onAddToShoppingList,
+  onAddToMealPlan,
   onShare,
 }: RecipeCardProps) {
   const title = titleOverride ?? recipe.title;
@@ -397,34 +603,79 @@ function RecipeCard({
   return (
     <Card>
       <View style={styles.titleRow}>
-        <View style={styles.titleBlock}>
-          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-          <Text style={[styles.meta, { color: colors.textMuted }]}>{subtitle}</Text>
-        </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={isFavorite ? `Remove ${title} from favorites` : `Add ${title} to favorites`}
-          hitSlop={10}
-          onPress={onToggleFavorite}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          accessibilityLabel={`View full recipe for ${title}`}
+          onPress={onViewRecipe}
+          style={({ pressed }) => [styles.titleBlock, { opacity: pressed ? 0.88 : 1 }]}
         >
-          <Ionicons
-            name={isFavorite ? "star" : "star-outline"}
-            size={26}
-            color={isFavorite ? colors.primary : colors.textMuted}
-          />
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.meta, { color: colors.textMuted }]}>{subtitle}</Text>
+          <Text style={[styles.tapHint, { color: colors.primary }]}>Tap for full recipe</Text>
         </Pressable>
+        <View style={styles.titleIcons}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={shareRecipeAccessibilityLabel(title)}
+            hitSlop={10}
+            onPress={() => {
+              onDismissSearch();
+              onShare();
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="share-outline" size={24} color={colors.textMuted} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              isFavorite ? `Remove ${title} from favorites` : `Add ${title} to favorites`
+            }
+            hitSlop={10}
+            onPress={() => {
+              onDismissSearch();
+              onToggleFavorite();
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons
+              name={isFavorite ? "star" : "star-outline"}
+              size={26}
+              color={isFavorite ? colors.primary : colors.textMuted}
+            />
+          </Pressable>
+        </View>
       </View>
-      {recipe.steps.slice(0, 2).map((step, i) => (
-        <Text key={`${title}-step-${i}`} style={[styles.step, { color: colors.textSecondary }]}>
-          {i + 1}. {step}
-        </Text>
-      ))}
+      <Pressable onPress={onViewRecipe}>
+        {recipe.steps.slice(0, 2).map((step, i) => (
+          <Text key={`${title}-step-${i}`} style={[styles.step, { color: colors.textSecondary }]}>
+            {i + 1}. {step}
+          </Text>
+        ))}
+        {recipe.steps.length > 2 ? (
+          <Text style={[styles.moreSteps, { color: colors.textMuted }]}>
+            +{recipe.steps.length - 2} more steps…
+          </Text>
+        ) : null}
+      </Pressable>
       <View style={styles.actions}>
-        <AppButton label="Share" variant="secondary" compact onPress={onShare} />
-        <AppButton label="→ Ingredients" compact onPress={onAddIngredients} />
-        <AppButton label="→ Shopping" variant="accent" compact onPress={onAddShopping} />
-        <AppButton label="Stock + scan" variant="secondary" compact onPress={onStock} />
+        <AppButton
+          label={RECIPE_SHOPPING_LIST_BUTTON_LABEL}
+          variant="secondary"
+          compact
+          onPress={() => {
+            onDismissSearch();
+            onAddToShoppingList();
+          }}
+        />
+        <AppButton
+          label={RECIPE_MEAL_PLAN_BUTTON_LABEL}
+          compact
+          onPress={() => {
+            onDismissSearch();
+            onAddToMealPlan();
+          }}
+        />
       </View>
     </Card>
   );
@@ -432,10 +683,14 @@ function RecipeCard({
 
 const styles = StyleSheet.create({
   scroll: { gap: spacing.md },
+  generatedSection: { gap: spacing.md },
   lead: { ...typography.caption, lineHeight: 20 },
   readyTitle: typography.headline,
   readyLine: { ...typography.caption, lineHeight: 20 },
   section: { ...typography.title, marginTop: spacing.md },
+  importCardTitle: typography.headline,
+  importHint: { ...typography.caption, lineHeight: 18, marginBottom: spacing.sm },
+  importInput: { minHeight: 140, paddingTop: spacing.sm },
   favoritesHeading: {
     flexDirection: "row",
     alignItems: "center",
@@ -449,10 +704,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.sm,
   },
+  titleIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
   titleBlock: { flex: 1 },
   title: typography.headline,
   meta: typography.caption,
   step: { ...typography.caption, lineHeight: 20 },
+  tapHint: { ...typography.caption, marginTop: 4, fontWeight: "600" },
+  moreSteps: { ...typography.caption, marginTop: 2, fontStyle: "italic" },
   favoritesList: { gap: spacing.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
 });

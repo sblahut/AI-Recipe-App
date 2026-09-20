@@ -12,7 +12,7 @@ from app.schemas import (
 )
 from app.services.barcode import normalize_barcode
 from app.services.inventory_merge import upsert_ingredient
-from app.services.openfoodfacts_lookup import lookup_product_name
+from app.services.openfoodfacts_lookup import lookup_product
 from app.units import default_unit
 
 router = APIRouter(tags=["products"])
@@ -66,15 +66,15 @@ def _resolve_product(db: Session, code: str) -> Product | None:
     product = db.get(Product, code)
     if product is not None:
         return product
-    looked_up = lookup_product_name(code)
+    looked_up = lookup_product(code)
     if not looked_up:
         return None
-    off_name, off_brand = looked_up
     return _upsert_product(
         db,
         barcode=code,
-        name=off_name,
-        brand=off_brand,
+        name=looked_up.name,
+        brand=looked_up.brand,
+        default_quantity_kind=looked_up.default_quantity_kind,
         source="openfoodfacts_api",
     )
 
@@ -138,6 +138,7 @@ def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> Bar
                 unit=unit,
                 barcode=code,
                 location=body.location.strip() if body.location and body.location.strip() else None,
+                expires_at=body.expires_at,
             ),
         )
         return BarcodeScanResponse(
