@@ -104,10 +104,10 @@ function Write-HomeStackStatusHtml {
     if (-not $apiUrl) { $apiUrl = $Urls.TailscaleIpApi }
     if (-not $apiUrl) { $apiUrl = $Urls.LanApi }
     if (-not $apiUrl) { $apiUrl = "Set a LAN or Tailscale URL in the app Settings (port 8000)." }
-    $lan = if ($Urls.LanApi) { $Urls.LanApi } else { "—" }
+    $lan = if ($Urls.LanApi) { $Urls.LanApi } else { "-" }
     $tsIp = if ($Urls.TailscaleIpApi) { $Urls.TailscaleIpApi } else { "Tailscale not running" }
     $dedicated = if ($Urls.DedicatedHttpApi) { $Urls.DedicatedHttpApi } else { "MagicDNS name not available yet" }
-    $https = if ($Urls.DedicatedHttpsApi) { "$($Urls.DedicatedHttpsApi) (after tailscale serve)" } else { "—" }
+    $https = if ($Urls.DedicatedHttpsApi) { "$($Urls.DedicatedHttpsApi) (after tailscale serve)" } else { "-" }
     $expo = if ($Urls.ExpoHint) { $Urls.ExpoHint } else { "Start Expo (port 8081), then refresh this page." }
     $metroUp = Test-LocalPortListening -Port 8081
     $expoQrBlock = if ($Urls.ExpoHint -and $metroUp) {

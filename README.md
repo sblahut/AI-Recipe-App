@@ -381,4 +381,6 @@ Copy `server/.env.example` to `server/.env`:
 
 ## License
 
-TBD
+Copyright © 2026 Zero Tech, LLC. Steven Blahut. All rights reserved.
+
+This software and documentation are proprietary to **Zero Tech, LLC**. You may not copy, modify, distribute, or use them except as permitted by Zero Tech, LLC in writing.
