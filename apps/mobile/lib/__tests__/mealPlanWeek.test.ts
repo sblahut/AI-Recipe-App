@@ -2,6 +2,7 @@ import {
   addDays,
   daysInWeek,
   formatPlanDate,
+  formatWeekRangeLabel,
   mealSlotSortIndex,
   mondayOnOrBefore,
   parsePlanDateLocal,
@@ -38,5 +39,10 @@ describe("mealPlanWeek", () => {
 
   it("orders meal slots", () => {
     expect(mealSlotSortIndex("breakfast")).toBeLessThan(mealSlotSortIndex("dinner"));
+  });
+
+  it("formats week range label", () => {
+    const mon = parsePlanDateLocal("2026-04-06");
+    expect(formatWeekRangeLabel(mon)).toBe("2026-04-06 – 2026-04-12");
   });
 });

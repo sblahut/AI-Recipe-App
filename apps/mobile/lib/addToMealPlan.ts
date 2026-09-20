@@ -7,6 +7,7 @@ import {
   type MealSlot,
   addDays,
   formatPlanDate,
+  formatWeekRangeLabel,
   mondayOnOrBefore,
 } from "@/lib/mealPlanWeek";
 import { findFavoriteMatch } from "@/lib/recipeFavorites";
@@ -32,19 +33,19 @@ async function ensureSavedFavorite(
   return saved.id;
 }
 
-function pickPlanDate(savedRecipeId: number, mealSlot: MealSlot, serverUrl: string): void {
-  const weekStart = mondayOnOrBefore(new Date());
-  const dayOptions = Array.from({ length: 7 }, (_, index) => {
-    const day = addDays(weekStart, index);
+function pickPlanDate(
+  savedRecipeId: number,
+  mealSlot: MealSlot,
+  serverUrl: string,
+  weekStartMonday: Date,
+): void {
+  const weekLabel = formatWeekRangeLabel(weekStartMonday);
+  const dayButtons = Array.from({ length: 7 }, (_, index) => {
+    const day = addDays(weekStartMonday, index);
+    const planDate = formatPlanDate(day);
+    const label = day.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" });
     return {
-      date: formatPlanDate(day),
-      label: day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }),
-    };
-  });
-
-  Alert.alert(`Plan · ${MEAL_SLOT_LABELS[mealSlot]}`, "Pick a day this week", [
-    ...dayOptions.map((option) => ({
-      text: option.label,
+      text: label,
       onPress: () => {
         void (async () => {
           try {
@@ -52,18 +53,30 @@ function pickPlanDate(savedRecipeId: number, mealSlot: MealSlot, serverUrl: stri
               baseUrl: serverUrl,
               method: "POST",
               body: JSON.stringify({
-                plan_date: option.date,
+                plan_date: planDate,
                 meal_slot: mealSlot,
                 saved_recipe_id: savedRecipeId,
               }),
             });
-            Alert.alert("Added to plan", `${option.label} · ${MEAL_SLOT_LABELS[mealSlot]}`);
+            Alert.alert("Added to plan", `${label} · ${MEAL_SLOT_LABELS[mealSlot]}`);
           } catch (e) {
             Alert.alert("Meal plan", e instanceof Error ? e.message : "Could not add to plan");
           }
         })();
       },
-    })),
+    };
+  });
+
+  Alert.alert(`${MEAL_SLOT_LABELS[mealSlot]} · ${weekLabel}`, "Choose a day (change week below)", [
+    {
+      text: "← Previous week",
+      onPress: () => pickPlanDate(savedRecipeId, mealSlot, serverUrl, addDays(weekStartMonday, -7)),
+    },
+    ...dayButtons,
+    {
+      text: "Next week →",
+      onPress: () => pickPlanDate(savedRecipeId, mealSlot, serverUrl, addDays(weekStartMonday, 7)),
+    },
     { text: "Cancel", style: "cancel" },
   ]);
 }
@@ -79,7 +92,7 @@ export async function promptAddRecipeToMealPlan(
     Alert.alert("Add to meal plan", recipe.title, [
       ...MEAL_SLOTS.map((slot) => ({
         text: MEAL_SLOT_LABELS[slot],
-        onPress: () => pickPlanDate(savedRecipeId, slot, serverUrl),
+        onPress: () => pickPlanDate(savedRecipeId, slot, serverUrl, mondayOnOrBefore(new Date())),
       })),
       { text: "Cancel", style: "cancel" },
     ]);

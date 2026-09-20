@@ -19,9 +19,8 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { promptAddRecipeToMealPlan } from "@/lib/addToMealPlan";
 import { apiFetch, apiJson } from "@/lib/api";
 import { findFavoriteMatch } from "@/lib/recipeFavorites";
+import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
-import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
-import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
 import { recipeListKey } from "@/lib/recipeListKey";
 import { recipeMatchesSearch } from "@/lib/recipeSearch";
 import {
@@ -30,7 +29,6 @@ import {
   recipeGenerateResponseSchema,
   recipeImportResponseSchema,
   savedRecipeReadSchema,
-  shoppingFromRecipeResponseSchema,
   shoppingListSchema,
   type GeneratedRecipe,
   type SavedRecipe,
@@ -274,44 +272,6 @@ export default function RecipesScreen() {
     }
   };
 
-  const addRecipeToShoppingList = (recipe: GeneratedRecipe) => {
-    if (lists.length === 0) {
-      Alert.alert("No lists", "Create a shopping list on the Shopping tab first.");
-      return;
-    }
-    Alert.alert(
-      "Add to shopping list",
-      recipe.title,
-      [
-        ...lists.map((list) => ({
-          text: list.name,
-          onPress: () => {
-            void (async () => {
-              try {
-                const raw = await apiJson<unknown>("/shopping/from-recipe", {
-                  baseUrl: serverUrl,
-                  method: "POST",
-                  body: JSON.stringify({ list_id: list.id, recipe }),
-                });
-                const result = shoppingFromRecipeResponseSchema.parse(raw);
-                const skipped = result.skipped_in_pantry.length;
-                const added = result.added.length;
-                const detail =
-                  skipped > 0
-                    ? `${added} added to ${list.name}. ${skipped} already in ingredients.`
-                    : `${added} items added to ${list.name}.`;
-                Alert.alert(added > 0 ? "Added" : "Nothing to buy", detail);
-              } catch (e) {
-                Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
-              }
-            })();
-          },
-        })),
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
-  };
-
   const openRecipeDetail = (recipe: GeneratedRecipe, titleOverride?: string) => {
     dismissSearch();
     setDetailRecipe(recipe);
@@ -466,8 +426,7 @@ export default function RecipesScreen() {
                   onDismissSearch={dismissSearch}
                   onViewRecipe={() => openRecipeDetail(recipe)}
                   onToggleFavorite={() => void toggleFavorite(recipe)}
-                  onAddShopping={() => void addRecipeToShoppingList(recipe)}
-                  onAddToIngredients={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
+                  onAddToShoppingList={() => promptAddRecipeToShoppingList(recipe, lists, serverUrl)}
                   onAddToMealPlan={() =>
                     void promptAddRecipeToMealPlan(recipe, serverUrl, favorites).then(() =>
                       loadFavorites(),
@@ -508,8 +467,7 @@ export default function RecipesScreen() {
               onDismissSearch={dismissSearch}
               onViewRecipe={() => openRecipeDetail(item.recipe, item.title)}
               onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
-              onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
-              onAddToIngredients={() => void stockFromSavedRecipe(item.id, serverUrl)}
+              onAddToShoppingList={() => promptAddRecipeToShoppingList(item.recipe, lists, serverUrl)}
               onAddToMealPlan={() =>
                 void promptAddRecipeToMealPlan(item.recipe, serverUrl, favorites).then(() =>
                   loadFavorites(),
@@ -541,8 +499,7 @@ type RecipeCardProps = {
   onDismissSearch: () => void;
   onViewRecipe: () => void;
   onToggleFavorite: () => void;
-  onAddShopping: () => void;
-  onAddToIngredients: () => void;
+  onAddToShoppingList: () => void;
   onAddToMealPlan: () => void;
   onShare: () => void;
 };
@@ -556,8 +513,7 @@ function RecipeCard({
   onDismissSearch,
   onViewRecipe,
   onToggleFavorite,
-  onAddShopping,
-  onAddToIngredients,
+  onAddToShoppingList,
   onAddToMealPlan,
   onShare,
 }: RecipeCardProps) {
@@ -619,12 +575,12 @@ function RecipeCard({
           }}
         />
         <AppButton
-          label="Shopping"
+          label="Shopping list"
           variant="accent"
           compact
           onPress={() => {
             onDismissSearch();
-            onAddShopping();
+            onAddToShoppingList();
           }}
         />
         <AppButton
@@ -633,14 +589,6 @@ function RecipeCard({
           onPress={() => {
             onDismissSearch();
             onAddToMealPlan();
-          }}
-        />
-        <AppButton
-          label="+ Ingredients"
-          compact
-          onPress={() => {
-            onDismissSearch();
-            onAddToIngredients();
           }}
         />
       </View>

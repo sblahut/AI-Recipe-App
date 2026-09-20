@@ -45,6 +45,11 @@ export function weekRangeFromWeekStart(weekStartMonday: Date): { start: string; 
   };
 }
 
+export function formatWeekRangeLabel(weekStartMonday: Date): string {
+  const { start, end } = weekRangeFromWeekStart(weekStartMonday);
+  return `${start} – ${end}`;
+}
+
 export function daysInWeek(weekStartMonday: Date): Date[] {
   return Array.from({ length: 7 }, (_, index) => addDays(weekStartMonday, index));
 }

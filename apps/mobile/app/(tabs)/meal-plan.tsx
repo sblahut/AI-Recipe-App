@@ -182,8 +182,8 @@ export default function MealPlanScreen() {
       return;
     }
     Alert.alert(
-      "Shop this week",
-      `Adds missing ingredients from your meal plan (${weekRange.start} → ${weekRange.end}) to the list you pick. Items already in Ingredients are skipped.`,
+      "Add to shopping list",
+      `For ${weekRange.start} – ${weekRange.end}: add grocery lines from your planned meals to the list you choose. Items you already have on Ingredients are not duplicated.`,
       [
       ...lists.map((list) => ({
         text: list.name,
@@ -207,7 +207,10 @@ export default function MealPlanScreen() {
                 mealPlanShopAlertMessage(summary, list.name),
               );
             } catch (e) {
-              Alert.alert("Shop failed", e instanceof Error ? e.message : "Unknown error");
+              Alert.alert(
+                "Shopping list",
+                e instanceof Error ? e.message : "Could not update shopping list",
+              );
             } finally {
               setShopLoading(false);
             }
@@ -221,9 +224,17 @@ export default function MealPlanScreen() {
 
   return (
     <Screen scroll contentContainerStyle={styles.scroll}>
-      <Text style={[styles.lead, { color: colors.textMuted }]}>
-        Plan the week from saved recipes, then send missing ingredients to a shopping list.
-      </Text>
+      <View
+        style={[
+          styles.leadBanner,
+          { borderColor: colors.accent, backgroundColor: colors.accentMuted },
+        ]}
+      >
+        <Text style={[styles.leadBannerText, { color: colors.text }]}>
+          Schedule saved recipes by day. Use the green button to copy missing groceries onto a
+          shopping list (skips what you already track on Ingredients).
+        </Text>
+      </View>
 
       <View style={styles.weekNav}>
         <Pressable
@@ -248,7 +259,8 @@ export default function MealPlanScreen() {
       </View>
 
       <AppButton
-        label={shopLoading ? "Adding…" : "Shop this week"}
+        label={shopLoading ? "Adding…" : "Add missing items to shopping list"}
+        variant="accent"
         loading={shopLoading}
         onPress={shopThisWeek}
       />
@@ -310,9 +322,18 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
-  lead: {
+  leadBanner: {
+    marginHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: 2,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  leadBannerText: {
     ...typography.body,
-    paddingHorizontal: spacing.lg,
+    textAlign: "center",
+    lineHeight: 22,
   },
   weekNav: {
     flexDirection: "row",

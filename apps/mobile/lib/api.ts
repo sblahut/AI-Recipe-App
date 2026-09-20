@@ -1,3 +1,4 @@
+import { formatApiDetail } from "@/lib/formatApiDetail";
 import { getStoredServerUrl } from "@/lib/storage";
 
 export class ApiError extends Error {
@@ -55,9 +56,9 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
     try {
       const body: unknown = await response.json();
       if (typeof body === "object" && body !== null && "detail" in body) {
-        const maybeDetail = (body as Record<string, unknown>).detail;
-        if (typeof maybeDetail === "string") {
-          detail = maybeDetail;
+        const formatted = formatApiDetail((body as Record<string, unknown>).detail);
+        if (formatted) {
+          detail = formatted;
         }
       }
     } catch {
