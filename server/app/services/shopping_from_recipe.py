@@ -4,6 +4,29 @@ from app.models import Ingredient, ShoppingListItem
 from app.schemas import GeneratedRecipe, ShoppingListItemRead
 from app.services.ingredient_names import ingredient_names_match
 from app.services.recipe_line_parse import effective_unit, parse_recipe_ingredient_line
+from app.units import canonical_unit_for_kind
+
+
+def _normalize_item_units(item: ShoppingListItem) -> None:
+    if item.unit:
+        item.unit = canonical_unit_for_kind(item.quantity_kind, item.unit)
+
+
+def heal_shopping_list_item_units(db: Session, items: list[ShoppingListItem]) -> None:
+    """Fix legacy invalid units (e.g. cups → cup) so API validation succeeds."""
+    dirty = False
+    for item in items:
+        before = item.unit
+        _normalize_item_units(item)
+        if item.unit != before:
+            dirty = True
+    if dirty:
+        db.commit()
+
+
+def _item_to_read(item: ShoppingListItem) -> ShoppingListItemRead:
+    _normalize_item_units(item)
+    return ShoppingListItemRead.model_validate(item)
 
 
 def _pantry_covers_line(
@@ -55,18 +78,22 @@ def add_recipe_to_shopping_list(
                         existing.quantity = parsed.quantity
                     else:
                         existing.quantity = existing.quantity + parsed.quantity
+                _normalize_item_units(existing)
                 db.commit()
                 db.refresh(existing)
-                added.append(ShoppingListItemRead.model_validate(existing))
+                added.append(_item_to_read(existing))
                 continue
 
+        raw_unit = parsed.unit or (effective_unit(parsed.quantity_kind, None) if parsed.quantity else None)
+        safe_unit = (
+            canonical_unit_for_kind(parsed.quantity_kind, raw_unit) if raw_unit else None
+        )
         item = ShoppingListItem(
             shopping_list_id=list_id,
             name=parsed.name,
             quantity=parsed.quantity,
             quantity_kind=parsed.quantity_kind,
-            unit=parsed.unit
-            or (effective_unit(parsed.quantity_kind, None) if parsed.quantity else None),
+            unit=safe_unit,
             barcode=None,
             checked=False,
         )
@@ -74,6 +101,6 @@ def add_recipe_to_shopping_list(
         db.commit()
         db.refresh(item)
         existing_items.append(item)
-        added.append(ShoppingListItemRead.model_validate(item))
+        added.append(_item_to_read(item))
 
     return added, skipped

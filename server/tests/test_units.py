@@ -1,6 +1,6 @@
 import pytest
 
-from app.units import default_unit, normalize_unit, validate_unit_for_kind
+from app.units import canonical_unit_for_kind, default_unit, normalize_unit, validate_unit_for_kind
 
 
 def test_normalize_unit_strips_and_underscores() -> None:
@@ -19,6 +19,14 @@ def test_validate_unit_none() -> None:
 def test_validate_unit_rejects_wrong_kind() -> None:
     with pytest.raises(ValueError, match="not valid for 'count'"):
         validate_unit_for_kind("count", "ml")
+
+
+def test_canonical_unit_maps_cups_to_cup() -> None:
+    assert canonical_unit_for_kind("volume", "cups") == "cup"
+
+
+def test_canonical_unit_maps_lbs_to_lb() -> None:
+    assert canonical_unit_for_kind("weight", "lbs") == "lb"
 
 
 def test_default_unit_by_kind() -> None:

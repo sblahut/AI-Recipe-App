@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { RecipeDetailModal } from "@/components/RecipeDetailModal";
 import { AppButton } from "@/components/ui/AppButton";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { SearchField, dismissSearchKeyboard } from "@/components/ui/SearchField";
 import { Card } from "@/components/ui/Card";
@@ -56,6 +57,9 @@ export default function RecipesScreen() {
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [detailRecipe, setDetailRecipe] = useState<GeneratedRecipe | null>(null);
   const [detailTitle, setDetailTitle] = useState<string | undefined>();
+  const [aiSearchExpanded, setAiSearchExpanded] = useState(true);
+  const [importExpanded, setImportExpanded] = useState(true);
+  const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<TextInput>(null);
   const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
@@ -335,8 +339,11 @@ export default function RecipesScreen() {
         }}
       />
 
-      <Card>
-        <Text style={[styles.importCardTitle, { color: colors.text }]}>Search AI for recipe</Text>
+      <CollapsibleSection
+        title="Search AI for recipe"
+        expanded={aiSearchExpanded}
+        onToggle={() => setAiSearchExpanded((open) => !open)}
+      >
         <Text style={[styles.importHint, { color: colors.textMuted }]}>
           Ask Ollama for up to {preferences.defaultRecipeCount ?? 3} ideas without using your
           ingredients list (count matches Settings → Recipes).
@@ -355,10 +362,13 @@ export default function RecipesScreen() {
             void searchAiForRecipe();
           }}
         />
-      </Card>
+      </CollapsibleSection>
 
-      <Card>
-        <Text style={[styles.importCardTitle, { color: colors.text }]}>Import recipe</Text>
+      <CollapsibleSection
+        title="Import recipe"
+        expanded={importExpanded}
+        onToggle={() => setImportExpanded((open) => !open)}
+      >
         <Text style={[styles.importHint, { color: colors.textMuted }]}>
           Paste text or paste a public recipe page URL. The server fetches the page and parses it with
           Ollama (HTTPS only, no LAN URLs).
@@ -392,7 +402,7 @@ export default function RecipesScreen() {
             void importRecipe();
           }}
         />
-      </Card>
+      </CollapsibleSection>
 
       <SearchField
         ref={searchInputRef}
@@ -440,44 +450,47 @@ export default function RecipesScreen() {
         </>
       ) : null}
 
-      <Pressable style={styles.favoritesHeading} onPress={dismissSearch}>
-        <Ionicons name="star" size={20} color={colors.primary} />
-        <Text style={[styles.section, styles.favoritesTitle, { color: colors.text }]}>Favorites</Text>
-      </Pressable>
-      {favorites.length === 0 ? (
-        <EmptyState
-          title="No favorites yet"
-          subtitle="Generate ideas above, then tap the star on any recipe to save it here."
-        />
-      ) : filteredFavorites.length === 0 ? (
-        <EmptyState title="No matches in favorites" subtitle="Try a different search term." />
-      ) : (
-        <FlatList
-          data={filteredFavorites}
-          scrollEnabled={false}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.favoritesList}
-          renderItem={({ item }) => (
-            <RecipeCard
-              recipe={item.recipe}
-              titleOverride={item.title}
-              meta={`Favorited ${new Date(item.created_at).toLocaleDateString()}`}
-              colors={colors}
-              isFavorite
-              onDismissSearch={dismissSearch}
-              onViewRecipe={() => openRecipeDetail(item.recipe, item.title)}
-              onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
-              onAddToShoppingList={() => promptAddRecipeToShoppingList(item.recipe, lists, serverUrl)}
-              onAddToMealPlan={() =>
-                void promptAddRecipeToMealPlan(item.recipe, serverUrl, favorites).then(() =>
-                  loadFavorites(),
-                )
-              }
-              onShare={() => void shareText(item.title, formatRecipeShare(item.recipe))}
-            />
-          )}
-        />
-      )}
+      <CollapsibleSection
+        title={`Favorites (${favorites.length})`}
+        expanded={favoritesExpanded}
+        onToggle={() => setFavoritesExpanded((open) => !open)}
+        leadingIcon="star"
+      >
+        {favorites.length === 0 ? (
+          <EmptyState
+            title="No favorites yet"
+            subtitle="Generate ideas above, then tap the star on any recipe to save it here."
+          />
+        ) : filteredFavorites.length === 0 ? (
+          <EmptyState title="No matches in favorites" subtitle="Try a different search term." />
+        ) : (
+          <FlatList
+            data={filteredFavorites}
+            scrollEnabled={false}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.favoritesList}
+            renderItem={({ item }) => (
+              <RecipeCard
+                recipe={item.recipe}
+                titleOverride={item.title}
+                meta={`Favorited ${new Date(item.created_at).toLocaleDateString()}`}
+                colors={colors}
+                isFavorite
+                onDismissSearch={dismissSearch}
+                onViewRecipe={() => openRecipeDetail(item.recipe, item.title)}
+                onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
+                onAddToShoppingList={() => promptAddRecipeToShoppingList(item.recipe, lists, serverUrl)}
+                onAddToMealPlan={() =>
+                  void promptAddRecipeToMealPlan(item.recipe, serverUrl, favorites).then(() =>
+                    loadFavorites(),
+                  )
+                }
+                onShare={() => void shareText(item.title, formatRecipeShare(item.recipe))}
+              />
+            )}
+          />
+        )}
+      </CollapsibleSection>
     </Screen>
   );
 }

@@ -19,7 +19,7 @@ def test_parse_volume_cups() -> None:
     parsed = parse_recipe_ingredient_line("milk", "2 cups")
     assert parsed.quantity == 2.0
     assert parsed.quantity_kind == "volume"
-    assert parsed.unit == "cups"
+    assert parsed.unit == "cup"
 
 
 def test_parse_fraction_volume() -> None:

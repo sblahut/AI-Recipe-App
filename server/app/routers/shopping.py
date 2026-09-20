@@ -18,7 +18,10 @@ from app.schemas import (
     ShoppingListRead,
 )
 from app.services.shopping_from_meal_plan import add_meal_plan_range_to_shopping_list
-from app.services.shopping_from_recipe import add_recipe_to_shopping_list
+from app.services.shopping_from_recipe import (
+    add_recipe_to_shopping_list,
+    heal_shopping_list_item_units,
+)
 
 router = APIRouter(prefix="/shopping", tags=["shopping"])
 
@@ -47,6 +50,7 @@ def get_shopping_list(list_id: int, db: Session = Depends(get_db)) -> ShoppingLi
     )
     if not row:
         raise HTTPException(status_code=404, detail="Shopping list not found")
+    heal_shopping_list_item_units(db, list(row.items))
     return row
 
 
