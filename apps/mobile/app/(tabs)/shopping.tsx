@@ -47,6 +47,8 @@ export default function ShoppingScreen() {
   const [newListName, setNewListName] = useState("");
   const [addingList, setAddingList] = useState(false);
   const [newItemName, setNewItemName] = useState("");
+  const [showAddItemForm, setShowAddItemForm] = useState(false);
+  const [addItemSaving, setAddItemSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const weeklyAdChains = useMemo(
@@ -105,6 +107,7 @@ export default function ShoppingScreen() {
     setSelectedId(null);
     setDetail(null);
     setNewItemName("");
+    setShowAddItemForm(false);
   };
 
   const selectList = (id: number) => {
@@ -167,10 +170,14 @@ export default function ShoppingScreen() {
     ]);
   };
 
-  const addItem = async () => {
+  const addItem = async (nameOverride?: string) => {
     if (selectedId == null) return;
-    const name = newItemName.trim();
-    if (!name) return;
+    const name = (nameOverride ?? newItemName).trim();
+    if (!name) {
+      Alert.alert("Name required", "Enter an item name.");
+      return;
+    }
+    setAddItemSaving(true);
     try {
       await apiFetch(`/shopping/lists/${selectedId}/items`, {
         baseUrl: serverUrl,
@@ -178,10 +185,18 @@ export default function ShoppingScreen() {
         body: JSON.stringify({ name, quantity_kind: "count", quantity: 1, unit: "each" }),
       });
       setNewItemName("");
+      setShowAddItemForm(false);
       await loadDetail(selectedId);
     } catch (e) {
       Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setAddItemSaving(false);
     }
+  };
+
+  const cancelAddItem = () => {
+    setNewItemName("");
+    setShowAddItemForm(false);
   };
 
   const shareList = async () => {
@@ -210,6 +225,33 @@ export default function ShoppingScreen() {
 
   if (loading) {
     return <Screen loading />;
+  }
+
+  if (showAddItemForm && selectedId != null) {
+    const listName = selectedList?.name ?? "Shopping list";
+    return (
+      <Screen scroll>
+        <Text style={[styles.addItemHeading, { color: colors.text }]}>Add item</Text>
+        <Text style={[styles.addItemHint, { color: colors.textMuted }]}>Adding to {listName}</Text>
+        <AppTextField
+          label="Item name"
+          value={newItemName}
+          onChangeText={setNewItemName}
+          placeholder="Milk, eggs, bread…"
+          autoFocus
+          onSubmitEditing={() => void addItem()}
+        />
+        <View style={styles.addItemActions}>
+          <AppButton label="Cancel" variant="ghost" onPress={cancelAddItem} />
+          <AppButton
+            label="Save"
+            loading={addItemSaving}
+            onPress={() => void addItem()}
+            style={styles.addItemSaveBtn}
+          />
+        </View>
+      </Screen>
+    );
   }
 
   return (
@@ -269,28 +311,41 @@ export default function ShoppingScreen() {
             <Text style={[styles.listTitle, { color: colors.text }]}>{selectedList?.name}</Text>
           </View>
 
-          {/* Add item bar */}
-          <View style={[styles.sectionPad, styles.row, styles.itemToolbar]}>
-            <View style={styles.flex}>
-              <AppTextField
-                placeholder="Add an item"
-                value={newItemName}
-                onChangeText={setNewItemName}
-                onSubmitEditing={() => void addItem()}
-              />
-            </View>
-            <AppButton label="Add" compact onPress={() => void addItem()} />
-            <AppButton
-              label="Scan"
-              variant="accent"
-              compact
+          {/* Quick actions — same pattern as Pantry tab */}
+          <View style={[styles.sectionPad, styles.actionRow]}>
+            <Pressable
+              onPress={() => setShowAddItemForm(true)}
+              style={({ pressed }) => [
+                styles.actionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="add-outline" size={22} color={colors.primary} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>Add item</Text>
+            </Pressable>
+            <Pressable
               onPress={() =>
                 router.push({
                   pathname: "/scan",
                   params: { target: "shopping_list", listId: String(selectedId) },
                 })
               }
-            />
+              style={({ pressed }) => [
+                styles.actionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="barcode-outline" size={22} color={colors.accent} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>Scan barcode</Text>
+            </Pressable>
           </View>
 
           {/* Actions */}
@@ -418,7 +473,34 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.xs,
   },
-  itemToolbar: { marginBottom: spacing.sm },
+  actionRow: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  actionCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  actionLabel: {
+    ...typography.button,
+  },
+  addItemHeading: { ...typography.h1, marginBottom: spacing.xs },
+  addItemHint: { ...typography.body, marginBottom: spacing.lg },
+  addItemActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  addItemSaveBtn: { minWidth: 100 },
   actionsRow: {
     flexDirection: "row",
     gap: spacing.sm,
