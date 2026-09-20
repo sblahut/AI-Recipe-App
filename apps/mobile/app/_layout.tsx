@@ -25,6 +25,7 @@ function RootStack() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="scan" options={{ title: "Scan barcode", presentation: "modal" }} />
+        <Stack.Screen name="shopping-list/[listId]" options={{ title: "Shopping list" }} />
       </Stack>
     </>
   );

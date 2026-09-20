@@ -1,12 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
 import { Chip } from "@/components/ui/Chip";
 import { StorageFilterOption } from "@/components/StorageFilterOption";
-import { SwipeableRow } from "@/components/SwipeableRow";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
@@ -27,16 +25,7 @@ import {
   shoppingListSchema,
   type ShoppingList,
   type ShoppingListDetail,
-  type ShoppingListItem,
 } from "@/lib/schemas";
-
-type ItemFilter = "All" | "To buy" | "In cart";
-
-const ITEM_FILTERS: { id: ItemFilter; label: string; icon: "layers-outline" | "cart-outline" | "checkmark-circle-outline" }[] = [
-  { id: "All", label: "All items", icon: "layers-outline" },
-  { id: "To buy", label: "Still to buy", icon: "cart-outline" },
-  { id: "In cart", label: "In cart", icon: "checkmark-circle-outline" },
-];
 
 export default function ShoppingScreen() {
   const { colors } = useAppTheme();
@@ -47,7 +36,6 @@ export default function ShoppingScreen() {
   const [detail, setDetail] = useState<ShoppingListDetail | null>(null);
   const [newListName, setNewListName] = useState("");
   const [newItemName, setNewItemName] = useState("");
-  const [itemFilter, setItemFilter] = useState<ItemFilter>("All");
   const [loading, setLoading] = useState(true);
 
   const weeklyAdChains = useMemo(
@@ -105,7 +93,6 @@ export default function ShoppingScreen() {
   const deselectList = () => {
     setSelectedId(null);
     setDetail(null);
-    setItemFilter("All");
     setNewItemName("");
   };
 
@@ -115,8 +102,17 @@ export default function ShoppingScreen() {
       return;
     }
     setSelectedId(id);
-    setItemFilter("All");
     void loadDetail(id);
+  };
+
+  const openShoppingList = () => {
+    if (selectedId == null) {
+      return;
+    }
+    router.push({
+      pathname: "/shopping-list/[listId]",
+      params: { listId: String(selectedId) },
+    });
   };
 
   const createList = async () => {
@@ -176,43 +172,6 @@ export default function ShoppingScreen() {
     }
   };
 
-  const setItemInCart = async (item: ShoppingListItem, inCart: boolean) => {
-    if (selectedId == null || item.checked === inCart) return;
-    try {
-      await apiFetch(
-        `/shopping/lists/${selectedId}/items/${item.id}?checked=${inCart ? "true" : "false"}`,
-        { baseUrl: serverUrl, method: "PATCH" },
-      );
-      await loadDetail(selectedId);
-    } catch (e) {
-      Alert.alert("Update failed", e instanceof Error ? e.message : "Unknown error");
-    }
-  };
-
-  const deleteItem = (item: ShoppingListItem) => {
-    if (selectedId == null) return;
-    Alert.alert("Remove item", `Remove ${item.name}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            try {
-              await apiFetch(`/shopping/lists/${selectedId}/items/${item.id}`, {
-                baseUrl: serverUrl,
-                method: "DELETE",
-              });
-              await loadDetail(selectedId);
-            } catch (e) {
-              Alert.alert("Remove failed", e instanceof Error ? e.message : "Unknown error");
-            }
-          })();
-        },
-      },
-    ]);
-  };
-
   const shareList = async () => {
     if (!detail) {
       Alert.alert("Nothing to share", "Select a list first.");
@@ -236,24 +195,14 @@ export default function ShoppingScreen() {
   };
 
   const selectedList = lists.find((list) => list.id === selectedId);
-  const items = detail?.items ?? [];
-  const filteredItems = items.filter((item) => {
-    if (itemFilter === "To buy") return !item.checked;
-    if (itemFilter === "In cart") return item.checked;
-    return true;
-  });
-  const countByFilter = {
-    All: items.length,
-    "To buy": items.filter((item) => !item.checked).length,
-    "In cart": items.filter((item) => item.checked).length,
-  };
+  const itemCount = detail?.items.length ?? 0;
 
   if (loading) {
     return <Screen loading />;
   }
 
   return (
-    <Screen padded={false}>
+    <Screen scroll padded={false}>
       <View style={styles.sectionPad}>
         <View style={styles.row}>
           <View style={styles.flex}>
@@ -384,67 +333,21 @@ export default function ShoppingScreen() {
           </View>
 
           <View style={styles.filterSection}>
-            <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse items</Text>
-            {ITEM_FILTERS.map((filter) => (
-              <StorageFilterOption
-                key={filter.id}
-                label={filter.label}
-                icon={filter.icon}
-                selected={itemFilter === filter.id}
-                count={countByFilter[filter.id]}
-                onPress={() => setItemFilter(filter.id)}
-              />
-            ))}
+            <View style={styles.browseHeader}>
+              <Text style={[styles.filterHeading, styles.browseHeading, { color: colors.textMuted }]}>
+                Browse items
+                {itemCount > 0 ? ` (${itemCount})` : ""}
+              </Text>
+              <Pressable
+                onPress={openShoppingList}
+                hitSlop={8}
+                accessibilityRole="link"
+                accessibilityLabel="Open shopping list"
+              >
+                <Text style={[styles.openListLink, { color: colors.primary }]}>Open shopping list</Text>
+              </Pressable>
+            </View>
           </View>
-
-          <FlatList
-            style={styles.flex}
-            data={filteredItems}
-            keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={filteredItems.length === 0 ? styles.listEmpty : styles.itemsList}
-            ListEmptyComponent={
-              <EmptyState
-                title={itemFilter === "All" ? "Nothing on this list yet" : "Nothing in this filter"}
-                subtitle="Add items, scan barcodes, or pick another filter."
-              />
-            }
-            renderItem={({ item }) => (
-              <SwipeableRow onDelete={() => deleteItem(item)} label="Remove">
-                <Card style={styles.rowCard}>
-                  <View style={styles.rowMain}>
-                    <Text
-                      style={[
-                        styles.name,
-                        { color: colors.text },
-                        item.checked && { color: colors.textMuted, textDecorationLine: "line-through" },
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                    <Text style={[styles.meta, { color: colors.textMuted }]}>
-                      {formatShoppingQty(item)} · {item.checked ? "In cart" : "Still to buy"}
-                    </Text>
-                  </View>
-                  <AppButton
-                    label={item.checked ? "Still to buy" : "Add to cart"}
-                    variant={item.checked ? "secondary" : "accent"}
-                    compact
-                    onPress={() => void setItemInCart(item, !item.checked)}
-                  />
-                  {Platform.OS === "web" ? (
-                    <Pressable
-                      accessibilityLabel={`Remove ${item.name}`}
-                      onPress={() => deleteItem(item)}
-                      hitSlop={8}
-                      style={({ pressed }) => [styles.deleteIcon, { opacity: pressed ? 0.6 : 1 }]}
-                    >
-                      <Ionicons name="trash-outline" size={20} color={colors.danger} />
-                    </Pressable>
-                  ) : null}
-                </Card>
-              </SwipeableRow>
-            )}
-          />
         </>
       ) : (
         <EmptyState
@@ -454,11 +357,6 @@ export default function ShoppingScreen() {
       )}
     </Screen>
   );
-}
-
-function formatShoppingQty(item: ShoppingListItem): string {
-  if (item.quantity == null) return "No quantity set";
-  return `${item.quantity} ${item.unit ?? ""}`.trim();
 }
 
 const styles = StyleSheet.create({
@@ -497,16 +395,12 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  itemsList: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
-  listEmpty: { flexGrow: 1 },
-  rowCard: {
-    marginBottom: spacing.sm,
+  browseHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: spacing.sm,
   },
-  rowMain: { flex: 1 },
-  deleteIcon: { padding: spacing.sm },
-  name: typography.headline,
-  meta: { ...typography.caption, marginTop: 2 },
+  browseHeading: { marginBottom: 0, flex: 1 },
+  openListLink: { ...typography.caption, fontWeight: "600" },
 });
