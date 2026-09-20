@@ -278,7 +278,20 @@ export default function IngredientsScreen() {
         </View>
 
         <Pressable style={styles.filterSection} onPress={dismissSearch}>
-          <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
+          <View style={styles.filterHeadingRow}>
+            <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
+            {!addingZone ? (
+              <AppButton
+                label="+ Add area / zone"
+                variant="secondary"
+                compact
+                onPress={() => {
+                  dismissSearch();
+                  setAddingZone(true);
+                }}
+              />
+            ) : null}
+          </View>
           {storageFilters.map((filter) => (
             <StorageFilterOption
               key={filter.id}
@@ -317,18 +330,7 @@ export default function IngredientsScreen() {
                 }}
               />
             </View>
-          ) : (
-            <AppButton
-              label="+ Add area / zone"
-              variant="secondary"
-              compact
-              style={styles.addZoneBtn}
-              onPress={() => {
-                dismissSearch();
-                setAddingZone(true);
-              }}
-            />
-          )}
+          ) : null}
         </Pressable>
 
         <Pressable style={styles.searchPad} onPress={dismissSearch}>
@@ -426,14 +428,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
   },
+  filterHeadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
   filterHeading: {
     ...typography.caption,
     fontWeight: "600",
-    marginBottom: spacing.xs,
+    flex: 1,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  addZoneBtn: { alignSelf: "flex-start", marginTop: spacing.sm },
   zoneForm: {
     flexDirection: "row",
     alignItems: "flex-end",
