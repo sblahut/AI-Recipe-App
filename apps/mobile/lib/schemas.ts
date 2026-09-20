@@ -34,6 +34,11 @@ export const quantityUnitsSchema = z.object({
   kinds: z.record(quantityKindSchema, z.array(z.string())),
 });
 
+export const homeNetworkSchema = z.object({
+  lan_host: z.string().nullable(),
+  expo_go_url: z.string().nullable(),
+});
+
 export const healthSchema = z.object({
   status: z.string(),
   ollama: z.boolean(),

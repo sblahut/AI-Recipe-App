@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Product
-from app.schemas import ProductCatalogStats, QuantityUnitsResponse
+from app.schemas import HomeNetworkResponse, ProductCatalogStats, QuantityUnitsResponse
+from app.services.home_network import primary_lan_ipv4
 from app.units import UNITS_BY_KIND, QuantityKind
 
 router = APIRouter(prefix="/meta", tags=["meta"])
@@ -15,6 +16,13 @@ def quantity_units() -> QuantityUnitsResponse:
         kind: list(units) for kind, units in UNITS_BY_KIND.items()
     }
     return QuantityUnitsResponse(kinds=kinds)
+
+
+@router.get("/home-network", response_model=HomeNetworkResponse)
+def home_network() -> HomeNetworkResponse:
+    lan = primary_lan_ipv4()
+    expo = f"exp://{lan}:8081" if lan else None
+    return HomeNetworkResponse(lan_host=lan, expo_go_url=expo)
 
 
 @router.get("/product-catalog", response_model=ProductCatalogStats)

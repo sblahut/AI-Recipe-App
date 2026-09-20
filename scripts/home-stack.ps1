@@ -103,41 +103,60 @@ function Write-HomeStackStatusHtml {
     $apiUrl = $Urls.DedicatedHttpApi
     if (-not $apiUrl) { $apiUrl = $Urls.TailscaleIpApi }
     if (-not $apiUrl) { $apiUrl = $Urls.LanApi }
-    if (-not $apiUrl) { $apiUrl = "http://127.0.0.1:8000" }
-
-    $qrSrc = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=$([uri]::EscapeDataString($apiUrl))"
+    if (-not $apiUrl) { $apiUrl = "Set a LAN or Tailscale URL in the app Settings (port 8000)." }
     $lan = if ($Urls.LanApi) { $Urls.LanApi } else { "—" }
     $tsIp = if ($Urls.TailscaleIpApi) { $Urls.TailscaleIpApi } else { "Tailscale not running" }
     $dedicated = if ($Urls.DedicatedHttpApi) { $Urls.DedicatedHttpApi } else { "MagicDNS name not available yet" }
     $https = if ($Urls.DedicatedHttpsApi) { "$($Urls.DedicatedHttpsApi) (after tailscale serve)" } else { "—" }
-    $expo = if ($Urls.ExpoHint) { $Urls.ExpoHint } else { "Start Expo, then scan the QR in that terminal" }
+    $expo = if ($Urls.ExpoHint) { $Urls.ExpoHint } else { "Start Expo (port 8081), then refresh this page." }
+    $metroUp = Test-LocalPortListening -Port 8081
+    $expoQrBlock = if ($Urls.ExpoHint -and $metroUp) {
+        $expoSrc = "https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=$([uri]::EscapeDataString($Urls.ExpoHint))"
+        @"
+  <h2>Open the app in Expo Go</h2>
+  <p>On your iPhone (same Wi‑Fi), scan with the <strong>Camera</strong> app. This opens <strong>Expo Go</strong> and loads the recipe app UI.</p>
+  <div class="qr"><img alt="Expo Go QR" src="$expoSrc" width="240" height="240" /></div>
+  <p><code>$expo</code></p>
+"@
+    } else {
+        @"
+  <h2>Open the app in Expo Go</h2>
+  <p>Waiting for Metro on port <strong>8081</strong>. When the Expo window is running, refresh this page (F5) to show the QR.</p>
+  <p><code>$expo</code></p>
+"@
+    }
 
     $html = @"
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="8" />
   <title>AI Recipe — Home stack</title>
   <style>
     body { font-family: Segoe UI, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
     code { background: #f3f3f3; padding: 0.15rem 0.35rem; }
     .qr { margin: 1rem 0; }
     h1 { font-size: 1.4rem; }
+    h2 { font-size: 1.15rem; margin-top: 1.5rem; }
+    hr { margin: 1.5rem 0; border: none; border-top: 1px solid #ddd; }
   </style>
 </head>
 <body>
-  <h1>AI Recipe is starting on this PC</h1>
-  <p>Put this URL in the iPhone app <strong>Settings → Home server</strong>, then Test connection.</p>
+  <h1>AI Recipe home stack</h1>
+  $expoQrBlock
+  <hr />
+  <h2>Home server API (Settings on the phone)</h2>
+  <p>Type into <strong>Settings → Home server</strong>, then Test connection. Port <strong>8000</strong> — not Expo.</p>
   <p><strong>Dedicated Tailscale URL (preferred):</strong><br /><code>$dedicated</code></p>
-  <div class="qr"><img alt="QR for home server URL" src="$qrSrc" width="220" height="220" /></div>
-  <p>Scan the QR to copy/type the same API URL. The Expo Go QR is in the Metro terminal (opens the app UI, not this API).</p>
+  <p><strong>API URL for Settings:</strong><br /><code>$apiUrl</code></p>
   <ul>
     <li>Home Wi‑Fi API: <code>$lan</code></li>
     <li>Tailscale IP API: <code>$tsIp</code></li>
     <li>HTTPS name (optional Serve): <code>$https</code></li>
-    <li>Expo Go (same Wi‑Fi): <code>$expo</code></li>
     <li>API docs on this PC: <a href="http://127.0.0.1:8000/docs">http://127.0.0.1:8000/docs</a></li>
   </ul>
+  <p class="hint">This page refreshes every 8 seconds while Metro starts.</p>
 </body>
 </html>
 "@

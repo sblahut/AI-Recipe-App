@@ -1,5 +1,4 @@
 import Constants from "expo-constants";
-import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Platform, StyleSheet, Text, View } from "react-native";
 
@@ -16,7 +15,10 @@ import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
 import { pickProfilePhoto, profilePhotoSourceOptions } from "@/lib/profilePhoto";
-import { serverUrlQrImageUri } from "@/lib/parseServerUrlFromQr";
+import { apiJson } from "@/lib/api";
+import { expoGoDisplayUrl, qrCodeImageUri } from "@/lib/expoGoDevUrl";
+import { phoneUnreachableHomeServerReason } from "@/lib/parseServerUrlFromQr";
+import { homeNetworkSchema } from "@/lib/schemas";
 import { weeklyAdUrlForStore } from "@/lib/storeChains";
 import {
   STORE_CHAINS,
@@ -77,6 +79,27 @@ export default function SettingsScreen() {
   );
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+  const [networkExpoUrl, setNetworkExpoUrl] = useState<string | null>(null);
+  const [lanHost, setLanHost] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const raw = await apiJson<unknown>("/meta/home-network", { baseUrl: serverUrl });
+        const network = homeNetworkSchema.parse(raw);
+        setLanHost(network.lan_host);
+        setNetworkExpoUrl(network.expo_go_url);
+      } catch {
+        setLanHost(null);
+        setNetworkExpoUrl(null);
+      }
+    })();
+  }, [serverUrl]);
+
+  const expoGoUrl = useMemo(
+    () => expoGoDisplayUrl(lanHost) ?? networkExpoUrl,
+    [lanHost, networkExpoUrl],
+  );
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -541,26 +564,40 @@ export default function SettingsScreen() {
         />
       </Card>
 
-      {/* Server connection */}
+      {/* Dev + server connection */}
       <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Home server</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Connect this phone</Text>
+
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          This URL is the kitchen API on your PC (port 8000), not Expo Go. Use your LAN address at
-          home, or the Tailscale MagicDNS URL at home and away. The other iPhone can scan this QR
-          in Settings to use the same server.
+          Scan with the iPhone Camera to open this project in Expo Go (same Wi‑Fi as the PC). Works
+          from this phone, from the PC status page, or while previewing on http://localhost:8081 —
+          the QR always uses your PC's LAN address, not localhost.
         </Text>
-        <View style={styles.serverQrWrap}>
-          <Image
-            accessibilityLabel="QR code for the home server URL"
-            source={{ uri: serverUrlQrImageUri(draft || serverUrl) }}
-            style={styles.serverQr}
-          />
-        </View>
-        <AppButton
-          label="Scan server QR"
-          variant="secondary"
-          onPress={() => router.push({ pathname: "/scan", params: { target: "server_url" } })}
-        />
+        {expoGoUrl ? (
+          <View style={styles.serverQrWrap}>
+            <Image
+              accessibilityLabel="QR code to open this app in Expo Go"
+              source={{ uri: qrCodeImageUri(expoGoUrl) }}
+              style={styles.serverQr}
+            />
+            <Text style={[styles.hint, { color: colors.textMuted }]} selectable>
+              {expoGoUrl}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            Start the API on your PC (port 8000) and Metro (port 8081), then reopen Settings to load
+            the Expo QR.
+          </Text>
+        )}
+
+        <Text style={[styles.subsectionTitle, { color: colors.text, marginTop: spacing.md }]}>
+          Home server API
+        </Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Kitchen data on your PC (port 8000). Use a LAN IP or Tailscale MagicDNS URL — not
+          localhost or port 8081.
+        </Text>
         <AppTextField
           label="Server address"
           hint="Example: http://kitchen-pc.tailxxxxx.ts.net:8000"
@@ -575,6 +612,11 @@ export default function SettingsScreen() {
           label="Save address"
           onPress={() => {
             void (async () => {
+              const blocked = phoneUnreachableHomeServerReason(draft.trim());
+              if (blocked) {
+                setResult(`✗ ${blocked}`);
+                return;
+              }
               await setServerUrl(draft);
               setResult("Saved.");
             })();
@@ -606,6 +648,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   sectionTitle: typography.headline,
+  subsectionTitle: { ...typography.label, fontWeight: "700", marginTop: spacing.sm },
   hint: { ...typography.caption, lineHeight: 18 },
   result: { ...typography.bodyMedium },
   empty: { ...typography.caption, paddingVertical: spacing.xs },

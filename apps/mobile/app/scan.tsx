@@ -20,7 +20,7 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiJson } from "@/lib/api";
-import { parseServerUrlFromQr } from "@/lib/parseServerUrlFromQr";
+import { parseServerUrlFromQr, phoneUnreachableHomeServerReason } from "@/lib/parseServerUrlFromQr";
 import {
   barcodeScanResponseSchema,
   productReadSchema,
@@ -74,6 +74,15 @@ function ServerUrlQrScan() {
           }
           const url = parseServerUrlFromQr(data);
           if (!url) {
+            return;
+          }
+          const blocked = phoneUnreachableHomeServerReason(url);
+          if (blocked) {
+            handled.current = true;
+            Alert.alert("Not a phone-reachable API", blocked, [
+              { text: "Scan again", onPress: () => { handled.current = false; } },
+              { text: "Cancel", onPress: () => router.back() },
+            ]);
             return;
           }
           handled.current = true;
