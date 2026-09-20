@@ -11,6 +11,8 @@ def test_primary_lan_ipv4_is_not_loopback_when_present():
 def test_home_network_response_shape():
     body = home_network()
     if body.lan_host:
+        assert body.api_base_url == f"http://{body.lan_host}:8000"
         assert body.expo_go_url == f"exp://{body.lan_host}:8081"
     else:
+        assert body.api_base_url is None
         assert body.expo_go_url is None

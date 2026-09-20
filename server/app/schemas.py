@@ -220,6 +220,7 @@ class QuantityUnitsResponse(BaseModel):
 
 class HomeNetworkResponse(BaseModel):
     lan_host: str | None = None
+    api_base_url: str | None = None
     expo_go_url: str | None = None
 
 

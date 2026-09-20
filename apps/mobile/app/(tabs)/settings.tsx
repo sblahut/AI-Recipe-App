@@ -17,7 +17,6 @@ import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
 import { pickProfilePhoto, profilePhotoSourceOptions } from "@/lib/profilePhoto";
 import { apiJson } from "@/lib/api";
 import { expoGoDisplayUrl, qrCodeImageUri } from "@/lib/expoGoDevUrl";
-import { phoneUnreachableHomeServerReason } from "@/lib/parseServerUrlFromQr";
 import { homeNetworkSchema } from "@/lib/schemas";
 import { weeklyAdUrlForStore } from "@/lib/storeChains";
 import {
@@ -47,7 +46,7 @@ const RECIPE_COUNT_OPTIONS = [1, 2, 3, 5, 10] as const;
 
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
-  const { serverUrl, setServerUrl, loading, testConnection } = useServerSettings();
+  const { serverUrl, loading } = useServerSettings();
   const {
     preferences,
     setUsername,
@@ -65,12 +64,9 @@ export default function SettingsScreen() {
     setProfilePhotoUri,
   } = useUserPreferences();
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [draft, setDraft] = useState(serverUrl);
   const [usernameDraft, setUsernameDraft] = useState(preferences.username);
   const [editingProfile, setEditingProfile] = useState(false);
   const [zoneDraft, setZoneDraft] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
   const [storeDraft, setStoreDraft] = useState<StoreDraft | null>(null);
 
   const storageLocations = useMemo(
@@ -102,12 +98,6 @@ export default function SettingsScreen() {
   );
 
   useEffect(() => {
-    queueMicrotask(() => {
-      setDraft(serverUrl);
-    });
-  }, [serverUrl]);
-
-  useEffect(() => {
     if (!editingProfile) {
       queueMicrotask(() => {
         setUsernameDraft(preferences.username);
@@ -118,13 +108,6 @@ export default function SettingsScreen() {
   if (loading) {
     return <Screen loading />;
   }
-
-  const resultColor =
-    result?.startsWith("✓") === true
-      ? colors.success
-      : result?.startsWith("✗") === true
-        ? colors.danger
-        : colors.textSecondary;
 
   const saveProfile = async () => {
     await setUsername(usernameDraft);
@@ -590,57 +573,6 @@ export default function SettingsScreen() {
             the Expo QR.
           </Text>
         )}
-
-        <Text style={[styles.subsectionTitle, { color: colors.text, marginTop: spacing.md }]}>
-          Home server API
-        </Text>
-        <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Kitchen data on your PC (port 8000). Use a LAN IP or Tailscale MagicDNS URL — not
-          localhost or port 8081.
-        </Text>
-        <AppTextField
-          label="Server address"
-          hint="Example: http://kitchen-pc.tailxxxxx.ts.net:8000"
-          value={draft}
-          onChangeText={setDraft}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-        />
-
-        <AppButton
-          label="Save address"
-          onPress={() => {
-            void (async () => {
-              const blocked = phoneUnreachableHomeServerReason(draft.trim());
-              if (blocked) {
-                setResult(`✗ ${blocked}`);
-                return;
-              }
-              await setServerUrl(draft);
-              setResult("Saved.");
-            })();
-          }}
-        />
-
-        <AppButton
-          label={testing ? "Testing…" : "Test connection"}
-          variant="secondary"
-          loading={testing}
-          onPress={() => {
-            void (async () => {
-              setTesting(true);
-              setResult(null);
-              const out = await testConnection();
-              setResult(out.ok ? `✓ ${out.message}` : `✗ ${out.message}`);
-              setTesting(false);
-            })();
-          }}
-        />
-
-        {result ? (
-          <Text style={[styles.result, { color: resultColor }]}>{result}</Text>
-        ) : null}
       </Card>
     </Screen>
   );
@@ -648,9 +580,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   sectionTitle: typography.headline,
-  subsectionTitle: { ...typography.label, fontWeight: "700", marginTop: spacing.sm },
   hint: { ...typography.caption, lineHeight: 18 },
-  result: { ...typography.bodyMedium },
   empty: { ...typography.caption, paddingVertical: spacing.xs },
   fieldLabel: { ...typography.label, marginTop: spacing.sm },
   profilePhotoBlock: {

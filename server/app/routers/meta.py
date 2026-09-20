@@ -21,8 +21,9 @@ def quantity_units() -> QuantityUnitsResponse:
 @router.get("/home-network", response_model=HomeNetworkResponse)
 def home_network() -> HomeNetworkResponse:
     lan = primary_lan_ipv4()
+    api_base = f"http://{lan}:8000" if lan else None
     expo = f"exp://{lan}:8081" if lan else None
-    return HomeNetworkResponse(lan_host=lan, expo_go_url=expo)
+    return HomeNetworkResponse(lan_host=lan, api_base_url=api_base, expo_go_url=expo)
 
 
 @router.get("/product-catalog", response_model=ProductCatalogStats)

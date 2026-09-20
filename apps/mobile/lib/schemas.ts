@@ -36,6 +36,7 @@ export const quantityUnitsSchema = z.object({
 
 export const homeNetworkSchema = z.object({
   lan_host: z.string().nullable(),
+  api_base_url: z.string().nullable(),
   expo_go_url: z.string().nullable(),
 });
 
