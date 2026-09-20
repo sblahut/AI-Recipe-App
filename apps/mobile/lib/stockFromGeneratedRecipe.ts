@@ -10,7 +10,7 @@ export async function stockFromGeneratedRecipe(
   recipe: GeneratedRecipe,
   serverUrl: string,
 ): Promise<void> {
-  const location = await pickStorageLocation("Stock from recipe");
+  const location = await pickStorageLocation("Add to ingredients");
   if (!location) {
     return;
   }
@@ -25,8 +25,8 @@ export async function stockFromGeneratedRecipe(
   }
 
   Alert.alert(
-    "Recipe stocked",
-    `${items.length} ingredient lines added to ${location}. Scan barcodes for packaged items.`,
+    "Added to ingredients",
+    `${items.length} lines added to ${location}. Scan barcodes for packaged items?`,
     [
       {
         text: "Scan barcodes",

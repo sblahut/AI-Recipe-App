@@ -7,7 +7,7 @@ import { openIngredientScan } from "@/lib/startIngredientScan";
 
 /** Add shopping list lines to ingredients, then scan barcodes for packaged goods. */
 export async function stockFromShoppingList(listId: number, serverUrl: string): Promise<void> {
-  const location = await pickStorageLocation("Stock from shopping list");
+  const location = await pickStorageLocation("Add cart to ingredients");
   if (!location) {
     return;
   }
@@ -35,8 +35,8 @@ export async function stockFromShoppingList(listId: number, serverUrl: string): 
   });
 
   Alert.alert(
-    "List added",
-    `${items.length} items added to ${location}. Scan barcodes for packaged products.`,
+    "Cart added to ingredients",
+    `${items.length} items added to ${location}. Scan barcodes for packaged products?`,
     [
       {
         text: "Scan barcodes",

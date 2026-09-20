@@ -278,7 +278,7 @@ export default function ShoppingScreen() {
               onPress={() => void shareList()}
             />
             <AppButton
-              label="Stock into ingredients"
+              label="Add cart to ingredients"
               compact
               style={styles.actionBtn}
               onPress={() => void stockFromShoppingList(selectedId, serverUrl)}

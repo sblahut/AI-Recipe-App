@@ -14,8 +14,6 @@ import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
-import { pickStorageLocation } from "@/lib/pickStorageLocation";
-import { recipeToIngredientCreates } from "@/lib/recipeIngredients";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
 import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
@@ -233,28 +231,6 @@ export default function RecipesScreen() {
     }
   };
 
-  const addRecipeToIngredients = async (recipe: GeneratedRecipe) => {
-    const location = await pickStorageLocation("Add to ingredients");
-    if (!location) {
-      return;
-    }
-    const items = recipeToIngredientCreates(recipe, location);
-    if (items.length === 0) {
-      Alert.alert("No ingredients", "This recipe has no ingredient lines to add.");
-      return;
-    }
-    try {
-      await apiFetch("/inventory/bulk", {
-        baseUrl: serverUrl,
-        method: "POST",
-        body: JSON.stringify({ items }),
-      });
-      Alert.alert("Added", `${items.length} items added to ${location}.`);
-    } catch (e) {
-      Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
-    }
-  };
-
   const addRecipeToShoppingList = (recipe: GeneratedRecipe) => {
     if (lists.length === 0) {
       Alert.alert("No lists", "Create a shopping list on the Shopping tab first.");
@@ -279,7 +255,7 @@ export default function RecipesScreen() {
                 const added = result.added.length;
                 const detail =
                   skipped > 0
-                    ? `${added} added to ${list.name}. ${skipped} already in your pantry.`
+                    ? `${added} added to ${list.name}. ${skipped} already in ingredients.`
                     : `${added} items added to ${list.name}.`;
                 Alert.alert(added > 0 ? "Added" : "Nothing to buy", detail);
               } catch (e) {
@@ -391,9 +367,8 @@ export default function RecipesScreen() {
                   colors={colors}
                   isFavorite={isFavorite}
                   onToggleFavorite={() => void toggleFavorite(recipe)}
-                  onAddIngredients={() => void addRecipeToIngredients(recipe)}
                   onAddShopping={() => void addRecipeToShoppingList(recipe)}
-                  onStock={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
+                  onAddToIngredients={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
                   onShare={() => void shareText(recipe.title, formatRecipeShare(recipe))}
                 />
               );
@@ -427,9 +402,8 @@ export default function RecipesScreen() {
               colors={colors}
               isFavorite
               onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
-              onAddIngredients={() => void addRecipeToIngredients(item.recipe)}
               onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
-              onStock={() => void stockFromSavedRecipe(item.id, serverUrl)}
+              onAddToIngredients={() => void stockFromSavedRecipe(item.id, serverUrl)}
               onShare={() => void shareText(item.title, formatRecipeShare(item.recipe))}
             />
           )}
@@ -454,9 +428,8 @@ type RecipeCardProps = {
   colors: ThemeColors;
   isFavorite: boolean;
   onToggleFavorite: () => void;
-  onAddIngredients: () => void;
   onAddShopping: () => void;
-  onStock: () => void;
+  onAddToIngredients: () => void;
   onShare: () => void;
 };
 
@@ -467,9 +440,8 @@ function RecipeCard({
   colors,
   isFavorite,
   onToggleFavorite,
-  onAddIngredients,
   onAddShopping,
-  onStock,
+  onAddToIngredients,
   onShare,
 }: RecipeCardProps) {
   const title = titleOverride ?? recipe.title;
@@ -505,9 +477,8 @@ function RecipeCard({
       ))}
       <View style={styles.actions}>
         <AppButton label="Share" variant="secondary" compact onPress={onShare} />
-        <AppButton label="→ Ingredients" compact onPress={onAddIngredients} />
-        <AppButton label="→ Shopping" variant="accent" compact onPress={onAddShopping} />
-        <AppButton label="Stock + scan" variant="secondary" compact onPress={onStock} />
+        <AppButton label="Shopping" variant="accent" compact onPress={onAddShopping} />
+        <AppButton label="+ Ingredients" compact onPress={onAddToIngredients} />
       </View>
     </Card>
   );
