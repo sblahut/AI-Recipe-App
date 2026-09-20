@@ -42,9 +42,7 @@ def list_meal_plan(
         .order_by(MealPlanEntry.plan_date, MealPlanEntry.id)
         .all()
     )
-    filtered = [
-        row for row in rows if start_d <= parse_plan_date(row.plan_date) <= end_d
-    ]
+    filtered = [row for row in rows if start_d <= parse_plan_date(row.plan_date) <= end_d]
     filtered.sort(
         key=lambda row: (
             parse_plan_date(row.plan_date),

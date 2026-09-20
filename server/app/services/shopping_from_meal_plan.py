@@ -26,11 +26,7 @@ def add_meal_plan_range_to_shopping_list(
     start_d, end_d = validate_plan_date_range(start_date, end_date)
 
     rows = db.query(MealPlanEntry).all()
-    in_range = [
-        row
-        for row in rows
-        if start_d <= parse_plan_date(row.plan_date) <= end_d
-    ]
+    in_range = [row for row in rows if start_d <= parse_plan_date(row.plan_date) <= end_d]
     in_range.sort(
         key=lambda row: (
             parse_plan_date(row.plan_date),
@@ -49,9 +45,7 @@ def add_meal_plan_range_to_shopping_list(
             missing_entry_ids.append(entry.id)
             continue
         recipe = GeneratedRecipe.model_validate(json.loads(saved.payload_json))
-        batch_added, batch_skipped = add_recipe_to_shopping_list(
-            db, list_id=list_id, recipe=recipe
-        )
+        batch_added, batch_skipped = add_recipe_to_shopping_list(db, list_id=list_id, recipe=recipe)
         added.extend(batch_added)
         skipped.extend(batch_skipped)
 

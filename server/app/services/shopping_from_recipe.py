@@ -84,10 +84,10 @@ def add_recipe_to_shopping_list(
                 added.append(_item_to_read(existing))
                 continue
 
-        raw_unit = parsed.unit or (effective_unit(parsed.quantity_kind, None) if parsed.quantity else None)
-        safe_unit = (
-            canonical_unit_for_kind(parsed.quantity_kind, raw_unit) if raw_unit else None
+        raw_unit = parsed.unit or (
+            effective_unit(parsed.quantity_kind, None) if parsed.quantity else None
         )
+        safe_unit = canonical_unit_for_kind(parsed.quantity_kind, raw_unit) if raw_unit else None
         item = ShoppingListItem(
             shopping_list_id=list_id,
             name=parsed.name,
