@@ -36,7 +36,7 @@ export async function stockFromShoppingList(listId: number, serverUrl: string): 
   });
 
   Alert.alert(
-    "Cart added to ingredients",
+    "Added to pantry",
     `${items.length} items added to ${location}. Scan barcodes for packaged products?`,
     [
       {

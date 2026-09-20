@@ -11,7 +11,7 @@ import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
-import { radius, spacing, typography } from "@/constants/theme";
+import { spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -348,33 +348,62 @@ export default function ShoppingScreen() {
             </Pressable>
           </View>
 
-          {/* Actions */}
-          <View style={[styles.sectionPad, styles.actionsRow]}>
-            <AppButton
-              label={SHOPPING_OPEN_LIST_LABEL}
-              variant="primary"
-              compact
-              style={styles.actionBtn}
+          <View style={[styles.sectionPad, styles.actionRow]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={SHOPPING_OPEN_LIST_LABEL}
               onPress={openShoppingList}
-            />
-            <AppButton
-              label={SHOPPING_STOCK_FROM_LIST_LABEL}
-              variant="secondary"
-              compact
-              style={styles.actionBtn}
+              style={({ pressed }) => [
+                styles.actionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="checkbox-outline" size={22} color={colors.primary} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>
+                {SHOPPING_OPEN_LIST_LABEL}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={SHOPPING_STOCK_FROM_LIST_LABEL}
               onPress={() => void stockFromShoppingList(selectedId, serverUrl)}
-            />
+              style={({ pressed }) => [
+                styles.actionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="nutrition-outline" size={22} color={colors.accent} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>
+                {SHOPPING_STOCK_FROM_LIST_LABEL}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.sectionPad}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={shareShoppingListAccessibilityLabel(selectedList?.name ?? "list")}
               onPress={() => void shareList()}
               style={({ pressed }) => [
-                styles.shareIconBtn,
-                { backgroundColor: colors.overlay, borderColor: colors.border },
-                pressed && { opacity: 0.82 },
+                styles.actionCard,
+                styles.actionCardFull,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
               ]}
             >
-              <Ionicons name="share-outline" size={20} color={colors.text} />
+              <Ionicons name="share-outline" size={22} color={colors.textSecondary} />
+              <Text style={[styles.actionLabel, { color: colors.text }]}>Share list</Text>
             </Pressable>
           </View>
 
@@ -501,21 +530,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   addItemSaveBtn: { minWidth: 100 },
-  actionsRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
+  actionCardFull: {
     marginBottom: spacing.lg,
-    alignItems: "stretch",
-  },
-  actionBtn: { flex: 1, minWidth: 0 },
-  shareIconBtn: {
-    minHeight: 42,
-    minWidth: 44,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.sm,
   },
   dealTitle: typography.headline,
   dealHint: { ...typography.caption, lineHeight: 18, marginTop: spacing.xs },

@@ -1,8 +1,8 @@
-/** Primary action on Shopping tab when a list is selected. */
-export const SHOPPING_OPEN_LIST_LABEL = "Open list";
+/** Open checklist view while shopping (Shop tab). */
+export const SHOPPING_OPEN_LIST_LABEL = "Shop this list";
 
-/** Move shopping list lines into Ingredients (inventory bulk). */
-export const SHOPPING_STOCK_FROM_LIST_LABEL = "Add shopping cart to ingredients";
+/** Move purchased list lines into Pantry inventory. */
+export const SHOPPING_STOCK_FROM_LIST_LABEL = "Add to pantry";
 
 /** Recipe card: add recipe lines to a shopping list. */
 export const RECIPE_SHOPPING_LIST_BUTTON_LABEL = "+ Shopping list";
