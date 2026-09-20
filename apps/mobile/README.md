@@ -110,7 +110,7 @@ After first `npm install`, commit `package-lock.json` so CI can run `npm ci`.
 
 ## Tabs
 
-- **Pantry** — list, manual add/edit, barcode scan
-- **Recipes** — generate from pantry, save favorites
-- **Shopping** — lists, manual items, scan to list, check off
-- **Settings** — server URL + health check
+- **Ingredients** — pantry by storage area, manual add/edit, swipe delete, barcode scan, custom zones
+- **Recipes** — generate from pantry, paste-import text, search, favorites, share, add to shopping / ingredients
+- **Shopping** — lists, weekly ad links by store chain, scan to list; **Open list** for filters (all / to buy / in cart)
+- **Settings** — profile & photo, appearance, kitchen defaults, favorite stores, recipes options, home server URL (dev/LAN)
