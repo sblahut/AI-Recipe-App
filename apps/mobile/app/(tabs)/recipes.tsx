@@ -23,6 +23,7 @@ import {
   healthSchema,
   ingredientSchema,
   recipeGenerateResponseSchema,
+  recipeImportResponseSchema,
   savedRecipeReadSchema,
   shoppingFromRecipeResponseSchema,
   shoppingListSchema,
@@ -63,6 +64,8 @@ export default function RecipesScreen() {
   const [favorites, setFavorites] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [ready, setReady] = useState<GenerateReady>({
@@ -160,6 +163,45 @@ export default function RecipesScreen() {
     } finally {
       setLoading(false);
       void loadReady();
+    }
+  };
+
+  const importRecipe = async () => {
+    const text = importText.trim();
+    if (text.length < 20) {
+      Alert.alert("Paste a recipe", "Include at least a title, ingredients, and steps (20+ characters).");
+      return;
+    }
+    if (!ready.serverOk) {
+      Alert.alert("Server offline", "Check the home server URL in Settings.");
+      return;
+    }
+    if (ready.ollamaOk === false) {
+      Alert.alert("Ollama offline", "Recipe import uses the same Ollama model as generate.");
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      const raw = await apiJson<unknown>("/recipes/import", {
+        baseUrl: serverUrl,
+        method: "POST",
+        body: JSON.stringify({
+          text,
+          persist: preferences.autoPersistGeneratedRecipes,
+        }),
+      });
+      const parsed = recipeImportResponseSchema.parse(raw);
+      setGenerated((prev) => [parsed.recipe, ...prev.filter((r) => r.title !== parsed.recipe.title)]);
+      setImportText("");
+      if (parsed.saved_recipe) {
+        await loadFavorites();
+      }
+      Alert.alert("Imported", parsed.recipe.title);
+    } catch (e) {
+      Alert.alert("Import failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setImportLoading(false);
     }
   };
 
@@ -284,6 +326,30 @@ export default function RecipesScreen() {
         loading={loading}
         onPress={() => void generate()}
       />
+
+      <Card>
+        <Text style={[styles.importCardTitle, { color: colors.text }]}>Import recipe</Text>
+        <Text style={[styles.importHint, { color: colors.textMuted }]}>
+          Paste text from a cookbook, email, or notes. URL fetching is not supported yet.
+        </Text>
+        <AppTextField
+          label="Recipe text"
+          value={importText}
+          onChangeText={setImportText}
+          placeholder="Title, ingredients, and steps…"
+          multiline
+          numberOfLines={8}
+          textAlignVertical="top"
+          style={styles.importInput}
+          autoCapitalize="sentences"
+        />
+        <AppButton
+          label={importLoading ? "Importing…" : "Import with AI"}
+          variant="secondary"
+          loading={importLoading}
+          onPress={() => void importRecipe()}
+        />
+      </Card>
 
       <AppTextField
         placeholder="Search recipes by title or ingredient"
@@ -436,6 +502,9 @@ const styles = StyleSheet.create({
   readyTitle: typography.headline,
   readyLine: { ...typography.caption, lineHeight: 20 },
   section: { ...typography.title, marginTop: spacing.md },
+  importCardTitle: typography.headline,
+  importHint: { ...typography.caption, lineHeight: 18, marginBottom: spacing.sm },
+  importInput: { minHeight: 140, paddingTop: spacing.sm },
   favoritesHeading: {
     flexDirection: "row",
     alignItems: "center",

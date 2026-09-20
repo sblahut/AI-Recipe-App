@@ -68,6 +68,11 @@ export const recipeGenerateResponseSchema = z.object({
   saved_recipes: z.array(savedRecipeReadSchema).optional().default([]),
 });
 
+export const recipeImportResponseSchema = z.object({
+  recipe: generatedRecipeSchema,
+  saved_recipe: savedRecipeReadSchema.nullable().optional(),
+});
+
 export const shoppingListSchema = z.object({
   id: z.number(),
   name: z.string(),

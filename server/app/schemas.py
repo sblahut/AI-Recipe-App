@@ -152,6 +152,20 @@ class RecipeGenerateResponse(BaseModel):
     saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
 
 
+class RecipeImportRequest(BaseModel):
+    text: str = Field(min_length=20, max_length=50_000)
+    persist: bool | None = Field(
+        default=None,
+        description="Save on server when true. When omitted, uses DEFAULT_PERSIST_GENERATED_RECIPES.",
+    )
+    favorite: bool = False
+
+
+class RecipeImportResponse(BaseModel):
+    recipe: GeneratedRecipe
+    saved_recipe: "SavedRecipeRead | None" = None
+
+
 class SavedRecipeCreate(BaseModel):
     recipe: GeneratedRecipe
     favorite: bool = False
@@ -238,3 +252,4 @@ class ShoppingFromRecipeResponse(BaseModel):
 
 
 RecipeGenerateResponse.model_rebuild()
+RecipeImportResponse.model_rebuild()

@@ -7,6 +7,8 @@ from app.models import Ingredient, SavedRecipe
 from app.schemas import (
     RecipeGenerateRequest,
     RecipeGenerateResponse,
+    RecipeImportRequest,
+    RecipeImportResponse,
     SavedRecipeCreate,
     SavedRecipeRead,
 )
@@ -76,6 +78,33 @@ async def generate_recipes(
         db.commit()
 
     return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
+
+
+@router.post("/import", response_model=RecipeImportResponse)
+async def import_recipe(
+    body: RecipeImportRequest, db: Session = Depends(get_db)
+) -> RecipeImportResponse:
+    try:
+        recipe = await ollama.import_recipe_from_text(body.text)
+    except ollama.OllamaError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    persist = (
+        body.persist if body.persist is not None else settings.default_persist_generated_recipes
+    )
+    saved: SavedRecipeRead | None = None
+    if persist or body.favorite:
+        row = SavedRecipe(
+            title=recipe.title,
+            payload_json=recipe.model_dump_json(),
+            favorite=body.favorite,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        saved = SavedRecipeRead.from_orm_row(row)
+
+    return RecipeImportResponse(recipe=recipe, saved_recipe=saved)
 
 
 @router.get("/saved", response_model=list[SavedRecipeRead])
