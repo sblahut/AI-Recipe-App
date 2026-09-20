@@ -1,13 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { z } from "zod";
@@ -17,6 +19,7 @@ import { StorageFilterOption } from "@/components/StorageFilterOption";
 import { SwipeableRow } from "@/components/SwipeableRow";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
+import { SearchField, dismissSearchKeyboard } from "@/components/ui/SearchField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
@@ -57,6 +60,7 @@ export default function IngredientsScreen() {
   const [addingZone, setAddingZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<TextInput>(null);
 
   const storageFilters = useMemo(
     () => buildStorageFilters(preferences.customZones),
@@ -243,105 +247,136 @@ export default function IngredientsScreen() {
     );
   }
 
+  const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
+
   return (
     <Screen padded={false}>
-      <View style={styles.toolbar}>
-        <AppButton label="+ Manual" compact onPress={() => setShowForm(true)} style={styles.toolbarBtn} />
-        <AppButton
-          label="Scan barcode"
-          variant="accent"
-          compact
-          style={styles.toolbarBtn}
-          onPress={() => void startIngredientScan()}
-        />
-      </View>
-
-      <View style={styles.filterSection}>
-        <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
-        {storageFilters.map((filter) => (
-          <StorageFilterOption
-            key={filter.id}
-            label={filter.label}
-            icon={filter.icon}
-            selected={locationFilter === filter.id}
-            count={countByFilter.get(filter.id) ?? 0}
-            onPress={() => setLocationFilter(filter.id)}
-            {...(filter.kind === "custom"
-              ? { onLongPress: () => confirmRemoveZone(filter.id) }
-              : {})}
+      <KeyboardAvoidingView
+        style={styles.fill}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={styles.toolbar}>
+          <AppButton
+            label="+ Manual"
+            compact
+            onPress={() => {
+              dismissSearch();
+              setShowForm(true);
+            }}
+            style={styles.toolbarBtn}
           />
-        ))}
-        {addingZone ? (
-          <View style={styles.zoneForm}>
-            <View style={styles.flex}>
-              <AppTextField
-                placeholder="Garage, spice rack, basement…"
-                value={newZoneName}
-                onChangeText={setNewZoneName}
-                onSubmitEditing={() => void submitZone()}
-                autoFocus
+          <AppButton
+            label="Scan barcode"
+            variant="accent"
+            compact
+            style={styles.toolbarBtn}
+            onPress={() => {
+              dismissSearch();
+              void startIngredientScan();
+            }}
+          />
+        </View>
+
+        <Pressable style={styles.filterSection} onPress={dismissSearch}>
+          <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Browse by storage</Text>
+          {storageFilters.map((filter) => (
+            <StorageFilterOption
+              key={filter.id}
+              label={filter.label}
+              icon={filter.icon}
+              selected={locationFilter === filter.id}
+              count={countByFilter.get(filter.id) ?? 0}
+              onPress={() => {
+                dismissSearch();
+                setLocationFilter(filter.id);
+              }}
+              {...(filter.kind === "custom"
+                ? { onLongPress: () => confirmRemoveZone(filter.id) }
+                : {})}
+            />
+          ))}
+          {addingZone ? (
+            <View style={styles.zoneForm}>
+              <View style={styles.flex}>
+                <AppTextField
+                  placeholder="Garage, spice rack, basement…"
+                  value={newZoneName}
+                  onChangeText={setNewZoneName}
+                  onSubmitEditing={() => void submitZone()}
+                  autoFocus
+                />
+              </View>
+              <AppButton label="Save" compact onPress={() => void submitZone()} />
+              <AppButton
+                label="Cancel"
+                variant="ghost"
+                compact
+                onPress={() => {
+                  setAddingZone(false);
+                  setNewZoneName("");
+                }}
               />
             </View>
-            <AppButton label="Save" compact onPress={() => void submitZone()} />
+          ) : (
             <AppButton
-              label="Cancel"
-              variant="ghost"
+              label="+ Add area / zone"
+              variant="secondary"
               compact
+              style={styles.addZoneBtn}
               onPress={() => {
-                setAddingZone(false);
-                setNewZoneName("");
+                dismissSearch();
+                setAddingZone(true);
               }}
             />
-          </View>
-        ) : (
-          <AppButton
-            label="+ Add area / zone"
-            variant="secondary"
-            compact
-            style={styles.addZoneBtn}
-            onPress={() => setAddingZone(true)}
-          />
-        )}
-      </View>
+          )}
+        </Pressable>
 
-      <View style={styles.searchPad}>
-        <AppTextField
-          placeholder="Search ingredients by name, location, notes, or barcode"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      <FlatList
-        data={filteredItems}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={filteredItems.length === 0 ? styles.listEmpty : styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
-        }
-        ListEmptyComponent={
-          <EmptyState
-            title={
-              searchQuery.trim()
-                ? "No matches"
-                : locationFilter === "All"
-                  ? "No ingredients yet"
-                  : "Nothing in this location"
-            }
-            subtitle={
-              searchQuery.trim()
-                ? "Try another search or clear the search field."
-                : "Add manually, scan a barcode, or pick another storage filter."
-            }
+        <Pressable style={styles.searchPad} onPress={dismissSearch}>
+          <SearchField
+            ref={searchInputRef}
+            placeholder="Search ingredients by name, location, notes, or barcode"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
-        }
-        renderItem={({ item }) => (
+        </Pressable>
+
+        <FlatList
+          style={styles.fill}
+          data={filteredItems}
+          keyExtractor={(item) => String(item.id)}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={dismissSearch}
+          contentContainerStyle={filteredItems.length === 0 ? styles.listEmpty : styles.list}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+          }
+          ListEmptyComponent={
+            <EmptyState
+              title={
+                searchQuery.trim()
+                  ? "No matches"
+                  : locationFilter === "All"
+                    ? "No ingredients yet"
+                    : "Nothing in this location"
+              }
+              subtitle={
+                searchQuery.trim()
+                  ? "Try another search or clear the search field."
+                  : "Add manually, scan a barcode, or pick another storage filter."
+              }
+            />
+          }
+          renderItem={({ item }) => (
           <SwipeableRow onDelete={() => deleteItem(item)}>
             <Card style={styles.row}>
               <Pressable
-                onPress={() => setEditing(item)}
+                onPress={() => {
+                  dismissSearch();
+                  setEditing(item);
+                }}
                 style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
               >
                 <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
@@ -362,7 +397,8 @@ export default function IngredientsScreen() {
             </Card>
           </SwipeableRow>
         )}
-      />
+        />
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -373,6 +409,7 @@ function formatQty(item: Ingredient): string {
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   toolbar: {
     flexDirection: "row",
     gap: spacing.sm,
