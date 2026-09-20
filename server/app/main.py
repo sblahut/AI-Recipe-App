@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import health, inventory, meta, products, recipes, shopping
+from app.routers import health, inventory, meal_plan, meta, products, recipes, shopping
 
 
 @asynccontextmanager
@@ -33,4 +33,5 @@ app.include_router(meta.router)
 app.include_router(inventory.router)
 app.include_router(products.router)
 app.include_router(recipes.router)
+app.include_router(meal_plan.router)
 app.include_router(shopping.router)

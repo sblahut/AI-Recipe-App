@@ -263,5 +263,71 @@ class ShoppingFromRecipeResponse(BaseModel):
     skipped_in_pantry: list[str]
 
 
+MealSlotField = Literal["breakfast", "lunch", "dinner", "snack"]
+
+
+class MealPlanEntryCreate(BaseModel):
+    plan_date: str = Field(max_length=10)
+    meal_slot: MealSlotField
+    saved_recipe_id: int
+
+    @field_validator("plan_date")
+    @classmethod
+    def validate_plan_date(cls, value: str) -> str:
+        from app.services.meal_plan_range import parse_plan_date
+
+        parse_plan_date(value)
+        return value
+
+
+class MealPlanEntryUpdate(BaseModel):
+    plan_date: str | None = Field(default=None, max_length=10)
+    meal_slot: MealSlotField | None = None
+    saved_recipe_id: int | None = None
+
+    @field_validator("plan_date")
+    @classmethod
+    def validate_plan_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        from app.services.meal_plan_range import parse_plan_date
+
+        parse_plan_date(value)
+        return value
+
+
+class MealPlanEntryRead(BaseModel):
+    id: int
+    plan_date: str
+    meal_slot: MealSlotField
+    saved_recipe_id: int
+    recipe_title: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ShoppingFromMealPlanRequest(BaseModel):
+    list_id: int
+    start_date: str = Field(max_length=10)
+    end_date: str = Field(max_length=10)
+
+    @model_validator(mode="after")
+    def validate_range(self) -> "ShoppingFromMealPlanRequest":
+        from app.services.meal_plan_range import validate_plan_date_range
+
+        validate_plan_date_range(self.start_date, self.end_date)
+        return self
+
+
+class ShoppingFromMealPlanResponse(BaseModel):
+    added: list[ShoppingListItemRead]
+    skipped_in_pantry: list[str]
+    missing_entry_ids: list[int] = Field(
+        default_factory=list,
+        description="Meal plan rows whose saved recipe was deleted",
+    )
+
+
 RecipeGenerateResponse.model_rebuild()
 RecipeImportResponse.model_rebuild()

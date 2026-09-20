@@ -211,14 +211,17 @@ Use your PC’s LAN IP instead of `127.0.0.1`, e.g. `http://192.168.1.50:8000/do
 | POST | `/recipes/generate` | AI recipes from inventory (optional auto-save) |
 | POST | `/recipes/import` | Parse pasted text or fetch a recipe URL, then Ollama (optional save) |
 | GET/POST/DELETE | `/recipes/saved` | Store and browse family recipes |
+| GET/POST/PATCH/DELETE | `/meal-plan` | Week plan entries (saved recipe + date + meal slot) |
 | GET/POST | `/shopping/lists` | Shopping trips and line items |
 | POST | `/shopping/from-recipe` | Missing recipe lines → list (skips pantry) |
+| POST | `/shopping/from-meal-plan` | Same for all meals in a date range (multi-recipe) |
 
 ## Usage flow
 
 1. **Stock the pantry** — scan barcodes or add items manually with the right kind/unit.
 2. **Cook** — generate from pantry, paste-import a recipe, star favorites.
-3. **Shop** — build lists, open list view to check off items, scan in the store.
+3. **Plan** — assign saved recipes to days on the **Plan** tab; **Shop this week** fills a list.
+4. **Shop** — build lists, open list view to check off items, scan in the store.
 
 ## Barcode catalog
 
@@ -311,7 +314,6 @@ Verbose server run: `python -m pytest tests -v`. CI uses `npm test -- --ci` in `
 
 ## Roadmap (later)
 
-- **Meal plan** and multi-recipe shopping lists.
 - **HTTPS / Tailscale** for using the app off-LAN.
 
 Product **`default_quantity_kind`** is inferred during OFF import and live OFF barcode lookup (e.g. milk → volume). Re-run the import script to backfill existing rows.
