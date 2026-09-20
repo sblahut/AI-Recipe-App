@@ -347,10 +347,6 @@ export default function ShoppingScreen() {
                 </Text>
               ) : (
                 <>
-                  <Text style={[styles.dealHint, { color: colors.textMuted }]}>
-                    Chain comes from Settings → Favorite grocery stores. Links open the chain site
-                    (you may pick your store on their page).
-                  </Text>
                   <View style={styles.chainRow}>
                     {weeklyAdChains.map((chain) => (
                       <Chip
