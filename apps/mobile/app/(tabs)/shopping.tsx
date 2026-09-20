@@ -18,7 +18,11 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { openAddressInMaps, openExternalUrl } from "@/lib/openMaps";
 import { formatShoppingListShare, shareText } from "@/lib/shareContent";
 import { stockFromShoppingList } from "@/lib/stockFromShoppingList";
-import { weeklyAdChainsForStores, weeklyAdChainForStore, weeklyAdUrlForChain } from "@/lib/storeChains";
+import {
+  weeklyAdChainForStore,
+  weeklyAdChainsForPicker,
+  weeklyAdUrlForChain,
+} from "@/lib/storeChains";
 import type { StoreChain } from "@/lib/userPreferences";
 import {
   shoppingListDetailSchema,
@@ -35,11 +39,12 @@ export default function ShoppingScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<ShoppingListDetail | null>(null);
   const [newListName, setNewListName] = useState("");
+  const [addingList, setAddingList] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [loading, setLoading] = useState(true);
 
   const weeklyAdChains = useMemo(
-    () => weeklyAdChainsForStores(preferences.stores),
+    () => weeklyAdChainsForPicker(preferences.stores),
     [preferences.stores],
   );
 
@@ -125,6 +130,7 @@ export default function ShoppingScreen() {
         body: JSON.stringify({ name }),
       });
       setNewListName("");
+      setAddingList(false);
       await loadLists();
     } catch (e) {
       Alert.alert("Could not create list", e instanceof Error ? e.message : "Unknown error");
@@ -202,22 +208,41 @@ export default function ShoppingScreen() {
 
   return (
     <Screen scroll padded={false}>
-      <View style={styles.sectionPad}>
-        <View style={styles.row}>
-          <View style={styles.flex}>
-            <AppTextField
-              placeholder="New list name"
-              value={newListName}
-              onChangeText={setNewListName}
-              onSubmitEditing={() => void createList()}
+      <View style={styles.filterSection}>
+        <View style={styles.filterHeadingRow}>
+          <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Your lists</Text>
+          {!addingList ? (
+            <AppButton
+              label="+ New list"
+              variant="secondary"
+              compact
+              onPress={() => setAddingList(true)}
+            />
+          ) : null}
+        </View>
+        {addingList ? (
+          <View style={styles.newListForm}>
+            <View style={styles.flex}>
+              <AppTextField
+                placeholder="List name"
+                value={newListName}
+                onChangeText={setNewListName}
+                onSubmitEditing={() => void createList()}
+                autoFocus
+              />
+            </View>
+            <AppButton label="Save" compact onPress={() => void createList()} />
+            <AppButton
+              label="Cancel"
+              variant="ghost"
+              compact
+              onPress={() => {
+                setAddingList(false);
+                setNewListName("");
+              }}
             />
           </View>
-          <AppButton label="Add" compact onPress={() => void createList()} />
-        </View>
-      </View>
-
-      <View style={styles.filterSection}>
-        <Text style={[styles.filterHeading, { color: colors.textMuted }]}>Your lists</Text>
+        ) : null}
         {lists.map((list) => (
           <StorageFilterOption
             key={list.id}
@@ -233,17 +258,7 @@ export default function ShoppingScreen() {
       {selectedId != null ? (
         <>
           <View style={[styles.sectionPad, styles.listHeader]}>
-            <View style={styles.flex}>
-              <Text style={[styles.listTitle, { color: colors.text }]}>{selectedList?.name}</Text>
-              <Pressable onPress={deselectList} hitSlop={8} accessibilityRole="button">
-                <Text style={[styles.allListsLink, { color: colors.primary }]}>All lists</Text>
-              </Pressable>
-            </View>
-            {selectedList ? (
-              <Pressable onPress={() => deleteList(selectedList)} hitSlop={8}>
-                <Text style={[styles.deleteList, { color: colors.danger }]}>Delete list</Text>
-              </Pressable>
-            ) : null}
+            <Text style={[styles.listTitle, { color: colors.text }]}>{selectedList?.name}</Text>
           </View>
 
           <View style={[styles.sectionPad, styles.row, styles.itemToolbar]}>
@@ -295,48 +310,52 @@ export default function ShoppingScreen() {
           <View style={styles.sectionPad}>
             <Card>
               <Text style={[styles.dealTitle, { color: colors.text }]}>Weekly ad</Text>
-              {weeklyAdChains.length === 0 ? (
-                <Text style={[styles.dealHint, { color: colors.textMuted }]}>
-                  Add favorite stores in Settings and set each store&apos;s chain (e.g. Publix, Food
-                  Lion) to open that chain&apos;s weekly ad here.
-                </Text>
-              ) : (
-                <>
-                  <View style={styles.chainRow}>
-                    {weeklyAdChains.map((chain) => (
-                      <Chip
-                        key={chain}
-                        label={chain}
-                        selected={weeklyAdChain === chain}
-                        capitalize={false}
-                        onPress={() => setWeeklyAdChain(chain)}
-                      />
-                    ))}
-                  </View>
-                  <AppButton
-                    label={
-                      weeklyAdChain ? `Open ${weeklyAdChain} weekly ad` : "Open weekly ad"
-                    }
-                    compact
-                    onPress={openWeeklyAd}
+              <Text style={[styles.dealHint, { color: colors.textMuted }]}>
+                Pick a chain, then open its weekly ad. Add stores in Settings for directions links.
+              </Text>
+              <View style={styles.chainRow}>
+                {weeklyAdChains.map((chain) => (
+                  <Chip
+                    key={chain}
+                    label={chain}
+                    selected={weeklyAdChain === chain}
+                    capitalize={false}
+                    onPress={() => setWeeklyAdChain(chain)}
                   />
-                  {storesForWeeklyChain.map((store) => (
-                    <AppButton
-                      key={store.id}
-                      label={store.address ? `Directions to ${store.name}` : store.name}
-                      variant="secondary"
-                      compact
-                      onPress={() => {
-                        void openAddressInMaps(store.address || store.name).catch((e: unknown) => {
-                          Alert.alert("Maps", e instanceof Error ? e.message : "Could not open maps");
-                        });
-                      }}
-                    />
-                  ))}
-                </>
-              )}
+                ))}
+              </View>
+              <AppButton
+                label={weeklyAdChain ? `Open ${weeklyAdChain} weekly ad` : "Open weekly ad"}
+                compact
+                onPress={openWeeklyAd}
+              />
+              {storesForWeeklyChain.map((store) => (
+                <AppButton
+                  key={store.id}
+                  label={store.address ? `Directions to ${store.name}` : store.name}
+                  variant="secondary"
+                  compact
+                  onPress={() => {
+                    void openAddressInMaps(store.address || store.name).catch((e: unknown) => {
+                      Alert.alert("Maps", e instanceof Error ? e.message : "Could not open maps");
+                    });
+                  }}
+                />
+              ))}
             </Card>
           </View>
+
+          {selectedList ? (
+            <View style={[styles.sectionPad, styles.deleteListSection]}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => deleteList(selectedList)}
+                style={({ pressed }) => [styles.deleteListPress, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={[styles.deleteList, { color: colors.danger }]}>Delete list</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </>
       ) : (
         <EmptyState
@@ -353,14 +372,33 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-end" },
   flex: { flex: 1 },
   listHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingBottom: spacing.sm,
   },
   listTitle: typography.headline,
-  allListsLink: { ...typography.caption, fontWeight: "600", marginTop: spacing.xs },
-  deleteList: { ...typography.caption, fontWeight: "600" },
+  deleteListSection: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+    alignItems: "center",
+  },
+  deleteListPress: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  deleteList: { ...typography.label, fontWeight: "600" },
+  newListForm: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  filterHeadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
   itemToolbar: { marginBottom: spacing.sm },
   actionsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md, alignItems: "stretch" },
   actionBtn: { flex: 1, minWidth: 0 },
@@ -381,7 +419,7 @@ const styles = StyleSheet.create({
   filterHeading: {
     ...typography.caption,
     fontWeight: "600",
-    marginBottom: spacing.xs,
+    flex: 1,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },

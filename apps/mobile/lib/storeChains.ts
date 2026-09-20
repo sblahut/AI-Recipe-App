@@ -77,3 +77,30 @@ export function weeklyAdChainsForStores(
   }
   return out;
 }
+
+/** Chains to show under Weekly ad (saved stores + common defaults, deduped). */
+export function weeklyAdChainsForPicker(
+  stores: readonly { chain: StoreChain; name: string }[],
+): StoreChain[] {
+  const defaults: StoreChain[] = [
+    "Publix",
+    "Food Lion",
+    "Walmart",
+    "Aldi",
+    "Wegmans",
+    "Target",
+    "Lidl",
+    "Giant",
+    "Harris Teeter",
+  ];
+  const seen = new Set<StoreChain>();
+  const out: StoreChain[] = [];
+  for (const chain of [...weeklyAdChainsForStores(stores), ...defaults]) {
+    if (chain === "Other" || !weeklyAdUrlForChain(chain) || seen.has(chain)) {
+      continue;
+    }
+    seen.add(chain);
+    out.push(chain);
+  }
+  return out;
+}
