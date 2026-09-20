@@ -268,7 +268,8 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 - Recipe import from **URLs** (not just paste).
 - **Meal plan** and multi-recipe shopping lists.
 - **HTTPS / Tailscale** for using the app off-LAN.
-- Smarter **default quantity kinds** from Open Food Facts categories (e.g. milk → volume).
+
+Product **`default_quantity_kind`** is inferred during OFF import and live OFF barcode lookup (e.g. milk → volume). Re-run the import script to backfill existing rows.
 
 ## Environment variables
 
