@@ -98,6 +98,7 @@ class BarcodeScanRequest(QuantityFieldsMixin):
         default=False,
         description="When barcode is unknown, save manual_name to the local product catalog",
     )
+    expires_at: datetime | None = None
 
 
 class BarcodeScanResponse(BaseModel):

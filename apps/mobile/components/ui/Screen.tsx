@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  type RefreshControlProps,
   type ViewProps,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,7 +18,7 @@ type Props = ViewProps & {
   padded?: boolean;
   loading?: boolean;
   contentContainerStyle?: object;
-  refreshControl?: ReactElement;
+  refreshControl?: ReactElement<RefreshControlProps>;
 };
 
 export function Screen({

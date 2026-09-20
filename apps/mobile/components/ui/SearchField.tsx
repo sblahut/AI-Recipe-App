@@ -1,6 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { forwardRef, useImperativeHandle, useRef, type RefObject } from "react";
-import { Keyboard, Pressable, StyleSheet, TextInput, View, type TextInputProps } from "react-native";
+import {
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  View,
+  type TextInput,
+  type TextInputProps,
+} from "react-native";
 
 import { spacing } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";

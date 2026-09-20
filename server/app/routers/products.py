@@ -138,6 +138,7 @@ def scan_barcode(body: BarcodeScanRequest, db: Session = Depends(get_db)) -> Bar
                 unit=unit,
                 barcode=code,
                 location=body.location.strip() if body.location and body.location.strip() else None,
+                expires_at=body.expires_at,
             ),
         )
         return BarcodeScanResponse(

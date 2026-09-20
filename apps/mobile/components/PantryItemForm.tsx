@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
+import { ExpirationDateField } from "@/components/ExpirationDateField";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Chip } from "@/components/ui/Chip";
@@ -57,6 +58,7 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDel
   const [quantity, setQuantity] = useState(initial?.quantity?.toString() ?? "");
   const [locationPreset, setLocationPreset] = useState(locInit.preset);
   const [customLocation, setCustomLocation] = useState(locInit.custom);
+  const [expiresAt, setExpiresAt] = useState<string | null>(initial?.expires_at ?? null);
   const [saving, setSaving] = useState(false);
 
   const selectKind = (kind: QuantityKind) => {
@@ -78,6 +80,10 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDel
   };
 
   const submit = async () => {
+    if (!name.trim()) {
+      Alert.alert("Name required", "Enter an ingredient name.");
+      return;
+    }
     setSaving(true);
     try {
       const parsedQty = quantity.trim() === "" ? null : Number(quantity);
@@ -87,6 +93,7 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDel
         unit,
         quantity: parsedQty,
         location: resolvedLocation(),
+        expires_at: expiresAt,
       });
     } finally {
       setSaving(false);
@@ -165,6 +172,8 @@ export function PantryItemForm({ initial, unitsByKind, onSubmit, onCancel, onDel
           <Chip key={u} label={u} selected={unit === u} onPress={() => setUnit(u)} />
         ))}
       </View>
+
+      <ExpirationDateField value={expiresAt} onChange={setExpiresAt} />
 
       <View style={styles.actions}>
         {initial && onDelete ? (

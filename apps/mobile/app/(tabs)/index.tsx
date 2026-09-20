@@ -7,9 +7,9 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import type { TextInput } from "react-native";
 import { z } from "zod";
 
 import { PantryItemForm } from "@/components/PantryItemForm";
@@ -29,6 +29,7 @@ import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { startIngredientScan } from "@/lib/startIngredientScan";
+import { formatExpirationLabel } from "@/lib/expirationDate";
 import { textMatchesSearch } from "@/lib/textSearch";
 import {
   ingredientSchema,
@@ -376,7 +377,7 @@ export default function IngredientsScreen() {
                 >
                   <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
                   <Text style={[styles.meta, { color: colors.textMuted }]}>
-                    {formatQty(item)} · {formatLocationLabel(item.location)}
+                    {formatIngredientMeta(item)}
                   </Text>
                 </Pressable>
                 {Platform.OS === "web" ? (
@@ -401,6 +402,15 @@ export default function IngredientsScreen() {
 function formatQty(item: Ingredient): string {
   if (item.quantity == null) return "No quantity set";
   return `${item.quantity} ${item.unit ?? ""}`.trim();
+}
+
+function formatIngredientMeta(item: Ingredient): string {
+  const parts = [formatQty(item), formatLocationLabel(item.location)];
+  const exp = formatExpirationLabel(item.expires_at);
+  if (exp) {
+    parts.push(`expires ${exp}`);
+  }
+  return parts.join(" · ");
 }
 
 const styles = StyleSheet.create({
