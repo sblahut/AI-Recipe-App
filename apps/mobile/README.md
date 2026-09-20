@@ -122,3 +122,9 @@ After first `npm install`, commit `package-lock.json` so CI can run `npm ci`.
 - **Plan** — week meal plan from saved recipes, **Shop this week** → shopping list
 - **Shopping** — lists, weekly ad links by store chain, scan to list; **Open list** for filters (all / to buy / in cart)
 - **Settings** — profile & photo, appearance, kitchen defaults, favorite stores, recipes options, home server URL (dev/LAN)
+
+## License
+
+Copyright © 2026 Zero Tech, LLC. Steven Blahut. All rights reserved.
+
+This software and documentation are proprietary to **Zero Tech, LLC**. You may not copy, modify, distribute, or use them except as permitted by Zero Tech, LLC in writing.
