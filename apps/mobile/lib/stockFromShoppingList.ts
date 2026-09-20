@@ -3,10 +3,11 @@ import { Alert } from "react-native";
 import { apiFetch, apiJson } from "@/lib/api";
 import { pickStorageLocation } from "@/lib/pickStorageLocation";
 import { shoppingListDetailSchema } from "@/lib/schemas";
+import { shoppingListItemsInCart } from "@/lib/shoppingListInCart";
 import { openIngredientScan } from "@/lib/startIngredientScan";
 import { SHOPPING_STOCK_FROM_LIST_LABEL } from "@/lib/uiActionLabels";
 
-/** Add shopping list lines to ingredients, then scan barcodes for packaged goods. */
+/** Add in-cart shopping list lines to Pantry, then scan barcodes for packaged goods. */
 export async function stockFromShoppingList(listId: number, serverUrl: string): Promise<void> {
   const location = await pickStorageLocation(SHOPPING_STOCK_FROM_LIST_LABEL);
   if (!location) {
@@ -20,7 +21,16 @@ export async function stockFromShoppingList(listId: number, serverUrl: string): 
     return;
   }
 
-  const items = detail.items.map((line) => ({
+  const inCart = shoppingListItemsInCart(detail.items);
+  if (inCart.length === 0) {
+    Alert.alert(
+      "Nothing in cart",
+      "Only items marked in cart are added to Pantry. Open Shop this list and check off what you bought first.",
+    );
+    return;
+  }
+
+  const items = inCart.map((line) => ({
     name: line.name,
     quantity_kind: line.quantity_kind,
     quantity: line.quantity,
@@ -37,7 +47,7 @@ export async function stockFromShoppingList(listId: number, serverUrl: string): 
 
   Alert.alert(
     "Added to pantry",
-    `${items.length} items added to ${location}. Scan barcodes for packaged products?`,
+    `${items.length} in-cart item${items.length === 1 ? "" : "s"} added to ${location}. Scan barcodes for packaged products?`,
     [
       {
         text: "Scan barcodes",

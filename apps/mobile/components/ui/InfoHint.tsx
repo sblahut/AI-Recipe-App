@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   Alert,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -11,7 +12,8 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { radius, spacing, typography } from "@/constants/theme";
+import { AppButton } from "@/components/ui/AppButton";
+import { elevatedShadow, radius, spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 type Props = {
@@ -19,6 +21,7 @@ type Props = {
   title?: string;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
+  iconSize?: number;
 };
 
 export function InfoHint({
@@ -26,79 +29,104 @@ export function InfoHint({
   title = "About this",
   accessibilityLabel = "More information",
   style,
+  iconSize = 22,
 }: Props) {
   const { colors } = useAppTheme();
-  const [webTooltipVisible, setWebTooltipVisible] = useState(false);
-
-  const showDialog = () => {
-    Alert.alert(title, message);
-  };
+  const [webPanelVisible, setWebPanelVisible] = useState(false);
 
   const isWeb = Platform.OS === "web";
 
+  const openWebPanel = () => {
+    setWebPanelVisible(true);
+  };
+
+  const closeWebPanel = () => {
+    setWebPanelVisible(false);
+  };
+
+  const showDialog = () => {
+    if (isWeb) {
+      openWebPanel();
+      return;
+    }
+    Alert.alert(title, message);
+  };
+
   return (
-    <View style={[styles.wrap, style]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityHint={message}
-        hitSlop={10}
-        onPress={showDialog}
-        {...(isWeb
-          ? {
-              onHoverIn: () => setWebTooltipVisible(true),
-              onHoverOut: () => setWebTooltipVisible(false),
-              onFocus: () => setWebTooltipVisible(true),
-              onBlur: () => setWebTooltipVisible(false),
-            }
-          : {})}
-        style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-      >
-        <Ionicons name="information-circle-outline" size={22} color={colors.textMuted} />
-      </Pressable>
-      {isWeb && webTooltipVisible ? (
-        <View
-          style={[
-            styles.tooltip,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-            },
-          ]}
-          pointerEvents="none"
+    <>
+      <View style={[styles.wrap, style]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          accessibilityHint={message}
+          hitSlop={8}
+          onPress={showDialog}
+          {...(isWeb
+            ? {
+                onHoverIn: openWebPanel,
+                onFocus: openWebPanel,
+              }
+            : {})}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
-          <Text style={[styles.tooltipText, { color: colors.textSecondary }]}>{message}</Text>
-        </View>
+          <Ionicons name="information-circle-outline" size={iconSize} color={colors.textMuted} />
+        </Pressable>
+      </View>
+
+      {isWeb ? (
+        <Modal
+          visible={webPanelVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={closeWebPanel}
+        >
+          <Pressable style={styles.webBackdrop} onPress={closeWebPanel}>
+            <Pressable
+              style={[
+                styles.webPanel,
+                elevatedShadow(),
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.webTitle, { color: colors.text }]}>{title}</Text>
+              <Text style={[styles.webMessage, { color: colors.textSecondary }]}>{message}</Text>
+              <AppButton label="Got it" variant="secondary" compact onPress={closeWebPanel} />
+            </Pressable>
+          </Pressable>
+        </Modal>
       ) : null}
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    position: "relative",
     alignItems: "center",
     justifyContent: "center",
   },
-  tooltip: {
-    position: "absolute",
-    bottom: "100%",
-    right: 0,
-    marginBottom: spacing.xs,
-    maxWidth: 280,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    ...Platform.select({
-      web: {
-        boxShadow: "0 4px 12px rgba(45, 36, 32, 0.12)",
-      },
-      default: {},
-    }),
+  webBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xl,
+    backgroundColor: "rgba(45, 36, 32, 0.45)",
   },
-  tooltipText: {
-    ...typography.caption,
-    lineHeight: 18,
+  webPanel: {
+    width: "100%",
+    maxWidth: 440,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  webTitle: {
+    ...typography.headline,
+  },
+  webMessage: {
+    ...typography.body,
+    lineHeight: 24,
   },
 });

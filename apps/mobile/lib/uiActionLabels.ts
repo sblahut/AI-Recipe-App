@@ -6,7 +6,7 @@ export const SHOPPING_STOCK_FROM_LIST_LABEL = "Add to pantry";
 
 /** Info hint for Shop tab “Add to pantry”. */
 export const SHOPPING_STOCK_FROM_LIST_HINT =
-  "Adds every item on this shopping list to your Pantry. You pick where they go (fridge, pantry, etc.). Packaged goods can be scanned afterward.";
+  "Adds only items you marked in cart on this list to your Pantry—not “still to buy” lines. You choose storage (fridge, pantry, etc.). Packaged goods can be scanned afterward.";
 
 /** Info hint for Plan tab “Shop for this week”. */
 export const MEAL_PLAN_SHOP_WEEK_HINT =

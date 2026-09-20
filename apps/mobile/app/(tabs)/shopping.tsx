@@ -394,6 +394,7 @@ export default function ShoppingScreen() {
                 message={SHOPPING_STOCK_FROM_LIST_HINT}
                 accessibilityLabel={`About ${SHOPPING_STOCK_FROM_LIST_LABEL}`}
                 style={styles.cardInfoHint}
+                iconSize={16}
               />
             </View>
           </View>
