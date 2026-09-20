@@ -1,31 +1,43 @@
 import {
   mealPlanShopAlertMessage,
   mealPlanShopAlertTitle,
+  mealPlanShopResultFromApi,
 } from "@/lib/shoppingFromMealPlanAlert";
 
 describe("shoppingFromMealPlanAlert", () => {
-  it("title for all in pantry", () => {
+  it("maps API payload", () => {
+    expect(
+      mealPlanShopResultFromApi({
+        added: [{ id: 1 }],
+        skipped_in_pantry: ["a", "b"],
+        missing_entry_ids: [],
+        meals_processed: 2,
+      }).skippedInIngredientsCount,
+    ).toBe(2);
+  });
+
+  it("title when already stocked", () => {
     expect(
       mealPlanShopAlertTitle({
         addedCount: 0,
-        skippedPantryCount: 4,
+        skippedInIngredientsCount: 4,
         missingEntryCount: 0,
         mealsProcessed: 2,
       }),
-    ).toBe("Already in pantry");
+    ).toBe("Already stocked");
   });
 
-  it("message explains meal plan shopping", () => {
+  it("message avoids pantry wording", () => {
     const msg = mealPlanShopAlertMessage(
       {
         addedCount: 0,
-        skippedPantryCount: 3,
+        skippedInIngredientsCount: 3,
         missingEntryCount: 0,
         mealsProcessed: 2,
       },
       "Wegmans",
     );
-    expect(msg).toContain("2 planned meals");
-    expect(msg).toContain("already in your ingredients");
+    expect(msg.toLowerCase()).not.toContain("pantry");
+    expect(msg).toContain("ingredients list");
   });
 });

@@ -9,6 +9,7 @@ describe("formatStockRecipeAlertMessage", () => {
     const msg = formatStockRecipeAlertMessage(3, "Fridge");
     expect(msg).toContain("3 lines saved to Fridge");
     expect(msg).toContain("pull to refresh");
-    expect(msg).toContain("Done");
+    expect(msg).toContain("OK");
+    expect(msg.toLowerCase()).not.toContain("pantry");
   });
 });

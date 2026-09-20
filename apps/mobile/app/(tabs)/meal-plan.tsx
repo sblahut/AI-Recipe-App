@@ -14,6 +14,7 @@ import { apiFetch, apiJson } from "@/lib/api";
 import {
   mealPlanShopAlertMessage,
   mealPlanShopAlertTitle,
+  mealPlanShopResultFromApi,
 } from "@/lib/shoppingFromMealPlanAlert";
 import {
   MEAL_SLOT_LABELS,
@@ -200,12 +201,7 @@ export default function MealPlanScreen() {
                 }),
               });
               const result = shoppingFromMealPlanResponseSchema.parse(raw);
-              const summary = {
-                addedCount: result.added.length,
-                skippedPantryCount: result.skipped_in_pantry.length,
-                missingEntryCount: result.missing_entry_ids.length,
-                mealsProcessed: result.meals_processed,
-              };
+              const summary = mealPlanShopResultFromApi(result);
               Alert.alert(
                 mealPlanShopAlertTitle(summary),
                 mealPlanShopAlertMessage(summary, list.name),

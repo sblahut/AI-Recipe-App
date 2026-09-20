@@ -1,9 +1,23 @@
 export type MealPlanShopResult = {
   addedCount: number;
-  skippedPantryCount: number;
+  skippedInIngredientsCount: number;
   missingEntryCount: number;
   mealsProcessed: number;
 };
+
+export function mealPlanShopResultFromApi(payload: {
+  added: unknown[];
+  skipped_in_pantry: string[];
+  missing_entry_ids: number[];
+  meals_processed: number;
+}): MealPlanShopResult {
+  return {
+    addedCount: payload.added.length,
+    skippedInIngredientsCount: payload.skipped_in_pantry.length,
+    missingEntryCount: payload.missing_entry_ids.length,
+    mealsProcessed: payload.meals_processed,
+  };
+}
 
 export function mealPlanShopAlertTitle(result: MealPlanShopResult): string {
   if (result.mealsProcessed === 0) {
@@ -12,8 +26,8 @@ export function mealPlanShopAlertTitle(result: MealPlanShopResult): string {
   if (result.addedCount > 0) {
     return "Shopping list updated";
   }
-  if (result.skippedPantryCount > 0) {
-    return "Already in pantry";
+  if (result.skippedInIngredientsCount > 0) {
+    return "Already stocked";
   }
   return "Nothing to add";
 }
@@ -27,8 +41,8 @@ export function mealPlanShopAlertMessage(result: MealPlanShopResult, listName: s
 
   if (result.addedCount > 0) {
     let msg = `Added or updated ${result.addedCount} item${result.addedCount === 1 ? "" : "s"} on "${listName}" from ${mealPhrase}.`;
-    if (result.skippedPantryCount > 0) {
-      msg += ` ${result.skippedPantryCount} ingredient line${result.skippedPantryCount === 1 ? "" : "s"} already covered by your pantry.`;
+    if (result.skippedInIngredientsCount > 0) {
+      msg += ` ${result.skippedInIngredientsCount} line${result.skippedInIngredientsCount === 1 ? "" : "s"} already on your ingredients list.`;
     }
     if (result.missingEntryCount > 0) {
       msg += ` ${result.missingEntryCount} plan row(s) had missing saved recipes.`;
@@ -36,10 +50,10 @@ export function mealPlanShopAlertMessage(result: MealPlanShopResult, listName: s
     return msg;
   }
 
-  if (result.skippedPantryCount > 0) {
+  if (result.skippedInIngredientsCount > 0) {
     return (
-      `For ${mealPhrase}, everything needed is already in your ingredients list — nothing new was added to "${listName}". ` +
-      "Turn off pantry matching is not available; remove pantry items or edit the list manually if you still want to shop them."
+      `For ${mealPhrase}, everything needed is already on your ingredients list — nothing new was added to "${listName}". ` +
+      "Remove or edit items on the Ingredients tab if you still want them on this shopping list."
     );
   }
 

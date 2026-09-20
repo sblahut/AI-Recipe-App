@@ -12,7 +12,7 @@ export async function stockFromSavedRecipe(
   savedRecipeId: number,
   serverUrl: string,
 ): Promise<void> {
-  const location = await pickStorageLocation("Add to ingredients");
+  const location = await pickStorageLocation("Storage for new ingredients");
   if (!location) {
     return;
   }

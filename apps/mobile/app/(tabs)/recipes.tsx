@@ -4,6 +4,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native
 import type { TextInput } from "react-native";
 import { z } from "zod";
 
+import { RecipeDetailModal } from "@/components/RecipeDetailModal";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { SearchField, dismissSearchKeyboard } from "@/components/ui/SearchField";
@@ -21,6 +22,7 @@ import { findFavoriteMatch } from "@/lib/recipeFavorites";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import { stockFromGeneratedRecipe } from "@/lib/stockFromGeneratedRecipe";
 import { stockFromSavedRecipe } from "@/lib/stockFromRecipe";
+import { recipeListKey } from "@/lib/recipeListKey";
 import { recipeMatchesSearch } from "@/lib/recipeSearch";
 import {
   healthSchema,
@@ -54,6 +56,8 @@ export default function RecipesScreen() {
   const [importUrl, setImportUrl] = useState("");
   const [importLoading, setImportLoading] = useState(false);
   const [lists, setLists] = useState<ShoppingList[]>([]);
+  const [detailRecipe, setDetailRecipe] = useState<GeneratedRecipe | null>(null);
+  const [detailTitle, setDetailTitle] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<TextInput>(null);
   const dismissSearch = () => dismissSearchKeyboard(searchInputRef);
@@ -138,6 +142,14 @@ export default function RecipesScreen() {
       });
       const parsed = recipeGenerateResponseSchema.parse(raw);
       setGenerated(parsed.recipes);
+      if (parsed.recipes.length === 0) {
+        Alert.alert("Search AI", "No recipes came back — try a different description.");
+      } else if (parsed.recipes.length < (preferences.defaultRecipeCount ?? 3)) {
+        Alert.alert(
+          "Search AI",
+          `Got ${parsed.recipes.length} recipe${parsed.recipes.length === 1 ? "" : "s"} (model sometimes returns fewer than ${preferences.defaultRecipeCount ?? 3}).`,
+        );
+      }
       if (parsed.saved_recipes.length > 0) {
         await loadFavorites();
       }
@@ -300,8 +312,23 @@ export default function RecipesScreen() {
     );
   };
 
+  const openRecipeDetail = (recipe: GeneratedRecipe, titleOverride?: string) => {
+    dismissSearch();
+    setDetailRecipe(recipe);
+    setDetailTitle(titleOverride);
+  };
+
   return (
     <Screen scroll contentContainerStyle={styles.scroll}>
+      <RecipeDetailModal
+        visible={detailRecipe != null}
+        recipe={detailRecipe}
+        {...(detailTitle ? { titleOverride: detailTitle } : {})}
+        onClose={() => {
+          setDetailRecipe(null);
+          setDetailTitle(undefined);
+        }}
+      />
       <Pressable onPress={dismissSearch}>
         <Text style={[styles.lead, { color: colors.textMuted }]}>
           Uses ingredients at home and your Ollama server. Tap the star to add recipes to Favorites.
@@ -351,7 +378,8 @@ export default function RecipesScreen() {
       <Card>
         <Text style={[styles.importCardTitle, { color: colors.text }]}>Search AI for recipe</Text>
         <Text style={[styles.importHint, { color: colors.textMuted }]}>
-          Ask Ollama for ideas without using your pantry list (e.g. &quot;easy Thai chicken curry&quot;).
+          Ask Ollama for up to {preferences.defaultRecipeCount ?? 3} ideas without using your
+          ingredients list (count matches Settings → Recipes).
         </Text>
         <AppTextField
           placeholder="What do you want to cook?"
@@ -418,22 +446,25 @@ export default function RecipesScreen() {
       {generated.length > 0 ? (
         <>
           <Pressable onPress={dismissSearch}>
-            <Text style={[styles.section, { color: colors.text }]}>Generated ideas</Text>
+            <Text style={[styles.section, { color: colors.text }]}>
+              Generated ideas ({filteredGenerated.length})
+            </Text>
           </Pressable>
           {filteredGenerated.length === 0 ? (
             <Pressable onPress={dismissSearch}>
               <EmptyState title="No matches" subtitle="Try a different search term." />
             </Pressable>
           ) : (
-            filteredGenerated.map((recipe) => {
+            filteredGenerated.map((recipe, index) => {
               const isFavorite = findFavoriteMatch(favorites, recipe) != null;
               return (
                 <RecipeCard
-                  key={recipe.title}
+                  key={recipeListKey(recipe, index)}
                   recipe={recipe}
                   colors={colors}
                   isFavorite={isFavorite}
                   onDismissSearch={dismissSearch}
+                  onViewRecipe={() => openRecipeDetail(recipe)}
                   onToggleFavorite={() => void toggleFavorite(recipe)}
                   onAddShopping={() => void addRecipeToShoppingList(recipe)}
                   onAddToIngredients={() => void stockFromGeneratedRecipe(recipe, serverUrl)}
@@ -475,6 +506,7 @@ export default function RecipesScreen() {
               colors={colors}
               isFavorite
               onDismissSearch={dismissSearch}
+              onViewRecipe={() => openRecipeDetail(item.recipe, item.title)}
               onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
               onAddShopping={() => void addRecipeToShoppingList(item.recipe)}
               onAddToIngredients={() => void stockFromSavedRecipe(item.id, serverUrl)}
@@ -507,6 +539,7 @@ type RecipeCardProps = {
   colors: ThemeColors;
   isFavorite: boolean;
   onDismissSearch: () => void;
+  onViewRecipe: () => void;
   onToggleFavorite: () => void;
   onAddShopping: () => void;
   onAddToIngredients: () => void;
@@ -521,6 +554,7 @@ function RecipeCard({
   colors,
   isFavorite,
   onDismissSearch,
+  onViewRecipe,
   onToggleFavorite,
   onAddShopping,
   onAddToIngredients,
@@ -533,13 +567,18 @@ function RecipeCard({
     `${recipe.prep_minutes ?? "?"} min · serves ${recipe.servings ?? "?"} · ${recipe.ingredients.length} ingredients`;
 
   return (
-    <Pressable onPress={onDismissSearch}>
     <Card>
       <View style={styles.titleRow}>
-        <View style={styles.titleBlock}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`View full recipe for ${title}`}
+          onPress={onViewRecipe}
+          style={({ pressed }) => [styles.titleBlock, { opacity: pressed ? 0.88 : 1 }]}
+        >
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.meta, { color: colors.textMuted }]}>{subtitle}</Text>
-        </View>
+          <Text style={[styles.tapHint, { color: colors.primary }]}>Tap for full recipe</Text>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isFavorite ? `Remove ${title} from favorites` : `Add ${title} to favorites`}
@@ -557,11 +596,18 @@ function RecipeCard({
           />
         </Pressable>
       </View>
-      {recipe.steps.slice(0, 2).map((step, i) => (
-        <Text key={`${title}-step-${i}`} style={[styles.step, { color: colors.textSecondary }]}>
-          {i + 1}. {step}
-        </Text>
-      ))}
+      <Pressable onPress={onViewRecipe}>
+        {recipe.steps.slice(0, 2).map((step, i) => (
+          <Text key={`${title}-step-${i}`} style={[styles.step, { color: colors.textSecondary }]}>
+            {i + 1}. {step}
+          </Text>
+        ))}
+        {recipe.steps.length > 2 ? (
+          <Text style={[styles.moreSteps, { color: colors.textMuted }]}>
+            +{recipe.steps.length - 2} more steps…
+          </Text>
+        ) : null}
+      </Pressable>
       <View style={styles.actions}>
         <AppButton
           label="Share"
@@ -590,7 +636,7 @@ function RecipeCard({
           }}
         />
         <AppButton
-          label="+ Pantry"
+          label="+ Ingredients"
           compact
           onPress={() => {
             onDismissSearch();
@@ -599,7 +645,6 @@ function RecipeCard({
         />
       </View>
     </Card>
-    </Pressable>
   );
 }
 
@@ -629,6 +674,8 @@ const styles = StyleSheet.create({
   title: typography.headline,
   meta: typography.caption,
   step: { ...typography.caption, lineHeight: 20 },
+  tapHint: { ...typography.caption, marginTop: 4, fontWeight: "600" },
+  moreSteps: { ...typography.caption, marginTop: 2, fontStyle: "italic" },
   favoritesList: { gap: spacing.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
 });

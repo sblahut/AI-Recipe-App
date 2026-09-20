@@ -11,7 +11,7 @@ export async function stockFromGeneratedRecipe(
   recipe: GeneratedRecipe,
   serverUrl: string,
 ): Promise<void> {
-  const location = await pickStorageLocation("Add to ingredients");
+  const location = await pickStorageLocation("Storage for new ingredients");
   if (!location) {
     return;
   }
