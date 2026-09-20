@@ -14,6 +14,7 @@ import {
   expiresAtIsoFromDate,
   expiresAtIsoFromDateInput,
   formatExpirationLabel,
+  formatIngredientExpirationPhrase,
 } from "@/lib/expirationDate";
 
 type Props = {
@@ -28,6 +29,7 @@ export function ExpirationDateField({ value, onChange }: Props) {
 
   const selectedDate = dateFromExpiresAtIso(value);
   const label = formatExpirationLabel(value);
+  const statusPhrase = formatIngredientExpirationPhrase(value);
 
   const applyWebInput = (text: string) => {
     setWebInput(text);
@@ -60,7 +62,7 @@ export function ExpirationDateField({ value, onChange }: Props) {
         placeholder="YYYY-MM-DD"
         autoCapitalize="none"
         autoCorrect={false}
-        hint={label ? `Stored as ${label}` : "Leave blank if the item does not expire"}
+        hint={statusPhrase ?? "Leave blank if the item does not expire"}
       />
     );
   }
@@ -68,8 +70,13 @@ export function ExpirationDateField({ value, onChange }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={[styles.label, { color: colors.text }]}>Expiration date (optional)</Text>
-      <Text style={[styles.value, { color: label ? colors.text : colors.textMuted }]}>
-        {label ?? "None set"}
+      <Text
+        style={[
+          styles.value,
+          { color: statusPhrase ? (statusPhrase.startsWith("expired") ? colors.danger : colors.text) : colors.textMuted },
+        ]}
+      >
+        {statusPhrase ?? "None set"}
       </Text>
       <View style={styles.actions}>
         <AppButton

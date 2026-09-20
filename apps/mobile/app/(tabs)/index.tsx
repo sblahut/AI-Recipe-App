@@ -29,7 +29,10 @@ import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { startIngredientScan } from "@/lib/startIngredientScan";
-import { formatExpirationLabel } from "@/lib/expirationDate";
+import {
+  formatIngredientExpirationPhrase,
+  isExpirationDue,
+} from "@/lib/expirationDate";
 import { formatUnitLabel } from "@/lib/quantityUnits";
 import { textMatchesSearch } from "@/lib/textSearch";
 import { defaultUnitsByKind, mergeQuantityUnitsFromApi } from "@/lib/quantityUnits";
@@ -362,7 +365,9 @@ export default function IngredientsScreen() {
         </View>
       ) : (
         <View style={styles.list}>
-          {filteredItems.map((item) => (
+          {filteredItems.map((item) => {
+            const expirationPhrase = formatIngredientExpirationPhrase(item.expires_at);
+            return (
             <SwipeableRow key={item.id} onDelete={() => deleteItem(item)}>
               <Card style={styles.row}>
                 <Pressable
@@ -373,8 +378,22 @@ export default function IngredientsScreen() {
                   style={({ pressed }) => [styles.rowMain, { opacity: pressed ? 0.92 : 1 }]}
                 >
                   <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
-                  <Text style={[styles.meta, { color: colors.textMuted }]}>
-                    {formatIngredientMeta(item)}
+                  <Text style={styles.meta}>
+                    <Text style={{ color: colors.textMuted }}>{formatIngredientMetaBase(item)}</Text>
+                    {expirationPhrase ? (
+                      <>
+                        <Text style={{ color: colors.textMuted }}> · </Text>
+                        <Text
+                          style={{
+                            color: isExpirationDue(item.expires_at)
+                              ? colors.danger
+                              : colors.textMuted,
+                          }}
+                        >
+                          {expirationPhrase}
+                        </Text>
+                      </>
+                    ) : null}
                   </Text>
                 </Pressable>
                 {Platform.OS === "web" ? (
@@ -389,7 +408,8 @@ export default function IngredientsScreen() {
                 ) : null}
               </Card>
             </SwipeableRow>
-          ))}
+            );
+          })}
         </View>
       )}
     </Screen>
@@ -402,13 +422,8 @@ function formatQty(item: Ingredient): string {
   return `${item.quantity} ${unitLabel}`.trim();
 }
 
-function formatIngredientMeta(item: Ingredient): string {
-  const parts = [formatQty(item), formatLocationLabel(item.location)];
-  const exp = formatExpirationLabel(item.expires_at);
-  if (exp) {
-    parts.push(`expires ${exp}`);
-  }
-  return parts.join(" · ");
+function formatIngredientMetaBase(item: Ingredient): string {
+  return [formatQty(item), formatLocationLabel(item.location)].join(" · ");
 }
 
 const styles = StyleSheet.create({

@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -25,7 +27,9 @@ def _format_line(row: Ingredient) -> str:
         kind = row.quantity_kind or "count"
         parts.append(f"({row.quantity} {unit}, {kind})".strip())
     if row.expires_at:
-        parts.append(f"expires {row.expires_at.date().isoformat()}")
+        exp_date = row.expires_at.date()
+        verb = "expired" if exp_date <= date.today() else "expires"
+        parts.append(f"{verb} {exp_date.isoformat()}")
     return " ".join(parts)
 
 

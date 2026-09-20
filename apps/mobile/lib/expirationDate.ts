@@ -72,3 +72,26 @@ export function formatExpirationLabel(iso: string | null | undefined): string | 
     year: "numeric",
   });
 }
+
+/** True when the expiration calendar day is today or in the past (local time). */
+export function isExpirationDue(iso: string | null | undefined): boolean {
+  const expiration = dateFromExpiresAtIso(iso);
+  if (!expiration) {
+    return false;
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expDay = new Date(expiration);
+  expDay.setHours(0, 0, 0, 0);
+  return expDay.getTime() <= today.getTime();
+}
+
+/** e.g. "expires Apr 5, 2026" or "expired Apr 5, 2026". */
+export function formatIngredientExpirationPhrase(iso: string | null | undefined): string | null {
+  const label = formatExpirationLabel(iso);
+  if (!label) {
+    return null;
+  }
+  const verb = isExpirationDue(iso) ? "expired" : "expires";
+  return `${verb} ${label}`;
+}
