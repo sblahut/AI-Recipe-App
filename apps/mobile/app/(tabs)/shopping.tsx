@@ -26,6 +26,11 @@ import {
   SHOPPING_STOCK_FROM_LIST_HINT,
   shareShoppingListAccessibilityLabel,
 } from "@/lib/uiActionLabels";
+import { isCollapsibleExpanded } from "@/lib/collapsibleExpanded";
+import {
+  defaultShoppingListExpanded,
+  formatShoppingListCollapsibleTitle,
+} from "@/lib/shoppingListSectionTitle";
 import {
   weeklyAdChainForStore,
   weeklyAdChainsForPicker,
@@ -109,12 +114,12 @@ export default function ShoppingScreen() {
   }, [loadLists]);
 
   const isListExpanded = useCallback(
-    (listId: number, index: number) => {
-      if (listId in expandedLists) {
-        return expandedLists[listId] ?? false;
-      }
-      return lists.length === 1 || index === 0;
-    },
+    (listId: number, index: number) =>
+      isCollapsibleExpanded(
+        listId,
+        expandedLists,
+        defaultShoppingListExpanded(index, lists.length),
+      ),
     [expandedLists, lists.length],
   );
 
@@ -347,8 +352,7 @@ export default function ShoppingScreen() {
           {lists.map((list, index) => {
             const detail = detailsById[list.id];
             const itemCount = detail?.items.length;
-            const title =
-              itemCount != null ? `${list.name} (${itemCount})` : list.name;
+            const title = formatShoppingListCollapsibleTitle(list.name, itemCount);
             return (
               <CollapsibleSection
                 key={list.id}

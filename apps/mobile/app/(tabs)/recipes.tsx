@@ -40,6 +40,7 @@ import {
 } from "@/lib/uiActionLabels";
 import { recipeListKey } from "@/lib/recipeListKey";
 import { recipeMatchesSearch } from "@/lib/recipeSearch";
+import { formatFilteredSectionTitle } from "@/lib/recipeSectionTitle";
 import {
   recipeGenerateResponseSchema,
   recipeImportResponseSchema,
@@ -139,23 +140,27 @@ export default function RecipesScreen() {
     [favorites, searchQuery],
   );
 
-  const generatedSectionTitle = useMemo(() => {
-    const total = generated.length;
-    const shown = filteredGenerated.length;
-    if (searchQuery.trim() && shown !== total) {
-      return `Recipe ideas (${shown} of ${total})`;
-    }
-    return `Recipe ideas (${total})`;
-  }, [filteredGenerated.length, generated.length, searchQuery]);
+  const generatedSectionTitle = useMemo(
+    () =>
+      formatFilteredSectionTitle(
+        "Recipe ideas",
+        generated.length,
+        filteredGenerated.length,
+        searchQuery,
+      ),
+    [filteredGenerated.length, generated.length, searchQuery],
+  );
 
-  const favoritesSectionTitle = useMemo(() => {
-    const total = favorites.length;
-    const shown = filteredFavorites.length;
-    if (searchQuery.trim() && shown !== total) {
-      return `Family favorites (${shown} of ${total})`;
-    }
-    return `Family favorites (${total})`;
-  }, [favorites.length, filteredFavorites.length, searchQuery]);
+  const favoritesSectionTitle = useMemo(
+    () =>
+      formatFilteredSectionTitle(
+        "Family favorites",
+        favorites.length,
+        filteredFavorites.length,
+        searchQuery,
+      ),
+    [favorites.length, filteredFavorites.length, searchQuery],
+  );
 
   const searchAiForRecipe = async () => {
     const query = aiSearchQuery.trim();

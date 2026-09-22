@@ -16,6 +16,11 @@ from app.schemas import (
     SavedRecipeRead,
 )
 from app.services import ollama
+from app.services.recipe_persist import (
+    import_recipe_favorite_flag,
+    import_recipe_should_persist,
+    persist_generated_recipes_as_favorites,
+)
 from app.services.recipe_url_fetch import RecipeFetchError, fetch_recipe_text_from_url
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
@@ -70,18 +75,9 @@ async def generate_recipes(
         if body.persist_generated is not None
         else settings.default_persist_generated_recipes
     )
-    saved_reads: list[SavedRecipeRead] = []
-    if persist:
-        for recipe in recipes:
-            row = SavedRecipe(
-                title=recipe.title,
-                payload_json=recipe.model_dump_json(),
-                favorite=True,
-            )
-            db.add(row)
-            db.flush()
-            saved_reads.append(SavedRecipeRead.from_orm_row(row))
-        db.commit()
+    saved_reads = (
+        persist_generated_recipes_as_favorites(db, recipes) if persist else []
+    )
 
     return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
 
@@ -100,18 +96,9 @@ async def search_recipes(
         if body.persist_generated is not None
         else settings.default_persist_generated_recipes
     )
-    saved_reads: list[SavedRecipeRead] = []
-    if persist:
-        for recipe in recipes:
-            row = SavedRecipe(
-                title=recipe.title,
-                payload_json=recipe.model_dump_json(),
-                favorite=True,
-            )
-            db.add(row)
-            db.flush()
-            saved_reads.append(SavedRecipeRead.from_orm_row(row))
-        db.commit()
+    saved_reads = (
+        persist_generated_recipes_as_favorites(db, recipes) if persist else []
+    )
 
     return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
 
@@ -136,11 +123,11 @@ async def import_recipe(
         body.persist if body.persist is not None else settings.default_persist_generated_recipes
     )
     saved: SavedRecipeRead | None = None
-    if persist or body.favorite:
+    if import_recipe_should_persist(persist=persist, favorite=body.favorite):
         row = SavedRecipe(
             title=recipe.title,
             payload_json=recipe.model_dump_json(),
-            favorite=body.favorite or persist,
+            favorite=import_recipe_favorite_flag(persist=persist, favorite=body.favorite),
         )
         db.add(row)
         db.commit()

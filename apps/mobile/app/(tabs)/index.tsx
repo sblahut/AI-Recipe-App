@@ -35,6 +35,9 @@ import {
   isExpirationDue,
 } from "@/lib/expirationDate";
 import { formatUnitLabel } from "@/lib/quantityUnits";
+import { isCollapsibleExpanded } from "@/lib/collapsibleExpanded";
+import { storageSectionIdForItem } from "@/lib/inventoryStorageSection";
+import { formatFilteredSectionTitle } from "@/lib/recipeSectionTitle";
 import { textMatchesSearch } from "@/lib/textSearch";
 import { defaultUnitsByKind, mergeQuantityUnitsFromApi } from "@/lib/quantityUnits";
 import {
@@ -175,12 +178,12 @@ export default function IngredientsScreen() {
   );
 
   const isSectionExpanded = useCallback(
-    (sectionId: StorageFilterId) => {
-      if (sectionId in expandedSections) {
-        return expandedSections[sectionId] ?? false;
-      }
-      return (countByFilter.get(sectionId) ?? 0) > 0;
-    },
+    (sectionId: StorageFilterId) =>
+      isCollapsibleExpanded(
+        sectionId,
+        expandedSections,
+        (countByFilter.get(sectionId) ?? 0) > 0,
+      ),
     [countByFilter, expandedSections],
   );
 
@@ -477,10 +480,12 @@ export default function IngredientsScreen() {
               return null;
             }
             const totalInSection = countByFilter.get(filter.id) ?? 0;
-            const title =
-              searchQuery.trim() && sectionItems.length !== totalInSection
-                ? `${filter.label} (${sectionItems.length} of ${totalInSection})`
-                : `${filter.label} (${totalInSection})`;
+            const title = formatFilteredSectionTitle(
+              filter.label,
+              totalInSection,
+              sectionItems.length,
+              searchQuery,
+            );
             return (
               <CollapsibleSection
                 key={filter.id}
@@ -505,20 +510,6 @@ export default function IngredientsScreen() {
       )}
     </Screen>
   );
-}
-
-function storageSectionIdForItem(
-  item: Ingredient,
-  customZones: readonly string[],
-): StorageFilterId {
-  const loc = item.location?.trim() ?? "";
-  if (!loc) {
-    return "Unassigned";
-  }
-  if (isKnownZone(loc, customZones)) {
-    return loc;
-  }
-  return "Other";
 }
 
 function formatQty(item: Ingredient): string {

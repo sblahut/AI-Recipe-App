@@ -3,23 +3,18 @@ import { z } from "zod";
 
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { apiJson } from "@/lib/api";
+import {
+  defaultHomeServerReady,
+  homeServerReadyFromHealth,
+  type HomeServerReady,
+} from "@/lib/homeServerReady";
 import { healthSchema, ingredientSchema } from "@/lib/schemas";
 
-export type HomeServerReady = {
-  serverOk: boolean;
-  ollamaOk: boolean | null;
-  ingredientCount: number;
-};
-
-const defaultReady: HomeServerReady = {
-  serverOk: false,
-  ollamaOk: null,
-  ingredientCount: 0,
-};
+export type { HomeServerReady };
 
 export function useHomeServerReady() {
   const { serverUrl } = useServerSettings();
-  const [ready, setReady] = useState<HomeServerReady>(defaultReady);
+  const [ready, setReady] = useState<HomeServerReady>(defaultHomeServerReady);
 
   const refresh = useCallback(async () => {
     try {
@@ -29,13 +24,9 @@ export function useHomeServerReady() {
       ]);
       const health = healthSchema.parse(healthRaw);
       const inventory = z.array(ingredientSchema).parse(inventoryRaw);
-      setReady({
-        serverOk: health.status === "ok",
-        ollamaOk: health.ollama,
-        ingredientCount: inventory.length,
-      });
+      setReady(homeServerReadyFromHealth(health, inventory.length));
     } catch {
-      setReady(defaultReady);
+      setReady(defaultHomeServerReady);
     }
   }, [serverUrl]);
 

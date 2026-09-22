@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 import type { ThemeColors } from "@/constants/theme";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { homeServerStatusLines } from "@/lib/homeServerReady";
 import { useHomeServerReady } from "@/hooks/useHomeServerReady";
 
 export function HomeServerStatusCard() {
@@ -24,31 +25,9 @@ export function HomeServerStatusCard() {
         Checks your home server, Ollama AI model, and how many ingredients are in Pantry.
       </Text>
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <ReadyLine
-        ok={ready.serverOk}
-        colors={colors}
-        label={ready.serverOk ? "Home server connected" : "Home server offline"}
-      />
-      <ReadyLine
-        ok={ready.ollamaOk === true}
-        colors={colors}
-        label={
-          ready.ollamaOk === true
-            ? "AI model ready"
-            : ready.ollamaOk === false
-              ? "AI model offline"
-              : "AI model status unknown"
-        }
-      />
-      <ReadyLine
-        ok={ready.ingredientCount > 0}
-        colors={colors}
-        label={
-          ready.ingredientCount > 0
-            ? `${ready.ingredientCount} ingredient${ready.ingredientCount === 1 ? "" : "s"} available`
-            : "Add ingredients on the Pantry tab"
-        }
-      />
+        {homeServerStatusLines(ready).map((line) => (
+          <ReadyLine key={line.label} ok={line.ok} colors={colors} label={line.label} />
+        ))}
       </View>
     </View>
   );
