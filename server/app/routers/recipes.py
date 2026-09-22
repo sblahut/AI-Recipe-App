@@ -75,9 +75,7 @@ async def generate_recipes(
         if body.persist_generated is not None
         else settings.default_persist_generated_recipes
     )
-    saved_reads = (
-        persist_generated_recipes_as_favorites(db, recipes) if persist else []
-    )
+    saved_reads = persist_generated_recipes_as_favorites(db, recipes) if persist else []
 
     return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
 
@@ -96,9 +94,7 @@ async def search_recipes(
         if body.persist_generated is not None
         else settings.default_persist_generated_recipes
     )
-    saved_reads = (
-        persist_generated_recipes_as_favorites(db, recipes) if persist else []
-    )
+    saved_reads = persist_generated_recipes_as_favorites(db, recipes) if persist else []
 
     return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
 
