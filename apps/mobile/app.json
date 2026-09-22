@@ -50,7 +50,8 @@
           "cameraPermission": "Take a photo for your profile."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

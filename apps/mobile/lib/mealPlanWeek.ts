@@ -30,11 +30,16 @@ export function addDays(date: Date, days: number): Date {
   return next;
 }
 
+/** Start of the calendar week containing `date`, for a given week-start weekday (0=Sun … 6=Sat). */
+export function weekStartOnOrBefore(date: Date, weekStartsOnDay: number): Date {
+  const day = date.getDay();
+  const diff = (day - weekStartsOnDay + 7) % 7;
+  return addDays(date, -diff);
+}
+
 /** Monday on or before the given local date. */
 export function mondayOnOrBefore(date: Date): Date {
-  const day = date.getDay();
-  const diff = day === 0 ? 6 : day - 1;
-  return addDays(date, -diff);
+  return weekStartOnOrBefore(date, 1);
 }
 
 export function weekRangeFromWeekStart(weekStartMonday: Date): { start: string; end: string } {

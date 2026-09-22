@@ -14,6 +14,7 @@ import {
   isReservedZoneName,
   newLocalId,
   normalizeZoneName,
+  resetUserPreferencesToDefaults,
   setUserPreferences,
   zoneNameTaken,
   type GroceryStore,
@@ -41,6 +42,8 @@ type UserPreferencesContextValue = {
   setPrioritizeExpiringWhenGenerating: (enabled: boolean) => Promise<void>;
   setDefaultRecipeCount: (count: number) => Promise<void>;
   setProfilePhotoUri: (uri: string | null) => Promise<void>;
+  updatePreferences: (patch: Partial<UserPreferences>) => Promise<void>;
+  resetLocalAppData: () => Promise<void>;
 };
 
 const UserPreferencesContext = createContext<UserPreferencesContextValue | null>(null);
@@ -200,6 +203,19 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     [persist, preferences],
   );
 
+  const updatePreferences = useCallback(
+    async (patch: Partial<UserPreferences>) => {
+      await persist({ ...preferences, ...patch });
+    },
+    [persist, preferences],
+  );
+
+  const resetLocalAppData = useCallback(async () => {
+    await deleteStoredProfilePhoto();
+    const defaults = await resetUserPreferencesToDefaults();
+    setPreferencesState(defaults);
+  }, []);
+
   const value = useMemo(
     () => ({
       preferences,
@@ -220,6 +236,8 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       setPrioritizeExpiringWhenGenerating,
       setDefaultRecipeCount,
       setProfilePhotoUri,
+      updatePreferences,
+      resetLocalAppData,
     }),
     [
       preferences,
@@ -240,6 +258,8 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       setPrioritizeExpiringWhenGenerating,
       setDefaultRecipeCount,
       setProfilePhotoUri,
+      updatePreferences,
+      resetLocalAppData,
     ],
   );
 

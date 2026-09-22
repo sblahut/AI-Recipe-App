@@ -29,7 +29,9 @@ import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
-import { startIngredientScan } from "@/lib/startIngredientScan";
+import { syncExpirationReminders } from "@/lib/expirationReminders";
+import { openDefaultBarcodeScan } from "@/lib/openDefaultBarcodeScan";
+import { sortPantryItems } from "@/lib/pantrySort";
 import {
   formatIngredientExpirationPhrase,
   isExpirationDue,
@@ -89,7 +91,8 @@ export default function IngredientsScreen() {
     const raw = await apiJson<unknown>("/inventory", { baseUrl: serverUrl });
     const list = z.array(ingredientSchema).parse(raw);
     setItems(list);
-  }, [serverUrl]);
+    void syncExpirationReminders(list, preferences.expirationReminderDaysBefore ?? null);
+  }, [serverUrl, preferences.expirationReminderDaysBefore]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -169,8 +172,12 @@ export default function IngredientsScreen() {
         bucket.push(item);
       }
     }
+    const sortBy = preferences.pantrySortBy ?? "name";
+    for (const [sectionId, bucket] of grouped) {
+      grouped.set(sectionId, sortPantryItems(bucket, sortBy));
+    }
     return grouped;
-  }, [searchFilteredItems, preferences.customZones, storageFilters]);
+  }, [searchFilteredItems, preferences.customZones, preferences.pantrySortBy, storageFilters]);
 
   const storageSectionFilters = useMemo(
     () => storageFilters.filter((filter) => filter.id !== "All"),
@@ -285,6 +292,11 @@ export default function IngredientsScreen() {
 
   const renderIngredientRow = (item: Ingredient) => {
     const expirationPhrase = formatIngredientExpirationPhrase(item.expires_at);
+    const lowStockThreshold = preferences.globalLowStockThreshold;
+    const isLowStock =
+      lowStockThreshold != null &&
+      item.quantity != null &&
+      item.quantity <= lowStockThreshold;
     return (
       <SwipeableRow key={item.id} onDelete={() => deleteItem(item)}>
         <Card style={styles.row}>
@@ -308,6 +320,12 @@ export default function IngredientsScreen() {
                   >
                     {expirationPhrase}
                   </Text>
+                </>
+              ) : null}
+              {isLowStock ? (
+                <>
+                  <Text style={{ color: colors.textMuted }}> · </Text>
+                  <Text style={{ color: colors.accent }}>Low stock</Text>
                 </>
               ) : null}
             </Text>
@@ -389,7 +407,7 @@ export default function IngredientsScreen() {
         <Pressable
           onPress={() => {
             dismissSearch();
-            void startIngredientScan();
+            void openDefaultBarcodeScan(serverUrl, preferences);
           }}
           style={({ pressed }) => [
             styles.actionCard,

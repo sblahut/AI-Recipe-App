@@ -156,6 +156,7 @@ class RecipeGenerateResponse(BaseModel):
 class RecipeSearchRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500)
     count: int = Field(default=3, ge=1, le=10)
+    constraints: str | None = None
     persist_generated: bool | None = Field(
         default=None,
         description="When true, save each result as a favorite. When omitted, uses server default.",
@@ -263,6 +264,7 @@ class ShoppingFromRecipeRequest(BaseModel):
     list_id: int
     recipe: GeneratedRecipe | None = None
     saved_recipe_id: int | None = None
+    skip_pantry_check: bool = False
 
     @model_validator(mode="after")
     def exactly_one_recipe_source(self) -> "ShoppingFromRecipeRequest":
@@ -326,6 +328,7 @@ class ShoppingFromMealPlanRequest(BaseModel):
     list_id: int
     start_date: str = Field(max_length=10)
     end_date: str = Field(max_length=10)
+    skip_pantry_check: bool = False
 
     @model_validator(mode="after")
     def validate_range(self) -> "ShoppingFromMealPlanRequest":

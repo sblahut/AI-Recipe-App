@@ -7,6 +7,7 @@ import {
   mondayOnOrBefore,
   parsePlanDateLocal,
   weekRangeFromWeekStart,
+  weekStartOnOrBefore,
 } from "@/lib/mealPlanWeek";
 
 describe("mealPlanWeek", () => {
@@ -23,6 +24,12 @@ describe("mealPlanWeek", () => {
     const wed = new Date(2026, 3, 8);
     const mon = mondayOnOrBefore(wed);
     expect(formatPlanDate(mon)).toBe("2026-04-06");
+  });
+
+  it("finds Sunday on or before when week starts Sunday", () => {
+    const wed = new Date(2026, 3, 8);
+    const sun = weekStartOnOrBefore(wed, 0);
+    expect(formatPlanDate(sun)).toBe("2026-04-05");
   });
 
   it("builds a seven-day week range", () => {

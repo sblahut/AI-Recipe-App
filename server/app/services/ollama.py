@@ -92,8 +92,12 @@ Pantry:
     return recipes
 
 
-async def search_recipes(*, query: str, count: int) -> list[GeneratedRecipe]:
+async def search_recipes(
+    *, query: str, count: int, constraints: str | None = None
+) -> list[GeneratedRecipe]:
     prompt = build_recipe_search_prompt(query=query, count=count)
+    if constraints:
+        prompt += f"\nConstraints: {constraints}"
 
     payload = {
         "model": settings.ollama_text_model,

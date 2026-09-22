@@ -3,6 +3,7 @@ import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/ui/AppButton";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import type { GeneratedRecipe } from "@/lib/schemas";
 
 type Props = {
@@ -14,15 +15,19 @@ type Props = {
 
 export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: Props) {
   const { colors } = useAppTheme();
+  const { preferences } = useUserPreferences();
+  const showPrepProminent = preferences.showPrepTimeProminent ?? true;
+  const showStepNumbers = preferences.showStepNumbers ?? true;
 
   if (!recipe) {
     return null;
   }
 
   const title = titleOverride ?? recipe.title;
+  const prepLabel = recipe.prep_minutes != null ? `${recipe.prep_minutes} min prep` : null;
   const metaParts = [
     recipe.servings != null ? `Serves ${recipe.servings}` : null,
-    recipe.prep_minutes != null ? `${recipe.prep_minutes} min` : null,
+    ...(showPrepProminent ? [] : [prepLabel]),
     `${recipe.ingredients.length} ingredients`,
   ].filter((part): part is string => part != null);
 
@@ -34,6 +39,9 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
 
           {/* Meta pills */}
+          {showPrepProminent && prepLabel ? (
+            <Text style={[styles.prepHeadline, { color: colors.primary }]}>{prepLabel}</Text>
+          ) : null}
           <View style={styles.metaRow}>
             {metaParts.map((part) => (
               <View key={part} style={[styles.metaPill, { backgroundColor: colors.overlay }]}>
@@ -88,9 +96,13 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
             ) : (
               recipe.steps.map((step, index) => (
                 <View key={`${title}-step-${index}`} style={styles.stepRow}>
-                  <View style={[styles.stepNumber, { backgroundColor: colors.primaryMuted }]}>
-                    <Text style={[styles.stepNumberText, { color: colors.primary }]}>{index + 1}</Text>
-                  </View>
+                  {showStepNumbers ? (
+                    <View style={[styles.stepNumber, { backgroundColor: colors.primaryMuted }]}>
+                      <Text style={[styles.stepNumberText, { color: colors.primary }]}>
+                        {index + 1}
+                      </Text>
+                    </View>
+                  ) : null}
                   <Text style={[styles.stepText, { color: colors.textSecondary }]}>{step}</Text>
                 </View>
               ))
@@ -115,6 +127,10 @@ const styles = StyleSheet.create({
   title: {
     ...typography.display,
     marginBottom: spacing.md,
+  },
+  prepHeadline: {
+    ...typography.title,
+    marginBottom: spacing.sm,
   },
   metaRow: {
     flexDirection: "row",

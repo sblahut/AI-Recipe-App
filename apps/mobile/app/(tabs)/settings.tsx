@@ -27,13 +27,20 @@ import {
   DEFAULT_THEME_PRIMARY,
   PRIMARY_COLOR_PRESETS,
 } from "@/lib/themePalette";
+import { shoppingListSchema, type ShoppingList } from "@/lib/schemas";
 import {
   STORE_CHAINS,
   allStorageLocations,
+  parseAvoidIngredientsInput,
+  type BarcodeScanDefault,
   type GroceryStore,
+  type PantrySortBy,
   type StoreChain,
+  type TextSizePreference,
   type ThemeMode,
+  type WeekStartsOnDay,
 } from "@/lib/userPreferences";
+import { z } from "zod";
 
 type StoreDraft = {
   id?: string;
@@ -51,6 +58,50 @@ const THEME_OPTIONS: { mode: ThemeMode; label: string }[] = [
 ];
 
 const RECIPE_COUNT_OPTIONS = [1, 2, 3, 5, 10] as const;
+
+const TEXT_SIZE_OPTIONS: { size: TextSizePreference; label: string }[] = [
+  { size: "small", label: "Small" },
+  { size: "default", label: "Default" },
+  { size: "large", label: "Large" },
+];
+
+const WEEK_START_OPTIONS: { day: WeekStartsOnDay; label: string }[] = [
+  { day: 0, label: "Sun" },
+  { day: 1, label: "Mon" },
+  { day: 2, label: "Tue" },
+  { day: 3, label: "Wed" },
+  { day: 4, label: "Thu" },
+  { day: 5, label: "Fri" },
+  { day: 6, label: "Sat" },
+];
+
+const HOUSEHOLD_SIZE_OPTIONS = [1, 2, 3, 4, 5, 6, 8] as const;
+
+const EXPIRATION_REMINDER_OPTIONS: { days: number | null; label: string }[] = [
+  { days: null, label: "Off" },
+  { days: 1, label: "1 day" },
+  { days: 2, label: "2 days" },
+  { days: 3, label: "3 days" },
+  { days: 7, label: "7 days" },
+];
+
+const LOW_STOCK_OPTIONS: { value: number | null; label: string }[] = [
+  { value: null, label: "Off" },
+  { value: 1, label: "≤ 1" },
+  { value: 2, label: "≤ 2" },
+  { value: 5, label: "≤ 5" },
+];
+
+const PANTRY_SORT_OPTIONS: { value: PantrySortBy; label: string }[] = [
+  { value: "name", label: "Name" },
+  { value: "expiry", label: "Expiry" },
+  { value: "location", label: "Location" },
+];
+
+const BARCODE_DEFAULT_OPTIONS: { value: BarcodeScanDefault; label: string }[] = [
+  { value: "pantry", label: "Pantry" },
+  { value: "shopping_list", label: "Shopping list" },
+];
 
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
@@ -73,6 +124,8 @@ export default function SettingsScreen() {
     setPrioritizeExpiringWhenGenerating,
     setDefaultRecipeCount,
     setProfilePhotoUri,
+    updatePreferences,
+    resetLocalAppData,
   } = useUserPreferences();
   const [photoBusy, setPhotoBusy] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState(preferences.username);
@@ -81,6 +134,9 @@ export default function SettingsScreen() {
   const [storeDraft, setStoreDraft] = useState<StoreDraft | null>(null);
   const [primaryPickerOpen, setPrimaryPickerOpen] = useState(false);
   const [accentPickerOpen, setAccentPickerOpen] = useState(false);
+  const [avoidDraft, setAvoidDraft] = useState(preferences.avoidIngredients.join(", "));
+  const [constraintDraft, setConstraintDraft] = useState(preferences.defaultConstraintText);
+  const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([]);
 
   const displayPrimary = preferences.primaryColor ?? colors.primary;
   const displayAccent = preferences.accentColor ?? colors.accent;
@@ -122,6 +178,22 @@ export default function SettingsScreen() {
       });
     }
   }, [preferences.username, editingProfile]);
+
+  useEffect(() => {
+    setAvoidDraft(preferences.avoidIngredients.join(", "));
+    setConstraintDraft(preferences.defaultConstraintText);
+  }, [preferences.avoidIngredients, preferences.defaultConstraintText]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const raw = await apiJson<unknown>("/shopping/lists", { baseUrl: serverUrl });
+        setShoppingLists(z.array(shoppingListSchema).parse(raw));
+      } catch {
+        setShoppingLists([]);
+      }
+    })();
+  }, [serverUrl]);
 
   if (loading) {
     return <Screen loading />;
@@ -244,6 +316,31 @@ export default function SettingsScreen() {
     }
     buttons.push({ text: "Cancel", style: "cancel" });
     Alert.alert("Profile photo", undefined, buttons);
+  };
+
+  const saveAvoidList = () => {
+    void updatePreferences({ avoidIngredients: parseAvoidIngredientsInput(avoidDraft) });
+  };
+
+  const saveDefaultConstraint = () => {
+    void updatePreferences({ defaultConstraintText: constraintDraft.trim() });
+  };
+
+  const confirmClearLocalData = () => {
+    Alert.alert(
+      "Clear local data",
+      "Resets preferences, profile photo, and on-device settings. Pantry, recipes, and lists on your home server are not deleted.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            void resetLocalAppData();
+          },
+        },
+      ],
+    );
   };
 
   const confirmRemoveZone = (zone: string) => {
@@ -420,6 +517,20 @@ export default function SettingsScreen() {
           onClose={() => setAccentPickerOpen(false)}
           onSave={(hex) => void setAccentColor(hex)}
         />
+        <Text style={[styles.fieldLabel, { color: colors.text, marginTop: spacing.md }]}>
+          Text size
+        </Text>
+        <View style={styles.chipRow}>
+          {TEXT_SIZE_OPTIONS.map(({ size, label }) => (
+            <Chip
+              key={size}
+              label={label}
+              selected={(preferences.textSize ?? "default") === size}
+              capitalize={false}
+              onPress={() => void updatePreferences({ textSize: size })}
+            />
+          ))}
+        </View>
       </Card>
 
       {/* Kitchen defaults */}
@@ -499,6 +610,91 @@ export default function SettingsScreen() {
         />
         <SettingsSwitchRow
           colors={colors}
+          label="Auto-favorite imported recipes"
+          hint="When on, pasted or URL imports are saved and starred separately from AI generate."
+          value={preferences.autoFavoriteImportedRecipes}
+          onValueChange={(next) => void updatePreferences({ autoFavoriteImportedRecipes: next })}
+        />
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Diet & allergies</Text>
+        <SettingsSwitchRow
+          colors={colors}
+          label="Vegetarian"
+          value={preferences.dietVegetarian}
+          onValueChange={(next) => void updatePreferences({ dietVegetarian: next })}
+        />
+        <SettingsSwitchRow
+          colors={colors}
+          label="Vegan"
+          value={preferences.dietVegan}
+          onValueChange={(next) => void updatePreferences({ dietVegan: next })}
+        />
+        <SettingsSwitchRow
+          colors={colors}
+          label="Gluten-free"
+          value={preferences.dietGlutenFree}
+          onValueChange={(next) => void updatePreferences({ dietGlutenFree: next })}
+        />
+        <AppTextField
+          label="Never use (comma-separated)"
+          hint="Sent to AI on generate and search."
+          value={avoidDraft}
+          onChangeText={setAvoidDraft}
+          onBlur={saveAvoidList}
+          placeholder="peanuts, shellfish"
+        />
+        <AppButton label="Save avoid list" variant="secondary" compact onPress={saveAvoidList} />
+        <SettingsSwitchRow
+          colors={colors}
+          label="Prefer quick recipes"
+          hint="Under 30 minutes when possible."
+          value={preferences.preferQuickRecipes}
+          onValueChange={(next) => void updatePreferences({ preferQuickRecipes: next })}
+        />
+        <SettingsSwitchRow
+          colors={colors}
+          label="Kid-friendly"
+          value={preferences.preferKidFriendly}
+          onValueChange={(next) => void updatePreferences({ preferKidFriendly: next })}
+        />
+        <AppTextField
+          label="Default notes for every generate"
+          value={constraintDraft}
+          onChangeText={setConstraintDraft}
+          onBlur={saveDefaultConstraint}
+          placeholder="No cilantro, air fryer OK"
+        />
+        <AppButton
+          label="Save default notes"
+          variant="secondary"
+          compact
+          onPress={saveDefaultConstraint}
+        />
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Household size</Text>
+        <View style={styles.chipRow}>
+          {HOUSEHOLD_SIZE_OPTIONS.map((size) => (
+            <Chip
+              key={size}
+              label={String(size)}
+              selected={(preferences.householdSize ?? 4) === size}
+              capitalize={false}
+              onPress={() => void updatePreferences({ householdSize: size })}
+            />
+          ))}
+        </View>
+        <SettingsSwitchRow
+          colors={colors}
+          label="Show prep time prominently"
+          value={preferences.showPrepTimeProminent ?? true}
+          onValueChange={(next) => void updatePreferences({ showPrepTimeProminent: next })}
+        />
+        <SettingsSwitchRow
+          colors={colors}
+          label="Number recipe steps"
+          value={preferences.showStepNumbers ?? true}
+          onValueChange={(next) => void updatePreferences({ showStepNumbers: next })}
+        />
+        <SettingsSwitchRow
+          colors={colors}
           label="Prioritize expiring ingredients"
           hint="Tells the AI to use items that expire soon first."
           value={preferences.prioritizeExpiringWhenGenerating ?? true}
@@ -513,6 +709,109 @@ export default function SettingsScreen() {
               selected={(preferences.defaultRecipeCount ?? 3) === count}
               capitalize={false}
               onPress={() => void setDefaultRecipeCount(count)}
+            />
+          ))}
+        </View>
+      </Card>
+
+      {/* Shopping & pantry */}
+      <Card>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Shopping & pantry</Text>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Default shopping list</Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Recipe and meal-plan adds skip the picker when set.
+        </Text>
+        <View style={styles.chipRow}>
+          <Chip
+            label="Ask each time"
+            selected={preferences.defaultShoppingListId == null}
+            capitalize={false}
+            onPress={() => void updatePreferences({ defaultShoppingListId: null })}
+          />
+          {shoppingLists.map((list) => (
+            <Chip
+              key={list.id}
+              label={list.name}
+              selected={preferences.defaultShoppingListId === list.id}
+              capitalize={false}
+              onPress={() => void updatePreferences({ defaultShoppingListId: list.id })}
+            />
+          ))}
+        </View>
+        <SettingsSwitchRow
+          colors={colors}
+          label="Skip pantry when building lists"
+          hint="When off, all recipe lines are added even if you already have the ingredient."
+          value={preferences.omitPantryItemsFromShoppingLists ?? true}
+          onValueChange={(next) => void updatePreferences({ omitPantryItemsFromShoppingLists: next })}
+        />
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Barcode scan default</Text>
+        <View style={styles.chipRow}>
+          {BARCODE_DEFAULT_OPTIONS.map(({ value, label }) => (
+            <Chip
+              key={value}
+              label={label}
+              selected={(preferences.barcodeScanDefault ?? "pantry") === value}
+              capitalize={false}
+              onPress={() => void updatePreferences({ barcodeScanDefault: value })}
+            />
+          ))}
+        </View>
+        <Text style={[styles.fieldLabel, { color: colors.text, marginTop: spacing.md }]}>
+          Sort pantry by
+        </Text>
+        <View style={styles.chipRow}>
+          {PANTRY_SORT_OPTIONS.map(({ value, label }) => (
+            <Chip
+              key={value}
+              label={label}
+              selected={(preferences.pantrySortBy ?? "name") === value}
+              capitalize={false}
+              onPress={() => void updatePreferences({ pantrySortBy: value })}
+            />
+          ))}
+        </View>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Expiration reminders</Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Local notifications before items expire (phone permission required).
+        </Text>
+        <View style={styles.chipRow}>
+          {EXPIRATION_REMINDER_OPTIONS.map(({ days, label }) => (
+            <Chip
+              key={label}
+              label={label}
+              selected={(preferences.expirationReminderDaysBefore ?? null) === days}
+              capitalize={false}
+              onPress={() => void updatePreferences({ expirationReminderDaysBefore: days })}
+            />
+          ))}
+        </View>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Low stock hint</Text>
+        <View style={styles.chipRow}>
+          {LOW_STOCK_OPTIONS.map(({ value, label }) => (
+            <Chip
+              key={label}
+              label={label}
+              selected={(preferences.globalLowStockThreshold ?? null) === value}
+              capitalize={false}
+              onPress={() => void updatePreferences({ globalLowStockThreshold: value })}
+            />
+          ))}
+        </View>
+      </Card>
+
+      {/* Meal plan */}
+      <Card>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Meal plan</Text>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Week starts on</Text>
+        <View style={styles.chipRow}>
+          {WEEK_START_OPTIONS.map(({ day, label }) => (
+            <Chip
+              key={day}
+              label={label}
+              selected={(preferences.weekStartsOnDay ?? 1) === day}
+              capitalize={false}
+              onPress={() => void updatePreferences({ weekStartsOnDay: day })}
             />
           ))}
         </View>
@@ -655,6 +954,20 @@ export default function SettingsScreen() {
             the Expo QR.
           </Text>
         )}
+      </Card>
+
+      {/* Data */}
+      <Card>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Data</Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Clears on-device preferences and profile photo. Server pantry, recipes, and shopping lists
+          are unchanged.
+        </Text>
+        <AppButton
+          label="Clear local data"
+          variant="secondary"
+          onPress={confirmClearLocalData}
+        />
       </Card>
     </Screen>
   );

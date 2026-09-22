@@ -85,7 +85,9 @@ async def search_recipes(
     body: RecipeSearchRequest, db: Session = Depends(get_db)
 ) -> RecipeGenerateResponse:
     try:
-        recipes = await ollama.search_recipes(query=body.query, count=body.count)
+        recipes = await ollama.search_recipes(
+            query=body.query, count=body.count, constraints=body.constraints
+        )
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 

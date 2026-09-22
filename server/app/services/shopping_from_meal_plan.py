@@ -22,6 +22,7 @@ def add_meal_plan_range_to_shopping_list(
     list_id: int,
     start_date: str,
     end_date: str,
+    skip_pantry_check: bool = False,
 ) -> tuple[list[ShoppingListItemRead], list[str], list[int], int]:
     start_d, end_d = validate_plan_date_range(start_date, end_date)
 
@@ -45,7 +46,12 @@ def add_meal_plan_range_to_shopping_list(
             missing_entry_ids.append(entry.id)
             continue
         recipe = GeneratedRecipe.model_validate(json.loads(saved.payload_json))
-        batch_added, batch_skipped = add_recipe_to_shopping_list(db, list_id=list_id, recipe=recipe)
+        batch_added, batch_skipped = add_recipe_to_shopping_list(
+            db,
+            list_id=list_id,
+            recipe=recipe,
+            skip_pantry_check=skip_pantry_check,
+        )
         added.extend(batch_added)
         skipped.extend(batch_skipped)
 

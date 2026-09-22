@@ -3,6 +3,7 @@ import { useColorScheme } from "react-native";
 import { radius, spacing, typography, type ThemeColors } from "@/constants/theme";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { resolveThemeColors } from "@/lib/themePalette";
+import { scaledTypography } from "@/lib/textScale";
 
 export function useAppTheme(): {
   colors: ThemeColors;
@@ -21,11 +22,13 @@ export function useAppTheme(): {
     accentColor: preferences.accentColor,
   });
 
+  const textSize = preferences.textSize ?? "default";
+
   return {
     colors,
     spacing,
     radius,
-    typography,
+    typography: scaledTypography(textSize),
     isDark,
   };
 }

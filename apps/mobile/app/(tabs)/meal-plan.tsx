@@ -10,7 +10,12 @@ import { InfoHint } from "@/components/ui/InfoHint";
 import { Screen } from "@/components/ui/Screen";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import {
+  resolveDefaultShoppingList,
+  skipPantryCheckFromPreferences,
+} from "@/lib/shoppingListTarget";
 import { apiFetch, apiJson } from "@/lib/api";
 import {
   mealPlanShopAlertMessage,
@@ -26,7 +31,7 @@ import {
   daysInWeek,
   formatPlanDate,
   mealSlotSortIndex,
-  mondayOnOrBefore,
+  weekStartOnOrBefore,
   weekdayLabel,
   weekRangeFromWeekStart,
 } from "@/lib/mealPlanWeek";
@@ -43,7 +48,11 @@ import {
 export default function MealPlanScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
-  const [weekStart, setWeekStart] = useState(() => mondayOnOrBefore(new Date()));
+  const { preferences, updatePreferences } = useUserPreferences();
+  const weekStartsOnDay = preferences.weekStartsOnDay ?? 1;
+  const [weekStart, setWeekStart] = useState(() =>
+    weekStartOnOrBefore(new Date(), weekStartsOnDay),
+  );
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [lists, setLists] = useState<ShoppingList[]>([]);
@@ -52,6 +61,10 @@ export default function MealPlanScreen() {
 
   const weekRange = useMemo(() => weekRangeFromWeekStart(weekStart), [weekStart]);
   const weekDays = useMemo(() => daysInWeek(weekStart), [weekStart]);
+
+  useEffect(() => {
+    setWeekStart(weekStartOnOrBefore(new Date(), weekStartsOnDay));
+  }, [weekStartsOnDay]);
 
   const entriesByDate = useMemo(() => {
     const map = new Map<string, MealPlanEntry[]>();
@@ -174,6 +187,35 @@ export default function MealPlanScreen() {
     ]);
   };
 
+  const runShopForWeek = (list: ShoppingList) => {
+    void (async () => {
+      setShopLoading(true);
+      try {
+        const raw = await apiJson<unknown>("/shopping/from-meal-plan", {
+          baseUrl: serverUrl,
+          method: "POST",
+          body: JSON.stringify({
+            list_id: list.id,
+            start_date: weekRange.start,
+            end_date: weekRange.end,
+            skip_pantry_check: skipPantryCheckFromPreferences(preferences),
+          }),
+        });
+        const result = shoppingFromMealPlanResponseSchema.parse(raw);
+        const summary = mealPlanShopResultFromApi(result);
+        Alert.alert(mealPlanShopAlertTitle(summary), mealPlanShopAlertMessage(summary, list.name));
+        await updatePreferences({ lastShoppingListId: list.id });
+      } catch (e) {
+        Alert.alert(
+          "Shopping list",
+          e instanceof Error ? e.message : "Could not update shopping list",
+        );
+      } finally {
+        setShopLoading(false);
+      }
+    })();
+  };
+
   const shopThisWeek = () => {
     if (entries.length === 0) {
       Alert.alert("Nothing planned", "Add meals to this week before building a shopping list.");
@@ -183,43 +225,20 @@ export default function MealPlanScreen() {
       Alert.alert("No lists", "Create a shopping list on the Shop tab first.");
       return;
     }
+    const defaultList = resolveDefaultShoppingList(lists, preferences);
+    if (defaultList) {
+      runShopForWeek(defaultList);
+      return;
+    }
     Alert.alert(
       "Shop for this week",
       "Choose which list to add missing groceries to. Items you already have won't be duplicated.",
       [
-      ...lists.map((list) => ({
-        text: list.name,
-        onPress: () => {
-          void (async () => {
-            setShopLoading(true);
-            try {
-              const raw = await apiJson<unknown>("/shopping/from-meal-plan", {
-                baseUrl: serverUrl,
-                method: "POST",
-                body: JSON.stringify({
-                  list_id: list.id,
-                  start_date: weekRange.start,
-                  end_date: weekRange.end,
-                }),
-              });
-              const result = shoppingFromMealPlanResponseSchema.parse(raw);
-              const summary = mealPlanShopResultFromApi(result);
-              Alert.alert(
-                mealPlanShopAlertTitle(summary),
-                mealPlanShopAlertMessage(summary, list.name),
-              );
-            } catch (e) {
-              Alert.alert(
-                "Shopping list",
-                e instanceof Error ? e.message : "Could not update shopping list",
-              );
-            } finally {
-              setShopLoading(false);
-            }
-          })();
-        },
-      })),
-      { text: "Cancel", style: "cancel" },
+        ...lists.map((list) => ({
+          text: list.name,
+          onPress: () => runShopForWeek(list),
+        })),
+        { text: "Cancel", style: "cancel" },
       ],
     );
   };

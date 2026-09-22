@@ -30,6 +30,7 @@ import { useHomeServerReady } from "@/hooks/useHomeServerReady";
 import { promptAddRecipeToMealPlan } from "@/lib/addToMealPlan";
 import { apiFetch, apiJson } from "@/lib/api";
 import { findFavoriteMatch } from "@/lib/recipeFavorites";
+import { buildRecipeAiConstraints } from "@/lib/recipeAiConstraints";
 import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import {
@@ -54,7 +55,14 @@ import {
 export default function RecipesScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
-  const { preferences } = useUserPreferences();
+  const { preferences, updatePreferences } = useUserPreferences();
+  const aiConstraints = useMemo(() => buildRecipeAiConstraints(preferences), [preferences]);
+  const rememberShoppingList = useCallback(
+    (listId: number) => {
+      void updatePreferences({ lastShoppingListId: listId });
+    },
+    [updatePreferences],
+  );
   const [favorites, setFavorites] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
@@ -186,6 +194,7 @@ export default function RecipesScreen() {
           query,
           count: preferences.defaultRecipeCount ?? 3,
           persist_generated: preferences.autoPersistGeneratedRecipes,
+          ...(aiConstraints ? { constraints: aiConstraints } : {}),
         }),
       });
       const parsed = recipeGenerateResponseSchema.parse(raw);
@@ -241,6 +250,7 @@ export default function RecipesScreen() {
           count: preferences.defaultRecipeCount ?? 3,
           persist_generated: preferences.autoPersistGeneratedRecipes,
           prioritize_expiring: preferences.prioritizeExpiringWhenGenerating ?? true,
+          ...(aiConstraints ? { constraints: aiConstraints } : {}),
         }),
       });
       const parsed = recipeGenerateResponseSchema.parse(raw);
@@ -289,7 +299,8 @@ export default function RecipesScreen() {
         method: "POST",
         body: JSON.stringify({
           ...(url ? { url } : { text }),
-          persist: preferences.autoPersistGeneratedRecipes,
+          persist: preferences.autoFavoriteImportedRecipes,
+          favorite: preferences.autoFavoriteImportedRecipes,
         }),
       });
       const parsed = recipeImportResponseSchema.parse(raw);
@@ -460,9 +471,22 @@ export default function RecipesScreen() {
                     onDismissSearch={dismissSearch}
                     onViewRecipe={() => openRecipeDetail(recipe)}
                     onToggleFavorite={() => void toggleFavorite(recipe)}
-                    onAddToShoppingList={() => promptAddRecipeToShoppingList(recipe, lists, serverUrl)}
+                    onAddToShoppingList={() =>
+                      promptAddRecipeToShoppingList(
+                        recipe,
+                        lists,
+                        serverUrl,
+                        preferences,
+                        rememberShoppingList,
+                      )
+                    }
                     onAddToMealPlan={() =>
-                      void promptAddRecipeToMealPlan(recipe, serverUrl, favorites).then(() =>
+                      void promptAddRecipeToMealPlan(
+                        recipe,
+                        serverUrl,
+                        favorites,
+                        preferences.weekStartsOnDay ?? 1,
+                      ).then(() =>
                         loadFavorites(),
                       )
                     }
@@ -506,9 +530,22 @@ export default function RecipesScreen() {
                 onDismissSearch={dismissSearch}
                 onViewRecipe={() => openRecipeDetail(item.recipe, item.title)}
                 onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
-                onAddToShoppingList={() => promptAddRecipeToShoppingList(item.recipe, lists, serverUrl)}
+                onAddToShoppingList={() =>
+                  promptAddRecipeToShoppingList(
+                    item.recipe,
+                    lists,
+                    serverUrl,
+                    preferences,
+                    rememberShoppingList,
+                  )
+                }
                 onAddToMealPlan={() =>
-                  void promptAddRecipeToMealPlan(item.recipe, serverUrl, favorites).then(() =>
+                  void promptAddRecipeToMealPlan(
+                    item.recipe,
+                    serverUrl,
+                    favorites,
+                    preferences.weekStartsOnDay ?? 1,
+                  ).then(() =>
                     loadFavorites(),
                   )
                 }
