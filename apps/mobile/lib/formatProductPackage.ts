@@ -1,8 +1,4 @@
-import type { z } from "zod";
-
-import { productReadSchema } from "@/lib/schemas";
-
-export type ProductRead = z.infer<typeof productReadSchema>;
+import type { ProductRead } from "@/lib/schemas";
 
 /** Human-readable package size from catalog defaults (e.g. "1 l"). */
 export function formatProductPackage(product: ProductRead): string | null {

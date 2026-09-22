@@ -199,10 +199,12 @@ export default function SettingsScreen() {
   }, [preferences.username, editingProfile]);
 
   useEffect(() => {
-    setAvoidDraft(preferences.avoidIngredients.join(", "));
-    setConstraintDraft(preferences.defaultConstraintText);
-    avoidPersistSkip.current = true;
-    constraintPersistSkip.current = true;
+    queueMicrotask(() => {
+      setAvoidDraft(preferences.avoidIngredients.join(", "));
+      setConstraintDraft(preferences.defaultConstraintText);
+      avoidPersistSkip.current = true;
+      constraintPersistSkip.current = true;
+    });
   }, [preferences.avoidIngredients, preferences.defaultConstraintText]);
 
   const loadShoppingLists = useCallback(async () => {

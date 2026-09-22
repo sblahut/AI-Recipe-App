@@ -50,8 +50,14 @@ export default function MealPlanScreen() {
   const { serverUrl } = useServerSettings();
   const { preferences } = useUserPreferences();
   const weekStartsOnDay = preferences.weekStartsOnDay ?? 1;
-  const [weekStart, setWeekStart] = useState(() =>
-    weekStartOnOrBefore(new Date(), weekStartsOnDay),
+  const weekStartBase = useMemo(
+    () => weekStartOnOrBefore(new Date(), weekStartsOnDay),
+    [weekStartsOnDay],
+  );
+  const [weekOffsetDays, setWeekOffsetDays] = useState(0);
+  const weekStart = useMemo(
+    () => addDays(weekStartBase, weekOffsetDays),
+    [weekStartBase, weekOffsetDays],
   );
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
@@ -63,7 +69,9 @@ export default function MealPlanScreen() {
   const weekDays = useMemo(() => daysInWeek(weekStart), [weekStart]);
 
   useEffect(() => {
-    setWeekStart(weekStartOnOrBefore(new Date(), weekStartsOnDay));
+    queueMicrotask(() => {
+      setWeekOffsetDays(0);
+    });
   }, [weekStartsOnDay]);
 
   const entriesByDate = useMemo(() => {
@@ -251,7 +259,7 @@ export default function MealPlanScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Previous week"
-          onPress={() => setWeekStart((current) => addDays(current, -7))}
+          onPress={() => setWeekOffsetDays((current) => current - 7)}
           style={({ pressed }) => [styles.weekArrow, pressed && styles.pressed]}
           hitSlop={12}
         >
@@ -265,7 +273,7 @@ export default function MealPlanScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Next week"
-          onPress={() => setWeekStart((current) => addDays(current, 7))}
+          onPress={() => setWeekOffsetDays((current) => current + 7)}
           style={({ pressed }) => [styles.weekArrow, pressed && styles.pressed]}
           hitSlop={12}
         >

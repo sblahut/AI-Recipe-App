@@ -140,6 +140,7 @@ export const productReadSchema = z.object({
   default_unit: z.string().nullable().optional(),
   source: z.string().nullable().optional(),
 });
+export type ProductRead = z.infer<typeof productReadSchema>;
 
 export const barcodeScanResponseSchema = z.object({
   barcode: z.string(),
