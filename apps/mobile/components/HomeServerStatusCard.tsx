@@ -18,7 +18,12 @@ export function HomeServerStatusCard() {
   );
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={styles.wrap}>
+      <Text style={[styles.heading, { color: colors.text }]}>Recipe generation status</Text>
+      <Text style={[styles.hint, { color: colors.textMuted }]}>
+        Checks your home server, Ollama AI model, and how many ingredients are in Pantry.
+      </Text>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <ReadyLine
         ok={ready.serverOk}
         colors={colors}
@@ -44,6 +49,7 @@ export function HomeServerStatusCard() {
             : "Add ingredients on the Pantry tab"
         }
       />
+      </View>
     </View>
   );
 }
@@ -58,8 +64,19 @@ function ReadyLine({ ok, label, colors }: { ok: boolean; label: string; colors: 
 }
 
 const styles = StyleSheet.create({
-  card: {
+  wrap: {
     marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  heading: {
+    ...typography.label,
+  },
+  hint: {
+    ...typography.caption,
+    lineHeight: 18,
+  },
+  card: {
+    marginTop: spacing.xs,
     borderRadius: radius.md,
     borderWidth: 1,
     padding: spacing.md,
