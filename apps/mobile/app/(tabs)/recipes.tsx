@@ -169,6 +169,24 @@ export default function RecipesScreen() {
     [favorites, searchQuery],
   );
 
+  const generatedSectionTitle = useMemo(() => {
+    const total = generated.length;
+    const shown = filteredGenerated.length;
+    if (searchQuery.trim() && shown !== total) {
+      return `Recipe ideas (${shown} of ${total})`;
+    }
+    return `Recipe ideas (${total})`;
+  }, [filteredGenerated.length, generated.length, searchQuery]);
+
+  const favoritesSectionTitle = useMemo(() => {
+    const total = favorites.length;
+    const shown = filteredFavorites.length;
+    if (searchQuery.trim() && shown !== total) {
+      return `Family favorites (${shown} of ${total})`;
+    }
+    return `Family favorites (${total})`;
+  }, [favorites.length, filteredFavorites.length, searchQuery]);
+
   const searchAiForRecipe = async () => {
     const query = aiSearchQuery.trim();
     if (query.length < 3) {
@@ -462,7 +480,7 @@ export default function RecipesScreen() {
       {/* Search filter */}
       <SearchField
         ref={searchInputRef}
-        placeholder="Filter recipes by title or ingredient"
+        placeholder="Search by title or ingredient"
         value={searchQuery}
         onChangeText={setSearchQuery}
         autoCapitalize="none"
@@ -479,7 +497,7 @@ export default function RecipesScreen() {
           <>
             <Pressable onPress={dismissSearch}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Recipe ideas ({filteredGenerated.length})
+                {generatedSectionTitle}
               </Text>
             </Pressable>
             {filteredGenerated.length === 0 ? (
@@ -515,7 +533,7 @@ export default function RecipesScreen() {
 
       {/* Favorites */}
       <CollapsibleSection
-        title={`Family favorites (${favorites.length})`}
+        title={favoritesSectionTitle}
         expanded={favoritesExpanded}
         onToggle={() => setFavoritesExpanded((open) => !open)}
         leadingIcon="star"
@@ -524,7 +542,7 @@ export default function RecipesScreen() {
           <EmptyState
             icon="star-outline"
             title="No favorites yet"
-            subtitle="Generate recipe ideas above, then tap the star to save the ones your family loves."
+            subtitle="Star a recipe to save it here, or turn on auto-favorite in Settings when you generate."
           />
         ) : filteredFavorites.length === 0 ? (
           <EmptyState icon="search-outline" title="No matches in favorites" subtitle="Try a different search term." />

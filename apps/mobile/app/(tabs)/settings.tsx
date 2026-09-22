@@ -411,8 +411,8 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipes</Text>
         <SettingsSwitchRow
           colors={colors}
-          label="Auto-save generated recipes"
-          hint="Saves each generate run on the server (not as favorites)."
+          label="Auto-favorite generated recipes"
+          hint="Stars each recipe from generate and AI search so it appears under Family favorites."
           value={preferences.autoPersistGeneratedRecipes}
           onValueChange={(next) => void setAutoPersistGeneratedRecipes(next)}
         />

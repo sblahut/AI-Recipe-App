@@ -76,7 +76,7 @@ async def generate_recipes(
             row = SavedRecipe(
                 title=recipe.title,
                 payload_json=recipe.model_dump_json(),
-                favorite=False,
+                favorite=True,
             )
             db.add(row)
             db.flush()
@@ -106,7 +106,7 @@ async def search_recipes(
             row = SavedRecipe(
                 title=recipe.title,
                 payload_json=recipe.model_dump_json(),
-                favorite=False,
+                favorite=True,
             )
             db.add(row)
             db.flush()
@@ -140,7 +140,7 @@ async def import_recipe(
         row = SavedRecipe(
             title=recipe.title,
             payload_json=recipe.model_dump_json(),
-            favorite=body.favorite,
+            favorite=body.favorite or persist,
         )
         db.add(row)
         db.commit()

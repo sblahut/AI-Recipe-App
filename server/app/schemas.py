@@ -117,7 +117,7 @@ class RecipeGenerateRequest(BaseModel):
     prioritize_expiring: bool = True
     persist_generated: bool | None = Field(
         default=None,
-        description="When true, save each generated recipe (non-favorite). When omitted, uses server default.",
+        description="When true, save each generated recipe as a favorite. When omitted, uses server default.",
     )
 
 
@@ -158,7 +158,7 @@ class RecipeSearchRequest(BaseModel):
     count: int = Field(default=3, ge=1, le=10)
     persist_generated: bool | None = Field(
         default=None,
-        description="When true, save each result (non-favorite). When omitted, uses server default.",
+        description="When true, save each result as a favorite. When omitted, uses server default.",
     )
 
 
