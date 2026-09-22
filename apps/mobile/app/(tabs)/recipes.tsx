@@ -55,14 +55,8 @@ import {
 export default function RecipesScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
-  const { preferences, updatePreferences } = useUserPreferences();
+  const { preferences } = useUserPreferences();
   const aiConstraints = useMemo(() => buildRecipeAiConstraints(preferences), [preferences]);
-  const rememberShoppingList = useCallback(
-    (listId: number) => {
-      void updatePreferences({ lastShoppingListId: listId });
-    },
-    [updatePreferences],
-  );
   const [favorites, setFavorites] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
   const [loading, setLoading] = useState(false);
@@ -472,13 +466,7 @@ export default function RecipesScreen() {
                     onViewRecipe={() => openRecipeDetail(recipe)}
                     onToggleFavorite={() => void toggleFavorite(recipe)}
                     onAddToShoppingList={() =>
-                      promptAddRecipeToShoppingList(
-                        recipe,
-                        lists,
-                        serverUrl,
-                        preferences,
-                        rememberShoppingList,
-                      )
+                      promptAddRecipeToShoppingList(recipe, lists, serverUrl, preferences)
                     }
                     onAddToMealPlan={() =>
                       void promptAddRecipeToMealPlan(
@@ -531,13 +519,7 @@ export default function RecipesScreen() {
                 onViewRecipe={() => openRecipeDetail(item.recipe, item.title)}
                 onToggleFavorite={() => void toggleFavorite(item.recipe, item.id)}
                 onAddToShoppingList={() =>
-                  promptAddRecipeToShoppingList(
-                    item.recipe,
-                    lists,
-                    serverUrl,
-                    preferences,
-                    rememberShoppingList,
-                  )
+                  promptAddRecipeToShoppingList(item.recipe, lists, serverUrl, preferences)
                 }
                 onAddToMealPlan={() =>
                   void promptAddRecipeToMealPlan(

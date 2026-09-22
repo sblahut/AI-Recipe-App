@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
-import { useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { HomeServerStatusCard } from "@/components/HomeServerStatusCard";
@@ -20,6 +21,7 @@ import { pickProfilePhoto, profilePhotoSourceOptions } from "@/lib/profilePhoto"
 import { apiJson } from "@/lib/api";
 import { expoGoDisplayUrl, qrCodeImageUri } from "@/lib/expoGoDevUrl";
 import { homeNetworkSchema } from "@/lib/schemas";
+import { rescheduleExpirationRemindersFromServer } from "@/lib/expirationReminders";
 import { weeklyAdUrlForStore } from "@/lib/storeChains";
 import {
   ACCENT_COLOR_PRESETS,
@@ -32,11 +34,9 @@ import {
   STORE_CHAINS,
   allStorageLocations,
   parseAvoidIngredientsInput,
-  type BarcodeScanDefault,
   type GroceryStore,
   type PantrySortBy,
   type StoreChain,
-  type TextSizePreference,
   type ThemeMode,
   type WeekStartsOnDay,
 } from "@/lib/userPreferences";
@@ -59,12 +59,6 @@ const THEME_OPTIONS: { mode: ThemeMode; label: string }[] = [
 
 const RECIPE_COUNT_OPTIONS = [1, 2, 3, 5, 10] as const;
 
-const TEXT_SIZE_OPTIONS: { size: TextSizePreference; label: string }[] = [
-  { size: "small", label: "Small" },
-  { size: "default", label: "Default" },
-  { size: "large", label: "Large" },
-];
-
 const WEEK_START_OPTIONS: { day: WeekStartsOnDay; label: string }[] = [
   { day: 0, label: "Sun" },
   { day: 1, label: "Mon" },
@@ -74,8 +68,6 @@ const WEEK_START_OPTIONS: { day: WeekStartsOnDay; label: string }[] = [
   { day: 5, label: "Fri" },
   { day: 6, label: "Sat" },
 ];
-
-const HOUSEHOLD_SIZE_OPTIONS = [1, 2, 3, 4, 5, 6, 8] as const;
 
 const EXPIRATION_REMINDER_OPTIONS: { days: number | null; label: string }[] = [
   { days: null, label: "Off" },
@@ -98,10 +90,7 @@ const PANTRY_SORT_OPTIONS: { value: PantrySortBy; label: string }[] = [
   { value: "location", label: "Location" },
 ];
 
-const BARCODE_DEFAULT_OPTIONS: { value: BarcodeScanDefault; label: string }[] = [
-  { value: "pantry", label: "Pantry" },
-  { value: "shopping_list", label: "Shopping list" },
-];
+const PREF_TEXT_DEBOUNCE_MS = 500;
 
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
@@ -137,6 +126,8 @@ export default function SettingsScreen() {
   const [avoidDraft, setAvoidDraft] = useState(preferences.avoidIngredients.join(", "));
   const [constraintDraft, setConstraintDraft] = useState(preferences.defaultConstraintText);
   const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([]);
+  const avoidPersistSkip = useRef(true);
+  const constraintPersistSkip = useRef(true);
 
   const displayPrimary = preferences.primaryColor ?? colors.primary;
   const displayAccent = preferences.accentColor ?? colors.accent;
@@ -182,18 +173,46 @@ export default function SettingsScreen() {
   useEffect(() => {
     setAvoidDraft(preferences.avoidIngredients.join(", "));
     setConstraintDraft(preferences.defaultConstraintText);
+    avoidPersistSkip.current = true;
+    constraintPersistSkip.current = true;
   }, [preferences.avoidIngredients, preferences.defaultConstraintText]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const raw = await apiJson<unknown>("/shopping/lists", { baseUrl: serverUrl });
-        setShoppingLists(z.array(shoppingListSchema).parse(raw));
-      } catch {
-        setShoppingLists([]);
-      }
-    })();
+  const loadShoppingLists = useCallback(async () => {
+    try {
+      const raw = await apiJson<unknown>("/shopping/lists", { baseUrl: serverUrl });
+      setShoppingLists(z.array(shoppingListSchema).parse(raw));
+    } catch {
+      setShoppingLists([]);
+    }
   }, [serverUrl]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadShoppingLists();
+    }, [loadShoppingLists]),
+  );
+
+  useEffect(() => {
+    if (avoidPersistSkip.current) {
+      avoidPersistSkip.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      void updatePreferences({ avoidIngredients: parseAvoidIngredientsInput(avoidDraft) });
+    }, PREF_TEXT_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [avoidDraft, updatePreferences]);
+
+  useEffect(() => {
+    if (constraintPersistSkip.current) {
+      constraintPersistSkip.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      void updatePreferences({ defaultConstraintText: constraintDraft.trim() });
+    }, PREF_TEXT_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [constraintDraft, updatePreferences]);
 
   if (loading) {
     return <Screen loading />;
@@ -318,12 +337,15 @@ export default function SettingsScreen() {
     Alert.alert("Profile photo", undefined, buttons);
   };
 
-  const saveAvoidList = () => {
-    void updatePreferences({ avoidIngredients: parseAvoidIngredientsInput(avoidDraft) });
-  };
-
-  const saveDefaultConstraint = () => {
-    void updatePreferences({ defaultConstraintText: constraintDraft.trim() });
+  const setExpirationReminderDays = (days: number | null) => {
+    void (async () => {
+      await updatePreferences({ expirationReminderDaysBefore: days });
+      try {
+        await rescheduleExpirationRemindersFromServer(serverUrl, days);
+      } catch {
+        // Pantry unreachable; Pantry tab refresh will reschedule.
+      }
+    })();
   };
 
   const confirmClearLocalData = () => {
@@ -517,20 +539,6 @@ export default function SettingsScreen() {
           onClose={() => setAccentPickerOpen(false)}
           onSave={(hex) => void setAccentColor(hex)}
         />
-        <Text style={[styles.fieldLabel, { color: colors.text, marginTop: spacing.md }]}>
-          Text size
-        </Text>
-        <View style={styles.chipRow}>
-          {TEXT_SIZE_OPTIONS.map(({ size, label }) => (
-            <Chip
-              key={size}
-              label={label}
-              selected={(preferences.textSize ?? "default") === size}
-              capitalize={false}
-              onPress={() => void updatePreferences({ textSize: size })}
-            />
-          ))}
-        </View>
       </Card>
 
       {/* Kitchen defaults */}
@@ -636,13 +644,11 @@ export default function SettingsScreen() {
         />
         <AppTextField
           label="Never use (comma-separated)"
-          hint="Sent to AI on generate and search."
+          hint="Saved automatically. Sent to AI on generate and search."
           value={avoidDraft}
           onChangeText={setAvoidDraft}
-          onBlur={saveAvoidList}
           placeholder="peanuts, shellfish"
         />
-        <AppButton label="Save avoid list" variant="secondary" compact onPress={saveAvoidList} />
         <SettingsSwitchRow
           colors={colors}
           label="Prefer quick recipes"
@@ -658,29 +664,11 @@ export default function SettingsScreen() {
         />
         <AppTextField
           label="Default notes for every generate"
+          hint="Saved automatically."
           value={constraintDraft}
           onChangeText={setConstraintDraft}
-          onBlur={saveDefaultConstraint}
           placeholder="No cilantro, air fryer OK"
         />
-        <AppButton
-          label="Save default notes"
-          variant="secondary"
-          compact
-          onPress={saveDefaultConstraint}
-        />
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>Household size</Text>
-        <View style={styles.chipRow}>
-          {HOUSEHOLD_SIZE_OPTIONS.map((size) => (
-            <Chip
-              key={size}
-              label={String(size)}
-              selected={(preferences.householdSize ?? 4) === size}
-              capitalize={false}
-              onPress={() => void updatePreferences({ householdSize: size })}
-            />
-          ))}
-        </View>
         <SettingsSwitchRow
           colors={colors}
           label="Show prep time prominently"
@@ -741,22 +729,10 @@ export default function SettingsScreen() {
         <SettingsSwitchRow
           colors={colors}
           label="Skip pantry when building lists"
-          hint="When off, all recipe lines are added even if you already have the ingredient."
+          hint="For add-from-recipe and shop-this-week only. When off, all recipe lines are added."
           value={preferences.omitPantryItemsFromShoppingLists ?? true}
           onValueChange={(next) => void updatePreferences({ omitPantryItemsFromShoppingLists: next })}
         />
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>Barcode scan default</Text>
-        <View style={styles.chipRow}>
-          {BARCODE_DEFAULT_OPTIONS.map(({ value, label }) => (
-            <Chip
-              key={value}
-              label={label}
-              selected={(preferences.barcodeScanDefault ?? "pantry") === value}
-              capitalize={false}
-              onPress={() => void updatePreferences({ barcodeScanDefault: value })}
-            />
-          ))}
-        </View>
         <Text style={[styles.fieldLabel, { color: colors.text, marginTop: spacing.md }]}>
           Sort pantry by
         </Text>
@@ -771,21 +747,25 @@ export default function SettingsScreen() {
             />
           ))}
         </View>
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>Expiration reminders</Text>
-        <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Local notifications before items expire (phone permission required).
-        </Text>
-        <View style={styles.chipRow}>
-          {EXPIRATION_REMINDER_OPTIONS.map(({ days, label }) => (
-            <Chip
-              key={label}
-              label={label}
-              selected={(preferences.expirationReminderDaysBefore ?? null) === days}
-              capitalize={false}
-              onPress={() => void updatePreferences({ expirationReminderDaysBefore: days })}
-            />
-          ))}
-        </View>
+        {Platform.OS !== "web" ? (
+          <>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Expiration reminders</Text>
+            <Text style={[styles.hint, { color: colors.textMuted }]}>
+              Local notifications before items expire. Schedules immediately when you change this.
+            </Text>
+            <View style={styles.chipRow}>
+              {EXPIRATION_REMINDER_OPTIONS.map(({ days, label }) => (
+                <Chip
+                  key={label}
+                  label={label}
+                  selected={(preferences.expirationReminderDaysBefore ?? null) === days}
+                  capitalize={false}
+                  onPress={() => setExpirationReminderDays(days)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
         <Text style={[styles.fieldLabel, { color: colors.text }]}>Low stock hint</Text>
         <View style={styles.chipRow}>
           {LOW_STOCK_OPTIONS.map(({ value, label }) => (

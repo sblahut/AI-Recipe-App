@@ -19,17 +19,6 @@ export function resolveDefaultShoppingList(
   return findShoppingListById(lists, preferences.defaultShoppingListId);
 }
 
-/** List id for barcode scan when default target is shopping. */
-export function resolveShoppingListForBarcodeScan(
-  lists: ShoppingList[],
-  preferences: Pick<UserPreferences, "defaultShoppingListId" | "lastShoppingListId">,
-): ShoppingList | null {
-  return (
-    findShoppingListById(lists, preferences.defaultShoppingListId) ??
-    findShoppingListById(lists, preferences.lastShoppingListId)
-  );
-}
-
 export function skipPantryCheckFromPreferences(
   preferences: Pick<UserPreferences, "omitPantryItemsFromShoppingLists">,
 ): boolean {

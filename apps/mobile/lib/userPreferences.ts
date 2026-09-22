@@ -19,14 +19,8 @@ export type GroceryStore = z.infer<typeof groceryStoreSchema>;
 export const themeModeSchema = z.enum(["system", "light", "dark"]);
 export type ThemeMode = z.infer<typeof themeModeSchema>;
 
-export const textSizePreferenceSchema = z.enum(["small", "default", "large"]);
-export type TextSizePreference = z.infer<typeof textSizePreferenceSchema>;
-
 export const pantrySortBySchema = z.enum(["name", "expiry", "location"]);
 export type PantrySortBy = z.infer<typeof pantrySortBySchema>;
-
-export const barcodeScanDefaultSchema = z.enum(["pantry", "shopping_list"]);
-export type BarcodeScanDefault = z.infer<typeof barcodeScanDefaultSchema>;
 
 /** 0 = Sunday … 6 = Saturday (JS Date#getDay). */
 export const weekStartsOnDaySchema = z.number().int().min(0).max(6);
@@ -61,14 +55,10 @@ export const userPreferencesSchema = z.object({
   autoFavoriteImportedRecipes: z.boolean().optional().default(false),
   omitPantryItemsFromShoppingLists: z.boolean().optional().default(true),
   defaultShoppingListId: z.number().int().nullable().optional().default(null),
-  lastShoppingListId: z.number().int().nullable().optional().default(null),
   weekStartsOnDay: weekStartsOnDaySchema.optional().default(1),
-  householdSize: z.number().int().min(1).max(12).optional().default(4),
-  textSize: textSizePreferenceSchema.optional().default("default"),
   pantrySortBy: pantrySortBySchema.optional().default("name"),
   showPrepTimeProminent: z.boolean().optional().default(true),
   showStepNumbers: z.boolean().optional().default(true),
-  barcodeScanDefault: barcodeScanDefaultSchema.optional().default("pantry"),
   expirationReminderDaysBefore: z.number().int().min(1).max(30).nullable().optional().default(null),
   globalLowStockThreshold: z.number().nullable().optional().default(null),
 });
@@ -97,14 +87,10 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   autoFavoriteImportedRecipes: false,
   omitPantryItemsFromShoppingLists: true,
   defaultShoppingListId: null,
-  lastShoppingListId: null,
   weekStartsOnDay: 1,
-  householdSize: 4,
-  textSize: "default",
   pantrySortBy: "name",
   showPrepTimeProminent: true,
   showStepNumbers: true,
-  barcodeScanDefault: "pantry",
   expirationReminderDaysBefore: null,
   globalLowStockThreshold: null,
 };

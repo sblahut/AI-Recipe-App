@@ -17,11 +17,9 @@ describe("buildRecipeAiConstraints", () => {
       dietGlutenFree: true,
       avoidIngredients: ["shellfish"],
       defaultConstraintText: "Air fryer OK",
-      householdSize: 6,
     });
     expect(result).toContain("Gluten-free");
     expect(result).toContain("shellfish");
     expect(result).toContain("Air fryer OK");
-    expect(result).toContain("6 servings");
   });
 });

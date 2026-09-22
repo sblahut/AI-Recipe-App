@@ -48,7 +48,7 @@ import {
 export default function MealPlanScreen() {
   const { colors } = useAppTheme();
   const { serverUrl } = useServerSettings();
-  const { preferences, updatePreferences } = useUserPreferences();
+  const { preferences } = useUserPreferences();
   const weekStartsOnDay = preferences.weekStartsOnDay ?? 1;
   const [weekStart, setWeekStart] = useState(() =>
     weekStartOnOrBefore(new Date(), weekStartsOnDay),
@@ -204,7 +204,6 @@ export default function MealPlanScreen() {
         const result = shoppingFromMealPlanResponseSchema.parse(raw);
         const summary = mealPlanShopResultFromApi(result);
         Alert.alert(mealPlanShopAlertTitle(summary), mealPlanShopAlertMessage(summary, list.name));
-        await updatePreferences({ lastShoppingListId: list.id });
       } catch (e) {
         Alert.alert(
           "Shopping list",

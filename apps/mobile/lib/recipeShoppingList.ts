@@ -38,7 +38,6 @@ export function promptAddRecipeToShoppingList(
   lists: ShoppingList[],
   serverUrl: string,
   preferences: UserPreferences,
-  onListUsed?: (listId: number) => void,
 ): void {
   if (lists.length === 0) {
     Alert.alert("No shopping lists", "Create a list on the Shopping tab first.");
@@ -50,7 +49,6 @@ export function promptAddRecipeToShoppingList(
     void (async () => {
       try {
         await postRecipeToShoppingList(recipe, defaultList, serverUrl, preferences);
-        onListUsed?.(defaultList.id);
       } catch (e) {
         Alert.alert(
           "Shopping list",
@@ -68,7 +66,6 @@ export function promptAddRecipeToShoppingList(
         void (async () => {
           try {
             await postRecipeToShoppingList(recipe, list, serverUrl, preferences);
-            onListUsed?.(list.id);
           } catch (e) {
             Alert.alert(
               "Shopping list",

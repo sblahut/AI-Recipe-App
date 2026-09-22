@@ -1,7 +1,10 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 
-import type { Ingredient } from "@/lib/schemas";
+import { z } from "zod";
+
+import { apiJson } from "@/lib/api";
+import { ingredientSchema, type Ingredient } from "@/lib/schemas";
 
 const CHANNEL_ID = "pantry-expiration";
 
@@ -74,4 +77,17 @@ export async function syncExpirationReminders(
       },
     });
   }
+}
+
+/** Reload pantry from the server and apply the current reminder schedule. */
+export async function rescheduleExpirationRemindersFromServer(
+  serverUrl: string,
+  daysBefore: number | null,
+): Promise<void> {
+  if (Platform.OS === "web") {
+    return;
+  }
+  const raw = await apiJson<unknown>("/inventory", { baseUrl: serverUrl });
+  const items = z.array(ingredientSchema).parse(raw);
+  await syncExpirationReminders(items, daysBefore);
 }

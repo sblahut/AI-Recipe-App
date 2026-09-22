@@ -28,11 +28,6 @@ export function buildRecipeAiConstraints(preferences: UserPreferences): string |
     parts.push("Kid-friendly, mild flavors, approachable for families.");
   }
 
-  const servings = preferences.householdSize ?? 4;
-  if (servings > 0 && servings !== 4) {
-    parts.push(`Scale recipes for about ${servings} servings when possible.`);
-  }
-
   const custom = preferences.defaultConstraintText.trim();
   if (custom) {
     parts.push(custom);

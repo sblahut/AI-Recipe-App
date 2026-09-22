@@ -30,8 +30,8 @@ import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { syncExpirationReminders } from "@/lib/expirationReminders";
-import { openDefaultBarcodeScan } from "@/lib/openDefaultBarcodeScan";
 import { sortPantryItems } from "@/lib/pantrySort";
+import { startIngredientScan } from "@/lib/startIngredientScan";
 import {
   formatIngredientExpirationPhrase,
   isExpirationDue,
@@ -407,7 +407,7 @@ export default function IngredientsScreen() {
         <Pressable
           onPress={() => {
             dismissSearch();
-            void openDefaultBarcodeScan(serverUrl, preferences);
+            void startIngredientScan();
           }}
           style={({ pressed }) => [
             styles.actionCard,
