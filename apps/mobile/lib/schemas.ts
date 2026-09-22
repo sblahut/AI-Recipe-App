@@ -135,6 +135,10 @@ export const productReadSchema = z.object({
   barcode: z.string(),
   name: z.string(),
   brand: z.string().nullable().optional(),
+  default_quantity_kind: z.enum(["count", "weight", "volume"]).nullable().optional(),
+  default_quantity: z.number().nullable().optional(),
+  default_unit: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
 });
 
 export const barcodeScanResponseSchema = z.object({

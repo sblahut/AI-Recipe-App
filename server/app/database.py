@@ -51,6 +51,16 @@ def _apply_sqlite_migrations() -> None:
             "source",
             "ALTER TABLE products ADD COLUMN source VARCHAR(32)",
         ),
+        (
+            "products",
+            "default_quantity",
+            "ALTER TABLE products ADD COLUMN default_quantity FLOAT",
+        ),
+        (
+            "products",
+            "default_unit",
+            "ALTER TABLE products ADD COLUMN default_unit VARCHAR(64)",
+        ),
     ]
     with engine.begin() as conn:
         for table, column, ddl in patches:

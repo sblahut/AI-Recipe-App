@@ -13,6 +13,8 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(512))
     brand: Mapped[str | None] = mapped_column(String(256), nullable=True)
     default_quantity_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    default_quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    default_unit: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 

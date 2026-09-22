@@ -73,6 +73,8 @@ class ProductRead(BaseModel):
     name: str
     brand: str | None = None
     default_quantity_kind: QuantityKindField | None = None
+    default_quantity: float | None = None
+    default_unit: str | None = None
     source: str | None = None
 
     model_config = {"from_attributes": True}
@@ -83,6 +85,8 @@ class ProductCreate(BaseModel):
     name: str
     brand: str | None = None
     default_quantity_kind: QuantityKindField | None = None
+    default_quantity: float | None = None
+    default_unit: str | None = None
 
 
 class BarcodeScanRequest(QuantityFieldsMixin):
@@ -97,6 +101,10 @@ class BarcodeScanRequest(QuantityFieldsMixin):
     register_product: bool = Field(
         default=False,
         description="When barcode is unknown, save manual_name to the local product catalog",
+    )
+    use_product_defaults: bool = Field(
+        default=True,
+        description="When true, quantity is package count and size comes from the product catalog",
     )
     expires_at: datetime | None = None
 

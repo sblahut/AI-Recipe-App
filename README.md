@@ -279,24 +279,27 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 
 ### Import Open Food Facts (offline)
 
-1. Download the JSONL export (large file, several GB compressed):  
+1. Download the JSONL export (large file, several GB compressed) into `server/data/imports/`:  
    https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz  
-2. Save under `server/data/imports/` (gitignored except the small sample file).
-3. Run the import:
+   Or from `server/`: `.\scripts\download-open-food-facts.ps1`
+2. Run the import (US products only by default):
 
    ```powershell
    cd server
-   .\.venv\Scripts\Activate.ps1
-   python scripts/import_open_food_facts.py --input data/imports/openfoodfacts-products.jsonl.gz --country en:united-states
+   .\import-products.ps1 -ImportPath data\imports\openfoodfacts-products.jsonl.gz
    ```
 
    Test on the committed sample:
 
    ```powershell
-   python scripts/import_open_food_facts.py --input data/imports/sample.openfoodfacts.jsonl
+   .\import-products.ps1 -ImportPath data\imports\sample.openfoodfacts.jsonl -Country ""
    ```
 
-   Options: `--limit N`, `--dry-run`, `--country en:united-states`.
+   Options: `--limit N`, `--dry-run`, `--country en:united-states` (empty string = all countries).
+
+   Import stores **package size** (`default_quantity`, `default_unit`, `default_quantity_kind`). Scans multiply that by **how many packages** you enter on the phone. Unknown barcodes still fall back to live OFF lookup when the PC has internet.
+
+   After import succeeds, you may **delete** `server/data/imports/openfoodfacts-products.jsonl.gz` to free disk; the catalog remains in `server/data/app.db`. You do **not** need to revert application code — those changes are how barcode scans use the catalog.
 
 ### Manual entry paths
 
@@ -366,7 +369,7 @@ Verbose server run: `python -m pytest tests -v`. CI uses `npm test -- --ci` in `
 
 - **TestFlight** iOS build so phones do not need Expo / Metro off-LAN (API + Tailscale URL is already documented above).
 
-Product **`default_quantity_kind`** is inferred during OFF import and live OFF barcode lookup (e.g. milk → volume). Re-run the import script to backfill existing rows.
+Product **package defaults** (`default_quantity_kind`, `default_quantity`, `default_unit`) are inferred during OFF import and live OFF lookup. Re-run the import script to backfill existing catalog rows.
 
 ## Environment variables
 

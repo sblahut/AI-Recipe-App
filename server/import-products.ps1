@@ -3,7 +3,7 @@
 #   .\import-products.ps1 -ImportPath data\imports\openfoodfacts-products.jsonl.gz -Country en:united-states
 param(
     [string]$ImportPath = "data/imports/sample.openfoodfacts.jsonl",
-    [string]$Country = "",
+    [string]$Country = "en:united-states",
     [int]$Limit = 0,
     [switch]$DryRun
 )
