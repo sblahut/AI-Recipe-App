@@ -26,6 +26,7 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useHomeServerReady } from "@/hooks/useHomeServerReady";
 import { promptAddRecipeToMealPlan } from "@/lib/addToMealPlan";
 import { apiFetch, apiJson } from "@/lib/api";
 import { findFavoriteMatch } from "@/lib/recipeFavorites";
@@ -40,8 +41,6 @@ import {
 import { recipeListKey } from "@/lib/recipeListKey";
 import { recipeMatchesSearch } from "@/lib/recipeSearch";
 import {
-  healthSchema,
-  ingredientSchema,
   recipeGenerateResponseSchema,
   recipeImportResponseSchema,
   savedRecipeReadSchema,
@@ -50,12 +49,6 @@ import {
   type SavedRecipe,
   type ShoppingList,
 } from "@/lib/schemas";
-
-type GenerateReady = {
-  serverOk: boolean;
-  ollamaOk: boolean | null;
-  ingredientCount: number;
-};
 
 export default function RecipesScreen() {
   const { colors } = useAppTheme();
@@ -76,11 +69,7 @@ export default function RecipesScreen() {
   const [importExpanded, setImportExpanded] = useState(true);
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [ready, setReady] = useState<GenerateReady>({
-    serverOk: false,
-    ollamaOk: null,
-    ingredientCount: 0,
-  });
+  const { ready, refresh: refreshReady } = useHomeServerReady();
   const searchInputRef = useRef<TextInput>(null);
   const scrollRef = useRef<ScrollView>(null);
   const generatedSectionY = useRef(0);
@@ -133,31 +122,12 @@ export default function RecipesScreen() {
     setLists(z.array(shoppingListSchema).parse(raw));
   }, [serverUrl]);
 
-  const loadReady = useCallback(async () => {
-    try {
-      const [healthRaw, inventoryRaw] = await Promise.all([
-        apiJson<unknown>("/health", { baseUrl: serverUrl }),
-        apiJson<unknown>("/inventory", { baseUrl: serverUrl }),
-      ]);
-      const health = healthSchema.parse(healthRaw);
-      const inventory = z.array(ingredientSchema).parse(inventoryRaw);
-      setReady({
-        serverOk: health.status === "ok",
-        ollamaOk: health.ollama,
-        ingredientCount: inventory.length,
-      });
-    } catch {
-      setReady({ serverOk: false, ollamaOk: null, ingredientCount: 0 });
-    }
-  }, [serverUrl]);
-
   useEffect(() => {
     queueMicrotask(() => {
       void loadFavorites().catch(() => undefined);
       void loadLists().catch(() => undefined);
-      void loadReady();
     });
-  }, [loadFavorites, loadLists, loadReady]);
+  }, [loadFavorites, loadLists]);
 
   const filteredGenerated = useMemo(
     () => generated.filter((recipe) => recipeMatchesSearch(recipe, searchQuery)),
@@ -280,7 +250,7 @@ export default function RecipesScreen() {
       Alert.alert("Generate failed", e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
-      void loadReady();
+      void refreshReady();
     }
   };
 
@@ -370,37 +340,6 @@ export default function RecipesScreen() {
           setDetailTitle(undefined);
         }}
       />
-
-      {/* Status indicators */}
-      <Pressable onPress={dismissSearch}>
-        <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <ReadyLine
-            ok={ready.serverOk}
-            colors={colors}
-            label={ready.serverOk ? "Home server connected" : "Home server offline"}
-          />
-          <ReadyLine
-            ok={ready.ollamaOk === true}
-            colors={colors}
-            label={
-              ready.ollamaOk === true
-                ? "AI model ready"
-                : ready.ollamaOk === false
-                  ? "AI model offline"
-                  : "AI model status unknown"
-            }
-          />
-          <ReadyLine
-            ok={ready.ingredientCount > 0}
-            colors={colors}
-            label={
-              ready.ingredientCount > 0
-                ? `${ready.ingredientCount} ingredient${ready.ingredientCount === 1 ? "" : "s"} available`
-                : "Add ingredients on the Pantry tab"
-            }
-          />
-        </View>
-      </Pressable>
 
       {/* Primary generate CTA */}
       <AppButton
@@ -578,17 +517,6 @@ export default function RecipesScreen() {
   );
 }
 
-function ReadyLine({ ok, label, colors }: { ok: boolean; label: string; colors: ThemeColors }) {
-  return (
-    <View style={styles.readyRow}>
-      <View style={[styles.readyDot, { backgroundColor: ok ? colors.success : colors.textMuted }]} />
-      <Text style={[styles.readyLabel, { color: ok ? colors.text : colors.textMuted }]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 type RecipeCardProps = {
   recipe: GeneratedRecipe;
   titleOverride?: string;
@@ -720,25 +648,6 @@ function RecipeCard({
 const styles = StyleSheet.create({
   scroll: { gap: spacing.lg },
   generatedSection: { gap: spacing.lg },
-  statusCard: {
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  readyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  readyDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  readyLabel: {
-    ...typography.caption,
-  },
   sectionTitle: {
     ...typography.title,
   },

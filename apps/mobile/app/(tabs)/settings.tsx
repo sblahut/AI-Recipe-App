@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Platform, StyleSheet, Text, View } from "react-native";
 
+import { HomeServerStatusCard } from "@/components/HomeServerStatusCard";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { SettingsLinkRow, SettingsSwitchRow } from "@/components/ui/SettingsRow";
 import { AppButton } from "@/components/ui/AppButton";
@@ -545,6 +546,7 @@ export default function SettingsScreen() {
             });
           }}
         />
+        <HomeServerStatusCard />
       </Card>
 
       {/* Dev + server connection */}
