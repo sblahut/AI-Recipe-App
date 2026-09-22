@@ -606,9 +606,12 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
-      {/* Recipes */}
+      {/* AI-generated recipes */}
       <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipes</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>AI-generated recipes</Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Generate, AI search, and import — plus how recipes appear in the app.
+        </Text>
         <SettingsSwitchRow
           colors={colors}
           label="Auto-favorite generated recipes"
