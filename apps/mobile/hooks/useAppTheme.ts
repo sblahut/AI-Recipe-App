@@ -1,14 +1,8 @@
 import { useColorScheme } from "react-native";
 
-import {
-  darkColors,
-  lightColors,
-  radius,
-  spacing,
-  typography,
-  type ThemeColors,
-} from "@/constants/theme";
+import { radius, spacing, typography, type ThemeColors } from "@/constants/theme";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
+import { resolveThemeColors } from "@/lib/themePalette";
 
 export function useAppTheme(): {
   colors: ThemeColors;
@@ -22,8 +16,13 @@ export function useAppTheme(): {
   const mode = preferences.themeMode ?? "system";
   const isDark =
     mode === "dark" || (mode === "system" && systemScheme === "dark");
+  const colors = resolveThemeColors(isDark, {
+    primaryColor: preferences.primaryColor,
+    accentColor: preferences.accentColor,
+  });
+
   return {
-    colors: isDark ? darkColors : lightColors,
+    colors,
     spacing,
     radius,
     typography,

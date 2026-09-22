@@ -19,12 +19,20 @@ export type GroceryStore = z.infer<typeof groceryStoreSchema>;
 export const themeModeSchema = z.enum(["system", "light", "dark"]);
 export type ThemeMode = z.infer<typeof themeModeSchema>;
 
+const hexColorSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/)
+  .nullable()
+  .optional();
+
 export const userPreferencesSchema = z.object({
   username: z.string(),
   customZones: z.array(z.string()),
   stores: z.array(groceryStoreSchema),
   autoPersistGeneratedRecipes: z.boolean().optional().default(false),
   themeMode: themeModeSchema.optional().default("system"),
+  primaryColor: hexColorSchema.default(null),
+  accentColor: hexColorSchema.default(null),
   defaultStorageLocation: z.string().nullable().optional().default(null),
   promptForStorageLocation: z.boolean().optional().default(true),
   prioritizeExpiringWhenGenerating: z.boolean().optional().default(true),
@@ -39,6 +47,8 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   stores: [],
   autoPersistGeneratedRecipes: false,
   themeMode: "system",
+  primaryColor: null,
+  accentColor: null,
   defaultStorageLocation: null,
   promptForStorageLocation: true,
   prioritizeExpiringWhenGenerating: true,

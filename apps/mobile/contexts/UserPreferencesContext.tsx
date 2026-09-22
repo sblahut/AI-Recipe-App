@@ -33,6 +33,9 @@ type UserPreferencesContextValue = {
   deleteStore: (id: string) => Promise<void>;
   setAutoPersistGeneratedRecipes: (enabled: boolean) => Promise<void>;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
+  setPrimaryColor: (hex: string | null) => Promise<void>;
+  setAccentColor: (hex: string | null) => Promise<void>;
+  resetBrandColors: () => Promise<void>;
   setDefaultStorageLocation: (location: string | null) => Promise<void>;
   setPromptForStorageLocation: (prompt: boolean) => Promise<void>;
   setPrioritizeExpiringWhenGenerating: (enabled: boolean) => Promise<void>;
@@ -140,6 +143,24 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     [persist, preferences],
   );
 
+  const setPrimaryColor = useCallback(
+    async (hex: string | null) => {
+      await persist({ ...preferences, primaryColor: hex });
+    },
+    [persist, preferences],
+  );
+
+  const setAccentColor = useCallback(
+    async (hex: string | null) => {
+      await persist({ ...preferences, accentColor: hex });
+    },
+    [persist, preferences],
+  );
+
+  const resetBrandColors = useCallback(async () => {
+    await persist({ ...preferences, primaryColor: null, accentColor: null });
+  }, [persist, preferences]);
+
   const setDefaultStorageLocation = useCallback(
     async (location: string | null) => {
       await persist({ ...preferences, defaultStorageLocation: location });
@@ -191,6 +212,9 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       deleteStore,
       setAutoPersistGeneratedRecipes,
       setThemeMode,
+      setPrimaryColor,
+      setAccentColor,
+      resetBrandColors,
       setDefaultStorageLocation,
       setPromptForStorageLocation,
       setPrioritizeExpiringWhenGenerating,
@@ -208,6 +232,9 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       deleteStore,
       setAutoPersistGeneratedRecipes,
       setThemeMode,
+      setPrimaryColor,
+      setAccentColor,
+      resetBrandColors,
       setDefaultStorageLocation,
       setPromptForStorageLocation,
       setPrioritizeExpiringWhenGenerating,

@@ -1,9 +1,10 @@
 import Constants from "expo-constants";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { HomeServerStatusCard } from "@/components/HomeServerStatusCard";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { ThemeColorPickerModal } from "@/components/ThemeColorPickerModal";
 import { SettingsLinkRow, SettingsSwitchRow } from "@/components/ui/SettingsRow";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -20,6 +21,12 @@ import { apiJson } from "@/lib/api";
 import { expoGoDisplayUrl, qrCodeImageUri } from "@/lib/expoGoDevUrl";
 import { homeNetworkSchema } from "@/lib/schemas";
 import { weeklyAdUrlForStore } from "@/lib/storeChains";
+import {
+  ACCENT_COLOR_PRESETS,
+  DEFAULT_THEME_ACCENT,
+  DEFAULT_THEME_PRIMARY,
+  PRIMARY_COLOR_PRESETS,
+} from "@/lib/themePalette";
 import {
   STORE_CHAINS,
   allStorageLocations,
@@ -58,6 +65,9 @@ export default function SettingsScreen() {
     deleteStore,
     setAutoPersistGeneratedRecipes,
     setThemeMode,
+    setPrimaryColor,
+    setAccentColor,
+    resetBrandColors,
     setDefaultStorageLocation,
     setPromptForStorageLocation,
     setPrioritizeExpiringWhenGenerating,
@@ -69,6 +79,13 @@ export default function SettingsScreen() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [zoneDraft, setZoneDraft] = useState("");
   const [storeDraft, setStoreDraft] = useState<StoreDraft | null>(null);
+  const [primaryPickerOpen, setPrimaryPickerOpen] = useState(false);
+  const [accentPickerOpen, setAccentPickerOpen] = useState(false);
+
+  const displayPrimary = preferences.primaryColor ?? colors.primary;
+  const displayAccent = preferences.accentColor ?? colors.accent;
+  const usingDefaultBrand =
+    preferences.primaryColor == null && preferences.accentColor == null;
 
   const storageLocations = useMemo(
     () => allStorageLocations(preferences.customZones),
@@ -340,6 +357,69 @@ export default function SettingsScreen() {
             />
           ))}
         </View>
+        <Text style={[styles.fieldLabel, { color: colors.text, marginTop: spacing.md }]}>
+          Brand colors
+        </Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Main color drives buttons, tabs, and links. Accent color is used for scan, shop, and
+          checkbox highlights.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setPrimaryPickerOpen(true)}
+          style={({ pressed }) => [
+            styles.colorRow,
+            { borderColor: colors.border, backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
+          ]}
+        >
+          <View style={[styles.colorSwatch, { backgroundColor: displayPrimary }]} />
+          <View style={styles.colorRowText}>
+            <Text style={[styles.colorRowLabel, { color: colors.text }]}>Main color</Text>
+            <Text style={[styles.hint, { color: colors.textMuted }]}>
+              {preferences.primaryColor ?? `Default (${DEFAULT_THEME_PRIMARY.light})`}
+            </Text>
+          </View>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setAccentPickerOpen(true)}
+          style={({ pressed }) => [
+            styles.colorRow,
+            { borderColor: colors.border, backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
+          ]}
+        >
+          <View style={[styles.colorSwatch, { backgroundColor: displayAccent }]} />
+          <View style={styles.colorRowText}>
+            <Text style={[styles.colorRowLabel, { color: colors.text }]}>Accent color</Text>
+            <Text style={[styles.hint, { color: colors.textMuted }]}>
+              {preferences.accentColor ?? `Default (${DEFAULT_THEME_ACCENT.light})`}
+            </Text>
+          </View>
+        </Pressable>
+        {!usingDefaultBrand ? (
+          <AppButton
+            label="Reset to default colors"
+            variant="ghost"
+            compact
+            onPress={() => void resetBrandColors()}
+          />
+        ) : null}
+        <ThemeColorPickerModal
+          visible={primaryPickerOpen}
+          title="Choose main color"
+          value={displayPrimary}
+          swatches={PRIMARY_COLOR_PRESETS}
+          onClose={() => setPrimaryPickerOpen(false)}
+          onSave={(hex) => void setPrimaryColor(hex)}
+        />
+        <ThemeColorPickerModal
+          visible={accentPickerOpen}
+          title="Choose accent color"
+          value={displayAccent}
+          swatches={ACCENT_COLOR_PRESETS}
+          onClose={() => setAccentPickerOpen(false)}
+          onSave={(hex) => void setAccentColor(hex)}
+        />
       </Card>
 
       {/* Kitchen defaults */}
@@ -619,6 +699,27 @@ const styles = StyleSheet.create({
   storeActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   storeForm: { gap: spacing.sm },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  colorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  colorSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  colorRowText: {
+    flex: 1,
+    gap: 2,
+  },
+  colorRowLabel: {
+    ...typography.label,
+  },
   row: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, alignItems: "center" },
   flex: { flex: 1 },
   serverQrWrap: { alignItems: "center", paddingVertical: spacing.sm },
