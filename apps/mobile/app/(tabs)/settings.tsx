@@ -9,7 +9,7 @@ import { ThemeColorPickerModal } from "@/components/ThemeColorPickerModal";
 import { SettingsLinkRow, SettingsSwitchRow } from "@/components/ui/SettingsRow";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
-import { Card } from "@/components/ui/Card";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { Chip } from "@/components/ui/Chip";
 import { Screen } from "@/components/ui/Screen";
 import { spacing, typography } from "@/constants/theme";
@@ -21,6 +21,7 @@ import { pickProfilePhoto, profilePhotoSourceOptions } from "@/lib/profilePhoto"
 import { apiJson } from "@/lib/api";
 import { expoGoDisplayUrl, qrCodeImageUri } from "@/lib/expoGoDevUrl";
 import { homeNetworkSchema } from "@/lib/schemas";
+import { isCollapsibleExpanded } from "@/lib/collapsibleExpanded";
 import { rescheduleExpirationRemindersFromServer } from "@/lib/expirationReminders";
 import { weeklyAdUrlForStore } from "@/lib/storeChains";
 import {
@@ -92,6 +93,18 @@ const PANTRY_SORT_OPTIONS: { value: PantrySortBy; label: string }[] = [
 
 const PREF_TEXT_DEBOUNCE_MS = 500;
 
+type SettingsSectionId =
+  | "profile"
+  | "appearance"
+  | "kitchen"
+  | "aiRecipes"
+  | "shoppingPantry"
+  | "mealPlan"
+  | "stores"
+  | "about"
+  | "connect"
+  | "data";
+
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
   const { serverUrl, loading } = useServerSettings();
@@ -128,6 +141,21 @@ export default function SettingsScreen() {
   const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([]);
   const avoidPersistSkip = useRef(true);
   const constraintPersistSkip = useRef(true);
+  const [expandedSections, setExpandedSections] = useState<
+    Partial<Record<SettingsSectionId, boolean>>
+  >({});
+
+  const isSectionExpanded = useCallback(
+    (id: SettingsSectionId) => isCollapsibleExpanded(id, expandedSections, true),
+    [expandedSections],
+  );
+
+  const toggleSection = useCallback((id: SettingsSectionId) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [id]: !isCollapsibleExpanded(id, prev, true),
+    }));
+  }, []);
 
   const displayPrimary = preferences.primaryColor ?? colors.primary;
   const displayAccent = preferences.accentColor ?? colors.accent;
@@ -382,10 +410,13 @@ export default function SettingsScreen() {
   };
 
   return (
-    <Screen scroll>
-      {/* Profile */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Profile</Text>
+    <Screen scroll contentContainerStyle={styles.sections}>
+      <CollapsibleSection
+        title="Profile"
+        expanded={isSectionExpanded("profile")}
+        onToggle={() => toggleSection("profile")}
+        leadingIcon="person-outline"
+      >
         <View style={styles.profilePhotoBlock}>
           <ProfileAvatar
             colors={colors}
@@ -457,11 +488,14 @@ export default function SettingsScreen() {
             </View>
           </View>
         )}
-      </Card>
+      </CollapsibleSection>
 
-      {/* Appearance */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
+      <CollapsibleSection
+        title="Appearance"
+        expanded={isSectionExpanded("appearance")}
+        onToggle={() => toggleSection("appearance")}
+        leadingIcon="color-palette-outline"
+      >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Choose light or dark mode, or follow your phone.
         </Text>
@@ -539,11 +573,14 @@ export default function SettingsScreen() {
           onClose={() => setAccentPickerOpen(false)}
           onSave={(hex) => void setAccentColor(hex)}
         />
-      </Card>
+      </CollapsibleSection>
 
-      {/* Kitchen defaults */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Kitchen</Text>
+      <CollapsibleSection
+        title="Kitchen"
+        expanded={isSectionExpanded("kitchen")}
+        onToggle={() => toggleSection("kitchen")}
+        leadingIcon="restaurant-outline"
+      >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Default storage when adding items from scans or recipes.
         </Text>
@@ -604,11 +641,14 @@ export default function SettingsScreen() {
           />
           <AppButton label="Add area" variant="secondary" onPress={() => void addCustomZone()} />
         </View>
-      </Card>
+      </CollapsibleSection>
 
-      {/* AI-generated recipes */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>AI-generated recipes</Text>
+      <CollapsibleSection
+        title="AI-generated recipes"
+        expanded={isSectionExpanded("aiRecipes")}
+        onToggle={() => toggleSection("aiRecipes")}
+        leadingIcon="sparkles-outline"
+      >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Generate, AI search, and import — plus how recipes appear in the app.
         </Text>
@@ -703,11 +743,14 @@ export default function SettingsScreen() {
             />
           ))}
         </View>
-      </Card>
+      </CollapsibleSection>
 
-      {/* Shopping & pantry */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Shopping & pantry</Text>
+      <CollapsibleSection
+        title="Shopping & pantry"
+        expanded={isSectionExpanded("shoppingPantry")}
+        onToggle={() => toggleSection("shoppingPantry")}
+        leadingIcon="basket-outline"
+      >
         <Text style={[styles.fieldLabel, { color: colors.text }]}>Default shopping list</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Recipe and meal-plan adds skip the picker when set.
@@ -781,11 +824,14 @@ export default function SettingsScreen() {
             />
           ))}
         </View>
-      </Card>
+      </CollapsibleSection>
 
-      {/* Meal plan */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Meal plan</Text>
+      <CollapsibleSection
+        title="Meal plan"
+        expanded={isSectionExpanded("mealPlan")}
+        onToggle={() => toggleSection("mealPlan")}
+        leadingIcon="calendar-outline"
+      >
         <Text style={[styles.fieldLabel, { color: colors.text }]}>Week starts on</Text>
         <View style={styles.chipRow}>
           {WEEK_START_OPTIONS.map(({ day, label }) => (
@@ -798,11 +844,14 @@ export default function SettingsScreen() {
             />
           ))}
         </View>
-      </Card>
+      </CollapsibleSection>
 
-      {/* Stores */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Grocery stores</Text>
+      <CollapsibleSection
+        title="Grocery stores"
+        expanded={isSectionExpanded("stores")}
+        onToggle={() => toggleSection("stores")}
+        leadingIcon="storefront-outline"
+      >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Save the stores you shop at. Open directions in your phone's maps app.
         </Text>
@@ -887,11 +936,14 @@ export default function SettingsScreen() {
             onPress={() => setStoreDraft(emptyStore)}
           />
         )}
-      </Card>
+      </CollapsibleSection>
 
-      {/* About */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
+      <CollapsibleSection
+        title="About"
+        expanded={isSectionExpanded("about")}
+        onToggle={() => toggleSection("about")}
+        leadingIcon="information-circle-outline"
+      >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           AI Recipe · version {appVersion}
         </Text>
@@ -909,12 +961,14 @@ export default function SettingsScreen() {
           }}
         />
         <HomeServerStatusCard />
-      </Card>
+      </CollapsibleSection>
 
-      {/* Dev + server connection */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Connect this phone</Text>
-
+      <CollapsibleSection
+        title="Connect this phone"
+        expanded={isSectionExpanded("connect")}
+        onToggle={() => toggleSection("connect")}
+        leadingIcon="qr-code-outline"
+      >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Scan with the iPhone Camera to open this project in Expo Go (same Wi‑Fi as the PC). Works
           from this phone, from the PC status page, or while previewing on http://localhost:8081 —
@@ -937,11 +991,14 @@ export default function SettingsScreen() {
             the Expo QR.
           </Text>
         )}
-      </Card>
+      </CollapsibleSection>
 
-      {/* Data */}
-      <Card>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Data</Text>
+      <CollapsibleSection
+        title="Data"
+        expanded={isSectionExpanded("data")}
+        onToggle={() => toggleSection("data")}
+        leadingIcon="trash-outline"
+      >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Clears on-device preferences and profile photo. Server pantry, recipes, and shopping lists
           are unchanged.
@@ -951,13 +1008,16 @@ export default function SettingsScreen() {
           variant="secondary"
           onPress={confirmClearLocalData}
         />
-      </Card>
+      </CollapsibleSection>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionTitle: typography.headline,
+  sections: {
+    gap: spacing.md,
+    paddingBottom: spacing.xl,
+  },
   hint: { ...typography.caption, lineHeight: 18 },
   empty: { ...typography.caption, paddingVertical: spacing.xs },
   fieldLabel: { ...typography.label, marginTop: spacing.sm },
