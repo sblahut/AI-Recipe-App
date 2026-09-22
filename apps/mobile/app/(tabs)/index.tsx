@@ -273,9 +273,8 @@ export default function IngredientsScreen() {
             void (async () => {
               await removeZone(zone);
               setExpandedSections((prev) => {
-                const next = { ...prev };
-                delete next[zone];
-                return next;
+                const { [zone]: _removed, ...rest } = prev;
+                return rest;
               });
             })();
           },

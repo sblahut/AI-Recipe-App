@@ -86,11 +86,6 @@ export default function ShoppingScreen() {
     );
   }, [preferences.stores, weeklyAdChain]);
 
-  const loadLists = useCallback(async () => {
-    const raw = await apiJson<unknown>("/shopping/lists", { baseUrl: serverUrl });
-    setLists(z.array(shoppingListSchema).parse(raw));
-  }, [serverUrl]);
-
   const loadDetail = useCallback(
     async (id: number) => {
       const raw = await apiJson<unknown>(`/shopping/lists/${id}`, { baseUrl: serverUrl });
@@ -100,6 +95,18 @@ export default function ShoppingScreen() {
     },
     [serverUrl],
   );
+
+  const loadLists = useCallback(async () => {
+    const raw = await apiJson<unknown>("/shopping/lists", { baseUrl: serverUrl });
+    const parsed = z.array(shoppingListSchema).parse(raw);
+    setLists(parsed);
+    for (let index = 0; index < parsed.length; index++) {
+      const list = parsed[index];
+      if (list && defaultShoppingListExpanded(index, parsed.length)) {
+        void loadDetail(list.id);
+      }
+    }
+  }, [loadDetail, serverUrl]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -133,22 +140,6 @@ export default function ShoppingScreen() {
     },
     [isListExpanded, loadDetail],
   );
-
-  useEffect(() => {
-    if (lists.length === 0) {
-      return;
-    }
-    for (let index = 0; index < lists.length; index++) {
-      const list = lists[index];
-      if (!list) {
-        continue;
-      }
-      const expanded = isListExpanded(list.id, index);
-      if (expanded && detailsById[list.id] == null) {
-        void loadDetail(list.id);
-      }
-    }
-  }, [detailsById, isListExpanded, lists, loadDetail]);
 
   const openShoppingList = (listId: number) => {
     router.push({
@@ -188,14 +179,12 @@ export default function ShoppingScreen() {
             try {
               await apiFetch(`/shopping/lists/${list.id}`, { baseUrl: serverUrl, method: "DELETE" });
               setExpandedLists((prev) => {
-                const next = { ...prev };
-                delete next[list.id];
-                return next;
+                const { [list.id]: _removedExpand, ...rest } = prev;
+                return rest;
               });
               setDetailsById((prev) => {
-                const next = { ...prev };
-                delete next[list.id];
-                return next;
+                const { [list.id]: _removedDetail, ...rest } = prev;
+                return rest;
               });
               if (activeListId === list.id) {
                 setActiveListId(null);
