@@ -1,7 +1,7 @@
 import Constants from "expo-constants";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Keyboard, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { HomeServerStatusCard } from "@/components/HomeServerStatusCard";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
@@ -23,7 +23,12 @@ import { expoGoDisplayUrl, qrCodeImageUri } from "@/lib/expoGoDevUrl";
 import { homeNetworkSchema } from "@/lib/schemas";
 import { isCollapsibleExpanded } from "@/lib/collapsibleExpanded";
 import { rescheduleExpirationRemindersFromServer } from "@/lib/expirationReminders";
-import { weeklyAdUrlForStore } from "@/lib/storeChains";
+import {
+  DEFAULT_PUBLIX_STORE_NUMBER,
+  PUBLIX_CHANCELLOR_CROSSING_URL,
+  weeklyAdUrlForStore,
+} from "@/lib/storeChains";
+import { effectivePublixStoreNumber, parsePublixStoreNumberInput } from "@/lib/publixStoreNumber";
 import {
   ACCENT_COLOR_PRESETS,
   DEFAULT_THEME_ACCENT,
@@ -134,6 +139,8 @@ export default function SettingsScreen() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [zoneDraft, setZoneDraft] = useState("");
   const [storeDraft, setStoreDraft] = useState<StoreDraft | null>(null);
+  const savedPublixStoreText = String(effectivePublixStoreNumber(preferences));
+  const [publixStoreDraft, setPublixStoreDraft] = useState(savedPublixStoreText);
   const [primaryPickerOpen, setPrimaryPickerOpen] = useState(false);
   const [accentPickerOpen, setAccentPickerOpen] = useState(false);
   const [avoidDraft, setAvoidDraft] = useState(preferences.avoidIngredients.join(", "));
@@ -189,6 +196,23 @@ export default function SettingsScreen() {
     () => expoGoDisplayUrl(lanHost) ?? networkExpoUrl,
     [lanHost, networkExpoUrl],
   );
+
+  useEffect(() => {
+    setPublixStoreDraft(String(effectivePublixStoreNumber(preferences)));
+  }, [preferences.publixStoreNumber]);
+
+  const publixStoreDirty = publixStoreDraft !== savedPublixStoreText;
+  const publixStoreCanSave = parsePublixStoreNumberInput(publixStoreDraft) != null;
+
+  const savePublixStoreNumber = () => {
+    const n = parsePublixStoreNumberInput(publixStoreDraft);
+    if (n == null) {
+      Alert.alert("Publix store number", "Enter a valid store number (digits only).");
+      return;
+    }
+    void updatePreferences({ publixStoreNumber: n });
+    Keyboard.dismiss();
+  };
 
   useEffect(() => {
     if (!editingProfile) {
@@ -857,6 +881,44 @@ export default function SettingsScreen() {
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Save the stores you shop at. Open directions in your phone's maps app.
         </Text>
+        <AppTextField
+          label="Publix store number"
+          hint={`For BOGO recipe ideas. Default is ${DEFAULT_PUBLIX_STORE_NUMBER} (Chancellor Crossing). Find yours at publix.com/locations.`}
+          placeholder={String(DEFAULT_PUBLIX_STORE_NUMBER)}
+          value={publixStoreDraft}
+          onChangeText={(text) => setPublixStoreDraft(text.replace(/\D/g, ""))}
+          keyboardType="number-pad"
+          returnKeyType="done"
+          onSubmitEditing={savePublixStoreNumber}
+        />
+        {publixStoreDirty && publixStoreCanSave ? (
+          <View style={styles.row}>
+            <AppButton
+              label="Save store number"
+              compact
+              onPress={savePublixStoreNumber}
+            />
+            <AppButton
+              label="Cancel"
+              variant="ghost"
+              compact
+              onPress={() => {
+                setPublixStoreDraft(savedPublixStoreText);
+                Keyboard.dismiss();
+              }}
+            />
+          </View>
+        ) : null}
+        <SettingsLinkRow
+          colors={colors}
+          label="Default store (Chancellor Crossing)"
+          hint={PUBLIX_CHANCELLOR_CROSSING_URL}
+          onPress={() => {
+            void openExternalUrl(PUBLIX_CHANCELLOR_CROSSING_URL).catch((e: unknown) => {
+              Alert.alert("Browser", e instanceof Error ? e.message : "Could not open link");
+            });
+          }}
+        />
 
         {preferences.stores.length === 0 && storeDraft == null ? (
           <Text style={[styles.empty, { color: colors.textMuted }]}>No stores saved yet.</Text>

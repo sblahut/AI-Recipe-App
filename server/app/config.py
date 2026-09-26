@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ollama_host: str = "http://127.0.0.1:11434"
     ollama_text_model: str = "mistral:7b"
     default_persist_generated_recipes: bool = False
+    publix_store_number: int = 1885
 
 
 settings = Settings()

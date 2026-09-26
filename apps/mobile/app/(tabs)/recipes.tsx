@@ -31,12 +31,15 @@ import { promptAddRecipeToMealPlan } from "@/lib/addToMealPlan";
 import { apiFetch, apiJson } from "@/lib/api";
 import { findFavoriteMatch } from "@/lib/recipeFavorites";
 import { buildRecipeAiConstraints } from "@/lib/recipeAiConstraints";
+import { resolvePublixStoreNumberForApi } from "@/lib/publixStoreNumber";
 import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import {
-  GENERATE_RECIPE_FROM_INGREDIENTS_LABEL,
+  GENERATE_RECIPES_LABEL,
   RECIPE_MEAL_PLAN_BUTTON_LABEL,
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
+  RECIPE_USE_PANTRY_INGREDIENTS_LABEL,
+  RECIPE_USE_PUBLIX_BOGO_LABEL,
   shareRecipeAccessibilityLabel,
 } from "@/lib/uiActionLabels";
 import { recipeListKey } from "@/lib/recipeListKey";
@@ -59,9 +62,10 @@ export default function RecipesScreen() {
   const aiConstraints = useMemo(() => buildRecipeAiConstraints(preferences), [preferences]);
   const [favorites, setFavorites] = useState<SavedRecipe[]>([]);
   const [generated, setGenerated] = useState<GeneratedRecipe[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [aiSearchQuery, setAiSearchQuery] = useState("");
-  const [aiSearchLoading, setAiSearchLoading] = useState(false);
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [recipeIdeaQuery, setRecipeIdeaQuery] = useState("");
+  const [usePantryIngredients, setUsePantryIngredients] = useState(false);
+  const [usePublixBogoIngredients, setUsePublixBogoIngredients] = useState(false);
   const [importText, setImportText] = useState("");
   const [importUrl, setImportUrl] = useState("");
   const [importLoading, setImportLoading] = useState(false);
@@ -164,66 +168,29 @@ export default function RecipesScreen() {
     [favorites.length, filteredFavorites.length, searchQuery],
   );
 
-  const searchAiForRecipe = async () => {
-    const query = aiSearchQuery.trim();
-    if (query.length < 3) {
-      Alert.alert("Search AI", "Describe the recipe you want (at least 3 characters).");
-      return;
-    }
-    if (!ready.serverOk) {
-      Alert.alert("Server offline", "Check the home server URL in Settings.");
-      return;
-    }
-    if (ready.ollamaOk === false) {
-      Alert.alert("Ollama offline", "AI search uses the same Ollama model as generate.");
-      return;
-    }
+  const generateRecipes = async () => {
+    const query = recipeIdeaQuery.trim();
+    const useSources = usePantryIngredients || usePublixBogoIngredients;
 
-    setAiSearchLoading(true);
-    try {
-      const raw = await apiJson<unknown>("/recipes/search", {
-        baseUrl: serverUrl,
-        method: "POST",
-        body: JSON.stringify({
-          query,
-          count: preferences.defaultRecipeCount ?? 3,
-          persist_generated: preferences.autoPersistGeneratedRecipes,
-          ...(aiConstraints ? { constraints: aiConstraints } : {}),
-        }),
-      });
-      const parsed = recipeGenerateResponseSchema.parse(raw);
-      if (parsed.recipes.length > 0) {
-        markScrollToGenerated();
-      }
-      setGenerated(parsed.recipes);
-      if (parsed.recipes.length === 0) {
-        Alert.alert("Search AI", "No recipes came back — try a different description.");
-      } else if (parsed.recipes.length < (preferences.defaultRecipeCount ?? 3)) {
-        Alert.alert(
-          "Search AI",
-          `Got ${parsed.recipes.length} recipe${parsed.recipes.length === 1 ? "" : "s"} (model sometimes returns fewer than ${preferences.defaultRecipeCount ?? 3}).`,
-        );
-      }
-      if (parsed.saved_recipes.length > 0) {
-        await loadFavorites();
-      }
-    } catch (e) {
-      Alert.alert("Search failed", e instanceof Error ? e.message : "Unknown error");
-    } finally {
-      setAiSearchLoading(false);
+    if (!useSources && query.length < 3) {
+      Alert.alert(
+        "Generate recipes",
+        "Describe what you want to cook (at least 3 characters), or select pantry and/or Publix BOGOs.",
+      );
+      return;
     }
-  };
-
-  const generate = async () => {
+    if (usePantryIngredients && ready.ingredientCount === 0) {
+      Alert.alert("No pantry items", "Add items on the Pantry tab or turn off “Use ingredients from pantry”.");
+      return;
+    }
+    const publixStoreNumber = usePublixBogoIngredients
+      ? resolvePublixStoreNumberForApi(preferences)
+      : undefined;
     if (!ready.serverOk) {
       Alert.alert(
         "Server offline",
         "Start the recipe API (server/run.ps1) and set the home server URL in Settings. Use port 8000, not Metro 8081.",
       );
-      return;
-    }
-    if (ready.ingredientCount === 0) {
-      Alert.alert("No ingredients", "Add items on the Pantry tab first. Generation uses what you have at home.");
       return;
     }
     if (ready.ollamaOk === false) {
@@ -234,14 +201,19 @@ export default function RecipesScreen() {
       return;
     }
 
-    setLoading(true);
+    const targetCount = preferences.defaultRecipeCount ?? 3;
+
+    setGenerateLoading(true);
     try {
-      const raw = await apiJson<unknown>("/recipes/generate", {
+      const raw = await apiJson<unknown>("/recipes/generate/sources", {
         baseUrl: serverUrl,
         method: "POST",
         body: JSON.stringify({
-          use_all: true,
-          count: preferences.defaultRecipeCount ?? 3,
+          use_pantry: usePantryIngredients,
+          use_publix_bogo: usePublixBogoIngredients,
+          ...(publixStoreNumber != null ? { publix_store_number: publixStoreNumber } : {}),
+          ...(query ? { query } : {}),
+          count: targetCount,
           persist_generated: preferences.autoPersistGeneratedRecipes,
           prioritize_expiring: preferences.prioritizeExpiringWhenGenerating ?? true,
           ...(aiConstraints ? { constraints: aiConstraints } : {}),
@@ -252,13 +224,21 @@ export default function RecipesScreen() {
         markScrollToGenerated();
       }
       setGenerated(parsed.recipes);
+      if (parsed.recipes.length === 0) {
+        Alert.alert("Generate recipes", "No recipes came back — try different options or wording.");
+      } else if (!useSources && parsed.recipes.length < targetCount) {
+        Alert.alert(
+          "Generate recipes",
+          `Got ${parsed.recipes.length} recipe${parsed.recipes.length === 1 ? "" : "s"} (model sometimes returns fewer than ${targetCount}).`,
+        );
+      }
       if (parsed.saved_recipes.length > 0) {
         await loadFavorites();
       }
     } catch (e) {
       Alert.alert("Generate failed", e instanceof Error ? e.message : "Unknown error");
     } finally {
-      setLoading(false);
+      setGenerateLoading(false);
       void refreshReady();
     }
   };
@@ -351,37 +331,38 @@ export default function RecipesScreen() {
         }}
       />
 
-      {/* Primary generate CTA */}
-      <AppButton
-        label={loading ? "Finding recipes…" : GENERATE_RECIPE_FROM_INGREDIENTS_LABEL}
-        loading={loading}
-        onPress={() => {
-          dismissSearch();
-          void generate();
-        }}
-      />
-
-      {/* AI Search */}
       <CollapsibleSection
         title="Search for a recipe idea"
         expanded={aiSearchExpanded}
         onToggle={() => setAiSearchExpanded((open) => !open)}
       >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Describe what you want to cook and the AI will suggest ideas.
+          Optional: describe what you want. Check pantry or Publix BOGOs to cook from those items (or
+          both). With neither checked, generation uses your description like a recipe search.
         </Text>
+        <RecipeSourceCheckbox
+          label={RECIPE_USE_PANTRY_INGREDIENTS_LABEL}
+          checked={usePantryIngredients}
+          onToggle={() => setUsePantryIngredients((on) => !on)}
+          colors={colors}
+        />
+        <RecipeSourceCheckbox
+          label={RECIPE_USE_PUBLIX_BOGO_LABEL}
+          checked={usePublixBogoIngredients}
+          onToggle={() => setUsePublixBogoIngredients((on) => !on)}
+          colors={colors}
+        />
         <AppTextField
           placeholder="e.g. quick weeknight pasta, comfort soup…"
-          value={aiSearchQuery}
-          onChangeText={setAiSearchQuery}
+          value={recipeIdeaQuery}
+          onChangeText={setRecipeIdeaQuery}
         />
         <AppButton
-          label={aiSearchLoading ? "Searching…" : "Search for recipe"}
-          variant="secondary"
-          loading={aiSearchLoading}
+          label={generateLoading ? "Finding recipes…" : GENERATE_RECIPES_LABEL}
+          loading={generateLoading}
           onPress={() => {
             dismissSearch();
-            void searchAiForRecipe();
+            void generateRecipes();
           }}
         />
       </CollapsibleSection>
@@ -541,6 +522,38 @@ export default function RecipesScreen() {
   );
 }
 
+type RecipeSourceCheckboxProps = {
+  label: string;
+  checked: boolean;
+  onToggle: () => void;
+  colors: ThemeColors;
+};
+
+function RecipeSourceCheckbox({ label, checked, onToggle, colors }: RecipeSourceCheckboxProps) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      accessibilityLabel={label}
+      onPress={onToggle}
+      style={({ pressed }) => [styles.sourceRow, { opacity: pressed ? 0.85 : 1 }]}
+    >
+      <View
+        style={[
+          styles.sourceCheckbox,
+          {
+            borderColor: checked ? colors.primary : colors.border,
+            backgroundColor: checked ? colors.primary : "transparent",
+          },
+        ]}
+      >
+        {checked ? <Ionicons name="checkmark" size={16} color={colors.onPrimary} /> : null}
+      </View>
+      <Text style={[styles.sourceLabel, { color: colors.text }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 type RecipeCardProps = {
   recipe: GeneratedRecipe;
   titleOverride?: string;
@@ -676,6 +689,24 @@ const styles = StyleSheet.create({
     ...typography.title,
   },
   hint: { ...typography.caption, lineHeight: 18 },
+  sourceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  sourceCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sourceLabel: {
+    ...typography.body,
+    flex: 1,
+  },
   importInput: { minHeight: 140, paddingTop: spacing.sm },
   favoritesList: { gap: spacing.md },
   titleRow: {

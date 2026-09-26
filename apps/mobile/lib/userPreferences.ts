@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
 
 import { BUILTIN_ZONES } from "@/constants/inventoryLocations";
-import { STORE_CHAINS } from "@/lib/storeChains";
+import { DEFAULT_PUBLIX_STORE_NUMBER, STORE_CHAINS } from "@/lib/storeChains";
 
 export { STORE_CHAINS, type StoreChain } from "@/lib/storeChains";
 
@@ -61,6 +61,8 @@ export const userPreferencesSchema = z.object({
   showStepNumbers: z.boolean().optional().default(true),
   expirationReminderDaysBefore: z.number().int().min(1).max(30).nullable().optional().default(null),
   globalLowStockThreshold: z.number().nullable().optional().default(null),
+  /** Publix store number for weekly-ad BOGO recipe generation (see publix.com/locations). */
+  publixStoreNumber: z.number().int().min(1).max(99999).nullable().optional().default(DEFAULT_PUBLIX_STORE_NUMBER),
 });
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
@@ -93,6 +95,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   showStepNumbers: true,
   expirationReminderDaysBefore: null,
   globalLowStockThreshold: null,
+  publixStoreNumber: DEFAULT_PUBLIX_STORE_NUMBER,
 };
 
 export function parseAvoidIngredientsInput(input: string): string[] {

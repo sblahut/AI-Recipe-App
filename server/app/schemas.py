@@ -129,6 +129,38 @@ class RecipeGenerateRequest(BaseModel):
     )
 
 
+class RecipePublixBogoGenerateRequest(BaseModel):
+    count: int = Field(default=3, ge=1, le=10)
+    constraints: str | None = None
+    persist_generated: bool | None = Field(
+        default=None,
+        description="When true, save each generated recipe as a favorite. When omitted, uses server default.",
+    )
+    publix_store_number: int | None = Field(
+        default=None,
+        ge=1,
+        description="Publix store number for weekly-ad pricing. Falls back to server PUBLIX_STORE_NUMBER.",
+    )
+
+
+class RecipeGenerateSourcesRequest(BaseModel):
+    use_pantry: bool = False
+    use_publix_bogo: bool = False
+    query: str | None = Field(default=None, max_length=500)
+    count: int = Field(default=3, ge=1, le=10)
+    constraints: str | None = None
+    prioritize_expiring: bool = True
+    persist_generated: bool | None = Field(
+        default=None,
+        description="When true, save each generated recipe as a favorite. When omitted, uses server default.",
+    )
+    publix_store_number: int | None = Field(
+        default=None,
+        ge=1,
+        description="Publix store number for weekly-ad BOGO. Falls back to server PUBLIX_STORE_NUMBER.",
+    )
+
+
 class RecipeIngredient(BaseModel):
     name: str
     quantity: str | None = None

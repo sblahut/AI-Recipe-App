@@ -18,8 +18,12 @@ export const RECIPE_SHOPPING_LIST_BUTTON_LABEL = "+ Shopping list";
 /** Recipe card: schedule recipe on the meal plan. */
 export const RECIPE_MEAL_PLAN_BUTTON_LABEL = "+ Meal plan";
 
-/** Recipes tab: generate from home inventory via Ollama. */
-export const GENERATE_RECIPE_FROM_INGREDIENTS_LABEL = "Generate Recipe from Ingredients";
+/** Recipes tab: unified generate action. */
+export const GENERATE_RECIPES_LABEL = "Generate Recipes";
+
+/** Recipe source toggles inside the idea / generate section. */
+export const RECIPE_USE_PANTRY_INGREDIENTS_LABEL = "Use ingredients from pantry";
+export const RECIPE_USE_PUBLIX_BOGO_LABEL = "Use ingredients from Publix BOGO list";
 
 export function shareShoppingListAccessibilityLabel(listName: string): string {
   return `Share shopping list ${listName}`;

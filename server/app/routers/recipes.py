@@ -4,11 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.services.publix_bogo import PublixBogoError, fetch_publix_bogo_titles
 from app.database import get_db
 from app.models import Ingredient, SavedRecipe
 from app.schemas import (
     RecipeGenerateRequest,
     RecipeGenerateResponse,
+    RecipePublixBogoGenerateRequest,
+    RecipeGenerateSourcesRequest,
     RecipeImportRequest,
     RecipeImportResponse,
     RecipeSearchRequest,
@@ -69,6 +72,107 @@ async def generate_recipes(
         )
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+    persist = (
+        body.persist_generated
+        if body.persist_generated is not None
+        else settings.default_persist_generated_recipes
+    )
+    saved_reads = persist_generated_recipes_as_favorites(db, recipes) if persist else []
+
+    return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
+
+
+@router.post("/generate/publix-bogo", response_model=RecipeGenerateResponse)
+async def generate_recipes_from_publix_bogo(
+    body: RecipePublixBogoGenerateRequest, db: Session = Depends(get_db)
+) -> RecipeGenerateResponse:
+    store_number = body.publix_store_number or settings.publix_store_number
+    if store_number is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Set PUBLIX_STORE_NUMBER on the server or send publix_store_number in the request",
+        )
+
+    try:
+        bogo_titles = await fetch_publix_bogo_titles(store_number)
+    except PublixBogoError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    lines = [f"{title} (Publix BOGO)" for title in bogo_titles]
+
+    try:
+        recipes = await ollama.generate_recipes_from_bogo_deals(
+            lines, count=body.count, constraints=body.constraints
+        )
+    except ollama.OllamaError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    persist = (
+        body.persist_generated
+        if body.persist_generated is not None
+        else settings.default_persist_generated_recipes
+    )
+    saved_reads = persist_generated_recipes_as_favorites(db, recipes) if persist else []
+
+    return RecipeGenerateResponse(recipes=recipes, saved_recipes=saved_reads)
+
+
+@router.post("/generate/sources", response_model=RecipeGenerateResponse)
+async def generate_recipes_from_sources(
+    body: RecipeGenerateSourcesRequest, db: Session = Depends(get_db)
+) -> RecipeGenerateResponse:
+    idea = (body.query or "").strip()
+    use_sources = body.use_pantry or body.use_publix_bogo
+
+    if not use_sources:
+        if len(idea) < 3:
+            raise HTTPException(
+                status_code=400,
+                detail="Describe a recipe idea (3+ characters) or select pantry and/or Publix BOGOs.",
+            )
+        try:
+            recipes = await ollama.search_recipes(
+                query=idea, count=body.count, constraints=body.constraints
+            )
+        except ollama.OllamaError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
+    else:
+        pantry_lines: list[str] = []
+        bogo_lines: list[str] = []
+
+        if body.use_pantry:
+            rows = db.query(Ingredient).order_by(Ingredient.name).all()
+            if not rows:
+                raise HTTPException(status_code=400, detail="No ingredients available")
+            if body.prioritize_expiring:
+                rows = sorted(rows, key=lambda r: (r.expires_at is None, r.expires_at or ""))
+            pantry_lines = [_format_line(r) for r in rows]
+
+        if body.use_publix_bogo:
+            store_number = body.publix_store_number or settings.publix_store_number
+            if store_number is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Set PUBLIX_STORE_NUMBER on the server or send publix_store_number",
+                )
+            try:
+                bogo_titles = await fetch_publix_bogo_titles(store_number)
+            except PublixBogoError as e:
+                raise HTTPException(status_code=502, detail=str(e)) from e
+            bogo_lines = [f"{title} (Publix BOGO)" for title in bogo_titles]
+
+        try:
+            recipes = await ollama.generate_recipes_from_selected_sources(
+                pantry_lines=pantry_lines,
+                bogo_lines=bogo_lines,
+                count=body.count,
+                constraints=body.constraints,
+                prioritize_expiring=body.prioritize_expiring and bool(pantry_lines),
+                idea_query=idea if idea else None,
+            )
+        except ollama.OllamaError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
 
     persist = (
         body.persist_generated

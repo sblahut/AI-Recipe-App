@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from app.config import settings
 from app.schemas import GeneratedRecipe
 from app.services.recipe_ai_search import build_recipe_search_prompt
+from app.services.recipe_generate_sources import build_selected_sources_prompt
 
 
 class OllamaError(Exception):
@@ -58,6 +59,114 @@ Pantry:
 {pantry}
 {extra}
 """
+
+    payload = {
+        "model": settings.ollama_text_model,
+        "prompt": prompt,
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.7},
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        r = await client.post(f"{settings.ollama_host}/api/generate", json=payload)
+        if not r.is_success:
+            raise OllamaError(f"Ollama generate failed: {r.status_code} {r.text}")
+        data = r.json()
+        raw = data.get("response", "")
+        parsed = _extract_json(raw)
+        if isinstance(parsed, dict) and "recipes" in parsed:
+            recipes_raw = parsed["recipes"]
+        elif isinstance(parsed, list):
+            recipes_raw = parsed
+        else:
+            raise OllamaError("Unexpected JSON shape from model")
+
+    recipes: list[GeneratedRecipe] = []
+    if not isinstance(recipes_raw, list):
+        raise OllamaError("Unexpected JSON shape from model")
+    for item in recipes_raw:
+        try:
+            recipes.append(GeneratedRecipe.model_validate(item))
+        except ValidationError as e:
+            raise OllamaError(f"Model returned an invalid recipe: {e}") from e
+    return recipes
+
+
+async def generate_recipes_from_bogo_deals(
+    deal_lines: list[str],
+    *,
+    count: int,
+    constraints: str | None,
+) -> list[GeneratedRecipe]:
+    deals = "\n".join(f"- {line}" for line in deal_lines) or "- (no BOGO items)"
+    extra = ""
+    if constraints:
+        extra += f"\nConstraints: {constraints}"
+
+    prompt = f"""You are a home chef planning meals around Publix weekly-ad BOGO (buy one get one) deals.
+Create {count} practical recipes that use primarily these sale items (shop the deals; pantry staples like salt, oil, or spices are fine).
+Return ONLY a JSON object with key "recipes" (array). Each recipe must have:
+title (string), servings (integer), prep_minutes (integer),
+ingredients (array of {{name, quantity}} where quantity is a string like "2" or "1 cup"),
+steps (array of strings),
+uses_from_pantry (array of strings — BOGO deal item names used from the list below).
+
+Publix BOGO deals this week:
+{deals}
+{extra}
+"""
+
+    payload = {
+        "model": settings.ollama_text_model,
+        "prompt": prompt,
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.7},
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        r = await client.post(f"{settings.ollama_host}/api/generate", json=payload)
+        if not r.is_success:
+            raise OllamaError(f"Ollama generate failed: {r.status_code} {r.text}")
+        data = r.json()
+        raw = data.get("response", "")
+        parsed = _extract_json(raw)
+        if isinstance(parsed, dict) and "recipes" in parsed:
+            recipes_raw = parsed["recipes"]
+        elif isinstance(parsed, list):
+            recipes_raw = parsed
+        else:
+            raise OllamaError("Unexpected JSON shape from model")
+
+    recipes: list[GeneratedRecipe] = []
+    if not isinstance(recipes_raw, list):
+        raise OllamaError("Unexpected JSON shape from model")
+    for item in recipes_raw:
+        try:
+            recipes.append(GeneratedRecipe.model_validate(item))
+        except ValidationError as e:
+            raise OllamaError(f"Model returned an invalid recipe: {e}") from e
+    return recipes
+
+
+async def generate_recipes_from_selected_sources(
+    *,
+    pantry_lines: list[str],
+    bogo_lines: list[str],
+    count: int,
+    constraints: str | None,
+    prioritize_expiring: bool,
+    idea_query: str | None,
+) -> list[GeneratedRecipe]:
+    prompt = build_selected_sources_prompt(
+        count=count,
+        pantry_lines=pantry_lines,
+        bogo_lines=bogo_lines,
+        constraints=constraints,
+        prioritize_expiring=prioritize_expiring,
+        idea_query=idea_query,
+    )
 
     payload = {
         "model": settings.ollama_text_model,
