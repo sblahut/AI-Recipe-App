@@ -31,3 +31,13 @@ def test_count_without_size() -> None:
     assert defaults.default_quantity_kind == "count"
     assert defaults.default_quantity == 1.0
     assert defaults.default_unit == "each"
+
+
+def test_malformed_quantity_string_falls_back() -> None:
+    defaults = infer_product_defaults(
+        {
+            "product_name": "Bad data",
+            "quantity": ". g",
+        }
+    )
+    assert defaults.default_quantity == 1.0

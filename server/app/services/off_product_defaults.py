@@ -38,7 +38,9 @@ def _parse_quantity_string(raw: str) -> tuple[float, str] | None:
     match = _SIZE_IN_QUANTITY.search(raw.strip().lower().replace(",", "."))
     if not match:
         return None
-    qty = float(match.group(1))
+    qty = _float_token(match.group(1))
+    if qty is None:
+        return None
     unit = match.group(2).replace(" ", "")
     if unit == "floz":
         unit = "fl oz"
