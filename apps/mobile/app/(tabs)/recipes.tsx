@@ -20,6 +20,7 @@ import { AppTextField } from "@/components/ui/AppTextField";
 import { SearchField, dismissSearchKeyboard } from "@/components/ui/SearchField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { InfoHint } from "@/components/ui/InfoHint";
 import { Screen } from "@/components/ui/Screen";
 import type { ThemeColors } from "@/constants/theme";
 import { spacing, typography } from "@/constants/theme";
@@ -36,6 +37,7 @@ import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import {
   GENERATE_RECIPES_LABEL,
+  RECIPE_GENERATE_SECTION_HINT,
   RECIPE_MEAL_PLAN_BUTTON_LABEL,
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
   RECIPE_USE_PANTRY_INGREDIENTS_LABEL,
@@ -337,10 +339,13 @@ export default function RecipesScreen() {
         expanded={aiSearchExpanded}
         onToggle={() => setAiSearchExpanded((open) => !open)}
       >
-        <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Optional: describe what you want. Check pantry or Publix BOGOs to cook from those items (or
-          both). With neither checked, generation uses your description like a recipe search.
-        </Text>
+        <View style={styles.generateSectionTopRow}>
+          <InfoHint
+            title="Search for a recipe idea"
+            message={RECIPE_GENERATE_SECTION_HINT}
+            accessibilityLabel="About generating recipes"
+          />
+        </View>
         <RecipeSourceCheckbox
           label={RECIPE_USE_PANTRY_INGREDIENTS_LABEL}
           checked={usePantryIngredients}
@@ -692,6 +697,12 @@ const styles = StyleSheet.create({
     ...typography.title,
   },
   hint: { ...typography.caption, lineHeight: 18 },
+  generateSectionTopRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginBottom: -spacing.xs,
+  },
   sourceRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -21,6 +21,10 @@ export const RECIPE_MEAL_PLAN_BUTTON_LABEL = "+ Meal plan";
 /** Recipes tab: unified generate action. */
 export const GENERATE_RECIPES_LABEL = "Generate Recipes";
 
+/** Info hint for Recipes tab “Search for a recipe idea” / generate section. */
+export const RECIPE_GENERATE_SECTION_HINT =
+  "Optional: describe what you want. Check pantry or Publix BOGOs to cook from those items (or both). With neither checked, generation uses your description like a recipe search.";
+
 /** Recipe source toggles inside the idea / generate section. */
 export const RECIPE_USE_PANTRY_INGREDIENTS_LABEL = "Use ingredients from pantry";
 export const RECIPE_USE_PUBLIX_BOGO_LABEL = "Use ingredients from Publix BOGO list";
