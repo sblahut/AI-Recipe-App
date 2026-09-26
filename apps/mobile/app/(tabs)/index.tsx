@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -107,11 +107,27 @@ export default function IngredientsScreen() {
     }
   }, [loadInventory, loadUnits]);
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      void refresh();
-    });
-  }, [refresh]);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      void (async () => {
+        try {
+          await Promise.all([loadUnits(), loadInventory()]);
+        } catch (e) {
+          if (active) {
+            Alert.alert("Error", e instanceof Error ? e.message : "Failed to load ingredients");
+          }
+        } finally {
+          if (active) {
+            setLoading(false);
+          }
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [loadInventory, loadUnits]),
+  );
 
   useEffect(() => {
     if (handledManualAdd.current) {
@@ -220,10 +236,10 @@ export default function IngredientsScreen() {
           body: JSON.stringify(payload),
         });
       }
+      await loadInventory();
       setShowForm(false);
       setEditing(null);
       setCreateDefaultLocation(undefined);
-      await loadInventory();
     } catch (e) {
       Alert.alert("Save failed", e instanceof Error ? e.message : "Unknown error");
       throw e;
