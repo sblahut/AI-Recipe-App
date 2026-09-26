@@ -190,8 +190,10 @@ export default function SettingsScreen() {
   );
 
   useEffect(() => {
-    setPublixStoreDraft(String(effectivePublixStoreNumber(preferences)));
-  }, [preferences.publixStoreNumber]);
+    queueMicrotask(() => {
+      setPublixStoreDraft(savedPublixStoreText);
+    });
+  }, [savedPublixStoreText]);
 
   const publixStoreDirty = publixStoreDraft !== savedPublixStoreText;
   const publixStoreCanSave = parsePublixStoreNumberInput(publixStoreDraft) != null;

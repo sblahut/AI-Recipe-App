@@ -4,21 +4,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.services.publix_bogo import PublixBogoError, fetch_publix_bogo_titles
 from app.database import get_db
 from app.models import Ingredient, SavedRecipe
 from app.schemas import (
     RecipeGenerateRequest,
     RecipeGenerateResponse,
-    RecipePublixBogoGenerateRequest,
     RecipeGenerateSourcesRequest,
     RecipeImportRequest,
     RecipeImportResponse,
+    RecipePublixBogoGenerateRequest,
     RecipeSearchRequest,
     SavedRecipeCreate,
     SavedRecipeRead,
 )
 from app.services import ollama
+from app.services.publix_bogo import PublixBogoError, fetch_publix_bogo_titles
 from app.services.recipe_persist import (
     import_recipe_favorite_flag,
     import_recipe_should_persist,

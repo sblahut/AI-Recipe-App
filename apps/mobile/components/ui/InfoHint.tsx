@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } fro
 
 import { AppButton } from "@/components/ui/AppButton";
 import { DismissibleModal } from "@/components/ui/DismissibleModal";
-import { spacing, typography } from "@/constants/theme";
+import { typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 type Props = {
