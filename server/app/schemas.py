@@ -68,6 +68,32 @@ class IngredientBulkCreate(BaseModel):
     items: list[IngredientCreate]
 
 
+class ProposedIngredientItem(QuantityFieldsMixin):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class ReceiptProposeRequest(BaseModel):
+    image_base64: str | None = Field(default=None, min_length=64)
+    text: str | None = Field(default=None, max_length=50_000)
+    url: str | None = Field(default=None, max_length=2048)
+
+    @model_validator(mode="after")
+    def exactly_one_purchase_source(self) -> "ReceiptProposeRequest":
+        image = (self.image_base64 or "").strip()
+        text = (self.text or "").strip()
+        url = (self.url or "").strip()
+        filled = sum(1 for value in (image, text, url) if value)
+        if filled != 1:
+            raise ValueError("Provide exactly one of image_base64, text, or url")
+        if text and len(text) < 20:
+            raise ValueError("text must be at least 20 characters")
+        return self
+
+
+class ReceiptProposeResponse(BaseModel):
+    items: list[ProposedIngredientItem]
+
+
 class ProductRead(BaseModel):
     barcode: str
     name: str

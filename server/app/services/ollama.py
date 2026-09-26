@@ -290,3 +290,55 @@ Recipe text:
         return GeneratedRecipe.model_validate(parsed)
     except ValidationError as e:
         raise OllamaError(f"Model returned an invalid recipe: {e}") from e
+
+
+async def generate_text_json(prompt: str) -> object:
+    payload = {
+        "model": settings.ollama_text_model,
+        "prompt": prompt,
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.1},
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        r = await client.post(f"{settings.ollama_host}/api/generate", json=payload)
+        if not r.is_success:
+            raise OllamaError(f"Ollama generate failed: {r.status_code} {r.text}")
+        data = r.json()
+        raw = data.get("response", "")
+        if not isinstance(raw, str) or not raw.strip():
+            raise OllamaError("Model returned an empty response")
+
+    return _extract_json(raw)
+
+
+async def generate_vision_json(prompt: str, image_base64: str) -> object:
+    payload = {
+        "model": settings.ollama_vision_model,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt,
+                "images": [image_base64],
+            }
+        ],
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.1},
+    }
+
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        r = await client.post(f"{settings.ollama_host}/api/chat", json=payload)
+        if not r.is_success:
+            raise OllamaError(
+                f"Ollama vision failed: {r.status_code} {r.text}. "
+                f"Install a vision model with `ollama pull {settings.ollama_vision_model}`."
+            )
+        data = r.json()
+        message = data.get("message") or {}
+        raw = message.get("content", "")
+        if not isinstance(raw, str) or not raw.strip():
+            raise OllamaError("Vision model returned an empty response")
+
+    return _extract_json(raw)

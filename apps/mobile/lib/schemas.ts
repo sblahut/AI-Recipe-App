@@ -18,6 +18,18 @@ export const ingredientSchema = z.object({
 });
 export type Ingredient = z.infer<typeof ingredientSchema>;
 
+export const proposedIngredientSchema = z.object({
+  name: z.string(),
+  quantity: z.number().nullable().optional(),
+  quantity_kind: quantityKindSchema.optional(),
+  unit: z.string().nullable().optional(),
+});
+export type ProposedIngredient = z.infer<typeof proposedIngredientSchema>;
+
+export const receiptProposeResponseSchema = z.object({
+  items: z.array(proposedIngredientSchema),
+});
+
 export const ingredientCreateSchema = z.object({
   name: z.string(),
   quantity: z.number().nullable().optional(),

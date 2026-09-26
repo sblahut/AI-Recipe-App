@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{_DEFAULT_DB}"
     ollama_host: str = "http://127.0.0.1:11434"
     ollama_text_model: str = "mistral:7b"
+    ollama_vision_model: str = "llava:7b"
+    receipt_vision_fallback: bool = False
     default_persist_generated_recipes: bool = False
     publix_store_number: int = 1885
 

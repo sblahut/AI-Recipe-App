@@ -31,6 +31,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiFetch, apiJson } from "@/lib/api";
 import { syncExpirationReminders } from "@/lib/expirationReminders";
 import { sortPantryItems } from "@/lib/pantrySort";
+import { startAddFromImage } from "@/lib/startAddFromImage";
 import { startIngredientScan } from "@/lib/startIngredientScan";
 import {
   formatIngredientExpirationPhrase,
@@ -418,6 +419,26 @@ export default function IngredientsScreen() {
           <Text style={[styles.actionLabel, { color: colors.text }]}>Scan barcode</Text>
         </Pressable>
       </View>
+      <View style={styles.actionRow}>
+        <Pressable
+          onPress={() => {
+            dismissSearch();
+            startAddFromImage();
+          }}
+          style={({ pressed }) => [
+            styles.actionCard,
+            styles.actionCardFull,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <Ionicons name="image-outline" size={22} color={colors.primary} />
+          <Text style={[styles.actionLabel, { color: colors.text }]}>Add from image</Text>
+        </Pressable>
+      </View>
 
       {/* Storage areas */}
       <Pressable style={styles.filterSection} onPress={dismissSearch}>
@@ -557,6 +578,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
+  },
+  actionCardFull: {
+    flex: 1,
   },
   actionCard: {
     flex: 1,
