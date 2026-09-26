@@ -43,6 +43,7 @@ import {
   shareRecipeAccessibilityLabel,
 } from "@/lib/uiActionLabels";
 import { recipeListKey } from "@/lib/recipeListKey";
+import { formatRecipeSourceMetaLine } from "@/lib/recipeSourceLists";
 import { recipeMatchesSearch } from "@/lib/recipeSearch";
 import { formatFilteredSectionTitle } from "@/lib/recipeSectionTitle";
 import {
@@ -582,12 +583,14 @@ function RecipeCard({
   onShare,
 }: RecipeCardProps) {
   const title = titleOverride ?? recipe.title;
+  const sourceMeta = formatRecipeSourceMetaLine(recipe);
   const subtitle =
     meta ??
     [
       recipe.prep_minutes != null ? `${recipe.prep_minutes} min` : null,
       recipe.servings != null ? `Serves ${recipe.servings}` : null,
       `${recipe.ingredients.length} ingredients`,
+      sourceMeta,
     ]
       .filter(Boolean)
       .join(" · ");

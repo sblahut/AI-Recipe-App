@@ -33,7 +33,8 @@ Return ONLY a JSON object with key "recipes" (array). Each recipe must have:
 title (string), servings (integer), prep_minutes (integer),
 ingredients (array of {{name, quantity}} where quantity is a string like "2" or "1 cup"),
 steps (array of strings),
-uses_from_pantry (array of strings — names of items used from the lists below).
+uses_from_pantry (array of strings — names used from the pantry list only, empty if none),
+uses_from_publix_bogo (array of strings — names used from the Publix BOGO list only, empty if none).
 
 Available items:
 {sources}

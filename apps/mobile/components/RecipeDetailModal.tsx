@@ -4,6 +4,7 @@ import { AppButton } from "@/components/ui/AppButton";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
+import { RecipeSourceNotes } from "@/components/RecipeSourceNotes";
 import type { GeneratedRecipe } from "@/lib/schemas";
 
 type Props = {
@@ -79,14 +80,7 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
             </View>
           </View>
 
-          {/* Pantry match */}
-          {recipe.uses_from_pantry && recipe.uses_from_pantry.length > 0 ? (
-            <View style={[styles.pantryNote, { backgroundColor: colors.successMuted }]}>
-              <Text style={[styles.pantryNoteText, { color: colors.success }]}>
-                {recipe.uses_from_pantry.length} ingredient{recipe.uses_from_pantry.length === 1 ? "" : "s"} already in your pantry
-              </Text>
-            </View>
-          ) : null}
+          <RecipeSourceNotes recipe={recipe} colors={colors} />
 
           {/* Steps */}
           <View style={styles.section}>
@@ -176,15 +170,6 @@ const styles = StyleSheet.create({
   emptyNote: {
     ...typography.body,
     padding: spacing.lg,
-  },
-  pantryNote: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    marginBottom: spacing.xl,
-  },
-  pantryNoteText: {
-    ...typography.captionMedium,
   },
   stepRow: {
     flexDirection: "row",

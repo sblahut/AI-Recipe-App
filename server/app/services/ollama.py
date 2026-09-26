@@ -53,7 +53,8 @@ Return ONLY a JSON object with key "recipes" (array). Each recipe must have:
 title (string), servings (integer), prep_minutes (integer),
 ingredients (array of {{name, quantity}} where quantity is a string like "2" or "1 cup"),
 steps (array of strings),
-uses_from_pantry (array of strings — subset of pantry item names used).
+uses_from_pantry (array of strings — subset of pantry item names used),
+uses_from_publix_bogo (empty array []).
 
 Pantry:
 {pantry}
@@ -110,7 +111,8 @@ Return ONLY a JSON object with key "recipes" (array). Each recipe must have:
 title (string), servings (integer), prep_minutes (integer),
 ingredients (array of {{name, quantity}} where quantity is a string like "2" or "1 cup"),
 steps (array of strings),
-uses_from_pantry (array of strings — BOGO deal item names used from the list below).
+uses_from_pantry (empty array []),
+uses_from_publix_bogo (array of strings — BOGO deal item names used from the list below).
 
 Publix BOGO deals this week:
 {deals}
@@ -251,7 +253,8 @@ Return ONLY a JSON object (not an array) with:
 title (string), servings (integer or null), prep_minutes (integer or null),
 ingredients (array of {{name, quantity}} where quantity is a string like "2 cups" or "1 lb"),
 steps (array of strings, in order),
-uses_from_pantry (empty array [] if unknown).
+uses_from_pantry (empty array [] if unknown),
+uses_from_publix_bogo (empty array []).
 
 Preserve ingredient amounts and step order from the source text. Do not invent extra ingredients.
 

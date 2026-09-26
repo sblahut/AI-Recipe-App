@@ -57,6 +57,7 @@ export const generatedRecipeSchema = z.object({
   ingredients: z.array(recipeIngredientSchema),
   steps: z.array(z.string()),
   uses_from_pantry: z.array(z.string()).optional(),
+  uses_from_publix_bogo: z.array(z.string()).optional(),
 });
 export type GeneratedRecipe = z.infer<typeof generatedRecipeSchema>;
 

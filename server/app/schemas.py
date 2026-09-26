@@ -186,6 +186,7 @@ class GeneratedRecipe(BaseModel):
     ingredients: list[RecipeIngredient]
     steps: list[str]
     uses_from_pantry: list[str] = Field(default_factory=list)
+    uses_from_publix_bogo: list[str] = Field(default_factory=list)
 
 
 class RecipeGenerateResponse(BaseModel):
