@@ -1,4 +1,6 @@
-from app.services.publix_bogo import decode_publix_title, parse_bogo_titles
+import pytest
+
+from app.services.publix_bogo import PublixBogoError, decode_publix_title, parse_bogo_titles
 
 
 def test_decode_publix_title_unescapes_html() -> None:
@@ -15,6 +17,11 @@ def test_parse_bogo_titles_filters_category() -> None:
     }
     titles = parse_bogo_titles(payload)
     assert titles == ["Cheerios", "Thomas' Bagels"]
+
+
+def test_parse_bogo_titles_raises_when_no_bogo_rows() -> None:
+    with pytest.raises(PublixBogoError, match="No BOGO items"):
+        parse_bogo_titles({"Savings": [{"title": "Milk", "categories": ["grocery"]}]})
 
 
 def test_parse_bogo_titles_deduplicates() -> None:
