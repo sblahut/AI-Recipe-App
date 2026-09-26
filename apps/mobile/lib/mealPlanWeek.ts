@@ -8,6 +8,17 @@ export const MEAL_SLOT_LABELS: Record<MealSlot, string> = {
   snack: "Snack",
 };
 
+/** Week-start weekday for meal plan (0 = Sunday … 6 = Saturday). */
+export const WEEK_START_DAY_OPTIONS: { day: number; label: string }[] = [
+  { day: 0, label: "Sunday" },
+  { day: 1, label: "Monday" },
+  { day: 2, label: "Tuesday" },
+  { day: 3, label: "Wednesday" },
+  { day: 4, label: "Thursday" },
+  { day: 5, label: "Friday" },
+  { day: 6, label: "Saturday" },
+];
+
 /** Local calendar day as YYYY-MM-DD. */
 export function formatPlanDate(date: Date): string {
   const y = date.getFullYear();

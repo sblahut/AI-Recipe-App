@@ -8,6 +8,7 @@ import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { ThemeColorPickerModal } from "@/components/ThemeColorPickerModal";
 import { SettingsLinkRow, SettingsSwitchRow } from "@/components/ui/SettingsRow";
 import { AppButton } from "@/components/ui/AppButton";
+import { AppSelect } from "@/components/ui/AppSelect";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { Chip } from "@/components/ui/Chip";
@@ -22,6 +23,7 @@ import { apiJson } from "@/lib/api";
 import { expoGoDisplayUrl, qrCodeImageUri } from "@/lib/expoGoDevUrl";
 import { homeNetworkSchema } from "@/lib/schemas";
 import { isCollapsibleExpanded } from "@/lib/collapsibleExpanded";
+import { WEEK_START_DAY_OPTIONS } from "@/lib/mealPlanWeek";
 import { rescheduleExpirationRemindersFromServer } from "@/lib/expirationReminders";
 import {
   DEFAULT_PUBLIX_STORE_NUMBER,
@@ -64,16 +66,6 @@ const THEME_OPTIONS: { mode: ThemeMode; label: string }[] = [
 ];
 
 const RECIPE_COUNT_OPTIONS = [1, 2, 3, 5, 10] as const;
-
-const WEEK_START_OPTIONS: { day: WeekStartsOnDay; label: string }[] = [
-  { day: 0, label: "Sun" },
-  { day: 1, label: "Mon" },
-  { day: 2, label: "Tue" },
-  { day: 3, label: "Wed" },
-  { day: 4, label: "Thu" },
-  { day: 5, label: "Fri" },
-  { day: 6, label: "Sat" },
-];
 
 const EXPIRATION_REMINDER_OPTIONS: { days: number | null; label: string }[] = [
   { days: null, label: "Off" },
@@ -858,18 +850,14 @@ export default function SettingsScreen() {
         onToggle={() => toggleSection("mealPlan")}
         leadingIcon="calendar-outline"
       >
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>Week starts on</Text>
-        <View style={styles.chipRow}>
-          {WEEK_START_OPTIONS.map(({ day, label }) => (
-            <Chip
-              key={day}
-              label={label}
-              selected={(preferences.weekStartsOnDay ?? 1) === day}
-              capitalize={false}
-              onPress={() => void updatePreferences({ weekStartsOnDay: day })}
-            />
-          ))}
-        </View>
+        <AppSelect<WeekStartsOnDay>
+          label="Week starts on"
+          hint="First day shown on the Plan tab."
+          value={preferences.weekStartsOnDay ?? 1}
+          options={WEEK_START_DAY_OPTIONS.map(({ day, label }) => ({ value: day, label }))}
+          onValueChange={(day) => void updatePreferences({ weekStartsOnDay: day })}
+          accessibilityLabel="Week starts on"
+        />
       </CollapsibleSection>
 
       <CollapsibleSection
