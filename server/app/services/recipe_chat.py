@@ -102,7 +102,9 @@ def parse_assistant_reply(raw: str) -> RecipeChatReply:
     try:
         parsed = ollama._extract_json(text)
     except ollama.OllamaError:
-        return RecipeChatReply(kind="message", assistant_text=normalize_display_text(text), recipes=[])
+        return RecipeChatReply(
+            kind="message", assistant_text=normalize_display_text(text), recipes=[]
+        )
 
     if not isinstance(parsed, dict):
         return RecipeChatReply(kind="message", assistant_text=text, recipes=[])
@@ -116,7 +118,9 @@ def parse_assistant_reply(raw: str) -> RecipeChatReply:
                 assistant_text=normalize_display_text(content),
                 recipes=[],
             )
-        return RecipeChatReply(kind="message", assistant_text=normalize_display_text(text), recipes=[])
+        return RecipeChatReply(
+            kind="message", assistant_text=normalize_display_text(text), recipes=[]
+        )
 
     recipes_raw = parsed.get("recipes")
     if recipes_raw is None and isinstance(parsed.get("title"), str):
@@ -135,8 +139,10 @@ def parse_assistant_reply(raw: str) -> RecipeChatReply:
             except ValidationError:
                 continue
         if recipes:
-            assistant_text = normalize_display_text(intro_text) if intro_text else (
-                f"Here are {len(recipes)} recipe idea(s)."
+            assistant_text = (
+                normalize_display_text(intro_text)
+                if intro_text
+                else (f"Here are {len(recipes)} recipe idea(s).")
             )
             return RecipeChatReply(kind="recipes", assistant_text=assistant_text, recipes=recipes)
 
@@ -173,9 +179,7 @@ def _ollama_messages(history: list[RecipeChatMessage], system: str) -> list[dict
             try:
                 recipes = json.loads(row.recipes_json)
                 if isinstance(recipes, list) and recipes:
-                    titles = [
-                        r.get("title", "Recipe") for r in recipes if isinstance(r, dict)
-                    ]
+                    titles = [r.get("title", "Recipe") for r in recipes if isinstance(r, dict)]
                     suffix = f" [Proposed recipes: {', '.join(titles)}]"
                     content = (content + suffix).strip()
             except json.JSONDecodeError:
@@ -225,17 +229,12 @@ def chat_session_preview(db: Session, session_id: int) -> str:
 
 def list_chat_sessions(db: Session, *, limit: int = 50) -> list[tuple[RecipeChatSession, int, str]]:
     sessions = (
-        db.query(RecipeChatSession)
-        .order_by(RecipeChatSession.updated_at.desc())
-        .limit(limit)
-        .all()
+        db.query(RecipeChatSession).order_by(RecipeChatSession.updated_at.desc()).limit(limit).all()
     )
     summaries: list[tuple[RecipeChatSession, int, str]] = []
     for session in sessions:
         count = (
-            db.query(RecipeChatMessage)
-            .filter(RecipeChatMessage.session_id == session.id)
-            .count()
+            db.query(RecipeChatMessage).filter(RecipeChatMessage.session_id == session.id).count()
         )
         if count == 0:
             continue

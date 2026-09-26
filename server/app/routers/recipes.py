@@ -326,9 +326,7 @@ async def send_recipe_chat(
         if persist:
             saved_reads = persist_generated_recipes_as_favorites(db, reply.recipes)
 
-    messages = [
-        _chat_message_to_read(row) for row in load_session_messages(db, session.id)
-    ]
+    messages = [_chat_message_to_read(row) for row in load_session_messages(db, session.id)]
     reply_kind = "recipes" if reply.recipes else "message"
     return RecipeChatSendResponse(
         session_id=session.id,
@@ -354,7 +352,9 @@ def list_recipe_chat_sessions(db: Session = Depends(get_db)) -> list[RecipeChatS
 
 
 @router.get("/chat/sessions/{session_id}", response_model=RecipeChatSessionDetail)
-def get_recipe_chat_session(session_id: int, db: Session = Depends(get_db)) -> RecipeChatSessionDetail:
+def get_recipe_chat_session(
+    session_id: int, db: Session = Depends(get_db)
+) -> RecipeChatSessionDetail:
     row = db.get(RecipeChatSession, session_id)
     if not row:
         raise HTTPException(status_code=404, detail="Chat session not found")

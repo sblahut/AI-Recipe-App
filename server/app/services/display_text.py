@@ -43,5 +43,7 @@ def normalize_generated_recipe(recipe: GeneratedRecipe) -> GeneratedRecipe:
         ingredients=ingredients,
         steps=[normalize_display_text(step) for step in recipe.steps],
         uses_from_pantry=[normalize_display_text(name) for name in recipe.uses_from_pantry],
-        uses_from_publix_bogo=[normalize_display_text(name) for name in recipe.uses_from_publix_bogo],
+        uses_from_publix_bogo=[
+            normalize_display_text(name) for name in recipe.uses_from_publix_bogo
+        ],
     )

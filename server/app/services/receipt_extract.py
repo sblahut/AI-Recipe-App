@@ -108,9 +108,7 @@ def _photo_failure_hint() -> str:
 
 
 def _no_items_error() -> ollama.OllamaError:
-    return ollama.OllamaError(
-        f"No grocery items were found. {_photo_failure_hint()}"
-    )
+    return ollama.OllamaError(f"No grocery items were found. {_photo_failure_hint()}")
 
 
 async def propose_items_from_purchase_text(
@@ -154,8 +152,7 @@ async def propose_items_from_receipt_image(image_base64: str) -> list[ProposedIn
 
     if len(ocr_text) < MIN_OCR_TEXT_CHARS:
         raise ollama.OllamaError(
-            "Could not read enough text from the photo. "
-            f"{_photo_failure_hint()}"
+            f"Could not read enough text from the photo. {_photo_failure_hint()}"
         )
     raise _no_items_error()
 

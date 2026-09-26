@@ -27,7 +27,9 @@ def is_store_brand_only(name: str) -> bool:
     return bool(_STORE_NAME_ONLY.match(trimmed))
 
 
-def filter_proposed_purchase_items(items: list[ProposedIngredientItem]) -> list[ProposedIngredientItem]:
+def filter_proposed_purchase_items(
+    items: list[ProposedIngredientItem],
+) -> list[ProposedIngredientItem]:
     kept: list[ProposedIngredientItem] = []
     for item in items:
         name = item.name.strip()
@@ -56,10 +58,7 @@ def validate_purchase_extraction(
             f"{source_hint}"
         )
 
-    raise ollama.OllamaError(
-        "No grocery line items were found. "
-        f"{source_hint}"
-    )
+    raise ollama.OllamaError(f"No grocery line items were found. {source_hint}")
 
 
 def invoice_text_quality_hint(text: str) -> str | None:
