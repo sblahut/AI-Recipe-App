@@ -77,3 +77,45 @@ def test_add_meal_plan_range_merges_recipes_into_list() -> None:
     assert added2 == []
 
     db.close()
+
+
+def test_shop_from_meal_plan_skips_cooked_entries() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    SessionLocal = sessionmaker(bind=engine)
+    db: Session = SessionLocal()
+
+    shopping = ShoppingList(name="Week")
+    db.add(shopping)
+    db.flush()
+
+    saved = SavedRecipe(
+        title="Soup",
+        payload_json=_recipe("Soup", "carrots").model_dump_json(),
+        favorite=True,
+    )
+    db.add(saved)
+    db.flush()
+
+    db.add(
+        MealPlanEntry(
+            plan_date="2026-04-07",
+            meal_slot="dinner",
+            saved_recipe_id=saved.id,
+            cooked=True,
+        )
+    )
+    db.commit()
+
+    added, skipped, missing, meals = add_meal_plan_range_to_shopping_list(
+        db,
+        list_id=shopping.id,
+        start_date="2026-04-07",
+        end_date="2026-04-13",
+    )
+
+    assert meals == 0
+    assert added == []
+    assert skipped == []
+    assert missing == []
+    db.close()

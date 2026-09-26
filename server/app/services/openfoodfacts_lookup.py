@@ -4,20 +4,32 @@ from __future__ import annotations
 
 import httpx
 
-from app.services.off_quantity_kind import infer_default_quantity_kind
-from app.units import QuantityKind
+from app.services.off_product_defaults import OffProductDefaults, infer_product_defaults
 
 OFF_PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 TIMEOUT = httpx.Timeout(6.0, connect=3.0)
 
 
 class OffProductInfo:
-    __slots__ = ("brand", "default_quantity_kind", "name")
+    __slots__ = (
+        "brand",
+        "default_quantity",
+        "default_quantity_kind",
+        "default_unit",
+        "name",
+    )
 
-    def __init__(self, name: str, brand: str | None, default_quantity_kind: QuantityKind) -> None:
+    def __init__(
+        self,
+        name: str,
+        brand: str | None,
+        defaults: OffProductDefaults,
+    ) -> None:
         self.name = name
         self.brand = brand
-        self.default_quantity_kind = default_quantity_kind
+        self.default_quantity_kind = defaults.default_quantity_kind
+        self.default_quantity = defaults.default_quantity
+        self.default_unit = defaults.default_unit
 
 
 def lookup_product(barcode: str) -> OffProductInfo | None:
@@ -56,8 +68,8 @@ def lookup_product(barcode: str) -> OffProductInfo | None:
 
     brand_raw = product.get("brands")
     brand = brand_raw.strip() if isinstance(brand_raw, str) and brand_raw.strip() else None
-    kind = infer_default_quantity_kind(product)
-    return OffProductInfo(name=name.strip(), brand=brand, default_quantity_kind=kind)
+    defaults = infer_product_defaults(product)
+    return OffProductInfo(name=name.strip(), brand=brand, defaults=defaults)
 
 
 def lookup_product_name(barcode: str) -> tuple[str, str | None] | None:

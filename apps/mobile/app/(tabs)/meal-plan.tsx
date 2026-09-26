@@ -1,23 +1,45 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
 import { AppButton } from "@/components/ui/AppButton";
+import { AppTextField } from "@/components/ui/AppTextField";
+import { DismissibleModal } from "@/components/ui/DismissibleModal";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { InfoHint } from "@/components/ui/InfoHint";
 import { Screen } from "@/components/ui/Screen";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import {
+  resolveDefaultShoppingList,
+  skipPantryCheckFromPreferences,
+} from "@/lib/shoppingListTarget";
 import { apiFetch, apiJson } from "@/lib/api";
+import { saveCustomMealRecipeTitle } from "@/lib/mealPlanCustomMeal";
 import {
   mealPlanShopAlertMessage,
   mealPlanShopAlertTitle,
   mealPlanShopResultFromApi,
 } from "@/lib/shoppingFromMealPlanAlert";
-import { MEAL_PLAN_SHOP_WEEK_HINT } from "@/lib/uiActionLabels";
+import {
+  mealPlanCookedAccessibilityLabel,
+  mealPlanCookedPantryMessage,
+  mealPlanCookedPantryTitle,
+} from "@/lib/mealPlanCookedAlert";
+import { MEAL_PLAN_COOKED_LABEL, MEAL_PLAN_SHOP_WEEK_HINT } from "@/lib/uiActionLabels";
 import {
   MEAL_SLOT_LABELS,
   MEAL_SLOTS,
@@ -26,11 +48,12 @@ import {
   daysInWeek,
   formatPlanDate,
   mealSlotSortIndex,
-  mondayOnOrBefore,
+  weekStartOnOrBefore,
   weekdayLabel,
   weekRangeFromWeekStart,
 } from "@/lib/mealPlanWeek";
 import {
+  mealPlanCookResponseSchema,
   mealPlanEntrySchema,
   savedRecipeReadSchema,
   shoppingFromMealPlanResponseSchema,
@@ -42,16 +65,39 @@ import {
 
 export default function MealPlanScreen() {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { serverUrl } = useServerSettings();
-  const [weekStart, setWeekStart] = useState(() => mondayOnOrBefore(new Date()));
+  const { preferences } = useUserPreferences();
+  const weekStartsOnDay = preferences.weekStartsOnDay ?? 1;
+  const weekStartBase = useMemo(
+    () => weekStartOnOrBefore(new Date(), weekStartsOnDay),
+    [weekStartsOnDay],
+  );
+  const [weekOffsetDays, setWeekOffsetDays] = useState(0);
+  const weekStart = useMemo(
+    () => addDays(weekStartBase, weekOffsetDays),
+    [weekStartBase, weekOffsetDays],
+  );
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [loading, setLoading] = useState(true);
   const [shopLoading, setShopLoading] = useState(false);
+  const [customMealTarget, setCustomMealTarget] = useState<{
+    planDate: string;
+    mealSlot: MealSlot;
+  } | null>(null);
+  const [customMealTitle, setCustomMealTitle] = useState("");
+  const [customMealSaving, setCustomMealSaving] = useState(false);
 
   const weekRange = useMemo(() => weekRangeFromWeekStart(weekStart), [weekStart]);
   const weekDays = useMemo(() => daysInWeek(weekStart), [weekStart]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setWeekOffsetDays(0);
+    });
+  }, [weekStartsOnDay]);
 
   const entriesByDate = useMemo(() => {
     const map = new Map<string, MealPlanEntry[]>();
@@ -103,33 +149,74 @@ export default function MealPlanScreen() {
     });
   }, [refresh]);
 
-  const pickRecipeAndAdd = (planDate: string, mealSlot: MealSlot) => {
-    if (savedRecipes.length === 0) {
-      Alert.alert(
-        "No saved recipes",
-        "Save or favorite a recipe on the Recipes tab, then assign it here.",
-      );
+  const addMealPlanEntry = async (
+    planDate: string,
+    mealSlot: MealSlot,
+    savedRecipeId: number,
+  ) => {
+    await apiFetch("/meal-plan", {
+      baseUrl: serverUrl,
+      method: "POST",
+      body: JSON.stringify({
+        plan_date: planDate,
+        meal_slot: mealSlot,
+        saved_recipe_id: savedRecipeId,
+      }),
+    });
+    await loadPlan();
+  };
+
+  const openCustomMealModal = (planDate: string, mealSlot: MealSlot) => {
+    setCustomMealTitle("");
+    setCustomMealTarget({ planDate, mealSlot });
+  };
+
+  const closeCustomMealModal = () => {
+    if (customMealSaving) {
       return;
     }
+    setCustomMealTarget(null);
+    setCustomMealTitle("");
+  };
+
+  const submitCustomMeal = () => {
+    if (!customMealTarget) {
+      return;
+    }
+    const { planDate, mealSlot } = customMealTarget;
+    setCustomMealSaving(true);
+    void (async () => {
+      try {
+        const savedRecipeId = await saveCustomMealRecipeTitle(customMealTitle, serverUrl);
+        await addMealPlanEntry(planDate, mealSlot, savedRecipeId);
+        setCustomMealTarget(null);
+        setCustomMealTitle("");
+      } catch (e) {
+        Alert.alert("Add meal", e instanceof Error ? e.message : "Could not add meal");
+      } finally {
+        setCustomMealSaving(false);
+      }
+    })();
+  };
+
+  const pickRecipeAndAdd = (planDate: string, mealSlot: MealSlot) => {
+    const favoriteRecipes = savedRecipes.filter((row) => row.favorite);
+    const recipeOptions = favoriteRecipes.length > 0 ? favoriteRecipes : savedRecipes;
+
     Alert.alert(
       MEAL_SLOT_LABELS[mealSlot],
-      `Pick a recipe for ${planDate}`,
+      `Add a meal for ${planDate}`,
       [
-        ...savedRecipes.map((row) => ({
+        {
+          text: "Meal Not in Favorites",
+          onPress: () => openCustomMealModal(planDate, mealSlot),
+        },
+        ...recipeOptions.map((row) => ({
           text: row.title,
           onPress: () => {
             void (async () => {
               try {
-                await apiFetch("/meal-plan", {
-                  baseUrl: serverUrl,
-                  method: "POST",
-                  body: JSON.stringify({
-                    plan_date: planDate,
-                    meal_slot: mealSlot,
-                    saved_recipe_id: row.id,
-                  }),
-                });
-                await loadPlan();
+                await addMealPlanEntry(planDate, mealSlot, row.id);
               } catch (e) {
                 Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
               }
@@ -149,6 +236,58 @@ export default function MealPlanScreen() {
       })),
       { text: "Cancel", style: "cancel" },
     ]);
+  };
+
+  const applyCookedResult = async (
+    entry: MealPlanEntry,
+    cooked: boolean,
+    consumePantry: boolean,
+  ) => {
+    const raw = await apiJson<unknown>(`/meal-plan/${entry.id}/cooked`, {
+      baseUrl: serverUrl,
+      method: "POST",
+      body: JSON.stringify({ cooked, consume_pantry: consumePantry }),
+    });
+    const result = mealPlanCookResponseSchema.parse(raw);
+    setEntries((current) =>
+      current.map((row) => (row.id === result.entry.id ? result.entry : row)),
+    );
+    if (cooked && consumePantry) {
+      Alert.alert(mealPlanCookedPantryTitle(result), mealPlanCookedPantryMessage(result));
+    }
+  };
+
+  const promptCooked = (entry: MealPlanEntry) => {
+    if (entry.cooked) {
+      void applyCookedResult(entry, false, false).catch((e: unknown) => {
+        Alert.alert("Meal plan", e instanceof Error ? e.message : "Could not update meal");
+      });
+      return;
+    }
+
+    Alert.alert(
+      "Cooked?",
+      `Remove ingredients for “${entry.recipe_title}” from Pantry?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Keep pantry",
+          onPress: () => {
+            void applyCookedResult(entry, true, false).catch((e: unknown) => {
+              Alert.alert("Meal plan", e instanceof Error ? e.message : "Could not update meal");
+            });
+          },
+        },
+        {
+          text: "Remove from pantry",
+          onPress: () => {
+            void applyCookedResult(entry, true, true).catch((e: unknown) => {
+              Alert.alert("Meal plan", e instanceof Error ? e.message : "Could not update meal");
+            });
+          },
+        },
+      ],
+    );
   };
 
   const removeEntry = (entry: MealPlanEntry) => {
@@ -174,52 +313,64 @@ export default function MealPlanScreen() {
     ]);
   };
 
+  const runShopForWeek = (list: ShoppingList) => {
+    void (async () => {
+      setShopLoading(true);
+      try {
+        const raw = await apiJson<unknown>("/shopping/from-meal-plan", {
+          baseUrl: serverUrl,
+          method: "POST",
+          body: JSON.stringify({
+            list_id: list.id,
+            start_date: weekRange.start,
+            end_date: weekRange.end,
+            skip_pantry_check: skipPantryCheckFromPreferences(preferences),
+          }),
+        });
+        const result = shoppingFromMealPlanResponseSchema.parse(raw);
+        const summary = mealPlanShopResultFromApi(result);
+        Alert.alert(mealPlanShopAlertTitle(summary), mealPlanShopAlertMessage(summary, list.name));
+      } catch (e) {
+        Alert.alert(
+          "Shopping list",
+          e instanceof Error ? e.message : "Could not update shopping list",
+        );
+      } finally {
+        setShopLoading(false);
+      }
+    })();
+  };
+
   const shopThisWeek = () => {
     if (entries.length === 0) {
       Alert.alert("Nothing planned", "Add meals to this week before building a shopping list.");
+      return;
+    }
+    if (entries.every((entry) => entry.cooked)) {
+      Alert.alert(
+        "Nothing to shop",
+        "Every meal this week is marked cooked. Uncheck Cooked if you still need groceries.",
+      );
       return;
     }
     if (lists.length === 0) {
       Alert.alert("No lists", "Create a shopping list on the Shop tab first.");
       return;
     }
+    const defaultList = resolveDefaultShoppingList(lists, preferences);
+    if (defaultList) {
+      runShopForWeek(defaultList);
+      return;
+    }
     Alert.alert(
       "Shop for this week",
       "Choose which list to add missing groceries to. Items you already have won't be duplicated.",
       [
-      ...lists.map((list) => ({
-        text: list.name,
-        onPress: () => {
-          void (async () => {
-            setShopLoading(true);
-            try {
-              const raw = await apiJson<unknown>("/shopping/from-meal-plan", {
-                baseUrl: serverUrl,
-                method: "POST",
-                body: JSON.stringify({
-                  list_id: list.id,
-                  start_date: weekRange.start,
-                  end_date: weekRange.end,
-                }),
-              });
-              const result = shoppingFromMealPlanResponseSchema.parse(raw);
-              const summary = mealPlanShopResultFromApi(result);
-              Alert.alert(
-                mealPlanShopAlertTitle(summary),
-                mealPlanShopAlertMessage(summary, list.name),
-              );
-            } catch (e) {
-              Alert.alert(
-                "Shopping list",
-                e instanceof Error ? e.message : "Could not update shopping list",
-              );
-            } finally {
-              setShopLoading(false);
-            }
-          })();
-        },
-      })),
-      { text: "Cancel", style: "cancel" },
+        ...lists.map((list) => ({
+          text: list.name,
+          onPress: () => runShopForWeek(list),
+        })),
+        { text: "Cancel", style: "cancel" },
       ],
     );
   };
@@ -228,12 +379,56 @@ export default function MealPlanScreen() {
 
   return (
     <Screen scroll contentContainerStyle={styles.scroll}>
+      <DismissibleModal
+        visible={customMealTarget != null}
+        onClose={closeCustomMealModal}
+        variant="bottomSheet"
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={[
+            styles.customMealModal,
+            {
+              backgroundColor: colors.background,
+              paddingTop: spacing.lg,
+            },
+          ]}
+          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+        >
+          <Text style={[styles.customMealHeading, { color: colors.text }]}>Meal Not in Favorites</Text>
+          {customMealTarget ? (
+            <Text style={[styles.customMealSub, { color: colors.textMuted }]}>
+              {customMealTarget.planDate} · {MEAL_SLOT_LABELS[customMealTarget.mealSlot]}
+            </Text>
+          ) : null}
+          <AppTextField
+            label="Meal name"
+            placeholder="e.g. Pizza night, leftovers, tacos…"
+            value={customMealTitle}
+            onChangeText={setCustomMealTitle}
+            autoFocus
+          />
+          <View style={styles.customMealActions}>
+            <AppButton
+              label="Cancel"
+              variant="ghost"
+              onPress={closeCustomMealModal}
+              disabled={customMealSaving}
+            />
+            <AppButton
+              label={customMealSaving ? "Saving…" : "Add to plan"}
+              loading={customMealSaving}
+              onPress={submitCustomMeal}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </DismissibleModal>
       {/* Week navigation */}
       <View style={styles.weekNav}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Previous week"
-          onPress={() => setWeekStart((current) => addDays(current, -7))}
+          onPress={() => setWeekOffsetDays((current) => current - 7)}
           style={({ pressed }) => [styles.weekArrow, pressed && styles.pressed]}
           hitSlop={12}
         >
@@ -247,7 +442,7 @@ export default function MealPlanScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Next week"
-          onPress={() => setWeekStart((current) => addDays(current, 7))}
+          onPress={() => setWeekOffsetDays((current) => current + 7)}
           style={({ pressed }) => [styles.weekArrow, pressed && styles.pressed]}
           hitSlop={12}
         >
@@ -311,22 +506,63 @@ export default function MealPlanScreen() {
                 </Text>
               ) : (
                 dayEntries.map((entry) => (
-                  <Pressable
+                  <View
                     key={entry.id}
-                    onLongPress={() => removeEntry(entry)}
-                    style={({ pressed }) => [
-                      styles.entryRow,
-                      { borderTopColor: colors.borderSubtle },
-                      pressed && styles.pressed,
-                    ]}
+                    style={[styles.entryRow, { borderTopColor: colors.borderSubtle }]}
                   >
-                    <View style={[styles.slotTag, { backgroundColor: colors.overlay }]}>
-                      <Text style={[styles.slotTagText, { color: colors.textMuted }]}>
-                        {MEAL_SLOT_LABELS[entry.meal_slot]}
+                    <Pressable
+                      onLongPress={() => removeEntry(entry)}
+                      style={({ pressed }) => [styles.entryMain, pressed && styles.pressed]}
+                    >
+                      <View style={[styles.slotTag, { backgroundColor: colors.overlay }]}>
+                        <Text style={[styles.slotTagText, { color: colors.textMuted }]}>
+                          {MEAL_SLOT_LABELS[entry.meal_slot]}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.entryTitle,
+                          { color: entry.cooked ? colors.textMuted : colors.text },
+                          entry.cooked ? styles.entryTitleCooked : null,
+                        ]}
+                      >
+                        {entry.recipe_title}
                       </Text>
-                    </View>
-                    <Text style={[styles.entryTitle, { color: colors.text }]}>{entry.recipe_title}</Text>
-                  </Pressable>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: entry.cooked }}
+                      accessibilityLabel={mealPlanCookedAccessibilityLabel(
+                        entry.recipe_title,
+                        entry.cooked,
+                      )}
+                      onPress={() => promptCooked(entry)}
+                      hitSlop={8}
+                      style={styles.cookedWrap}
+                    >
+                      <View
+                        style={[
+                          styles.cookedBox,
+                          {
+                            borderColor: entry.cooked ? colors.accent : colors.border,
+                            backgroundColor: entry.cooked ? colors.accent : "transparent",
+                          },
+                        ]}
+                      >
+                        {entry.cooked ? (
+                          <Ionicons name="checkmark" size={14} color={colors.onAccent} />
+                        ) : null}
+                      </View>
+                      <Text
+                        style={[
+                          styles.cookedLabel,
+                          { color: entry.cooked ? colors.accent : colors.textMuted },
+                        ]}
+                      >
+                        {MEAL_PLAN_COOKED_LABEL}
+                      </Text>
+                    </Pressable>
+                  </View>
                 ))
               )}
             </Card>
@@ -337,8 +573,8 @@ export default function MealPlanScreen() {
       {!loading && savedRecipes.length === 0 ? (
         <EmptyState
           icon="star-outline"
-          title="Save recipes first"
-          subtitle="Star or save recipes on the Recipes tab, then assign them to your weekly plan."
+          title="No saved recipes yet"
+          subtitle="Tap + on a day and choose Meal Not in Favorites, or star recipes on the Recipes tab to pick them here."
         />
       ) : null}
 
@@ -424,6 +660,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  entryMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minWidth: 0,
+  },
   slotTag: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
@@ -440,10 +683,49 @@ const styles = StyleSheet.create({
     ...typography.bodyMedium,
     flex: 1,
   },
+  entryTitleCooked: {
+    textDecorationLine: "line-through",
+  },
+  cookedWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    flexShrink: 0,
+  },
+  cookedBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cookedLabel: {
+    ...typography.captionMedium,
+  },
   hint: {
     ...typography.caption,
     textAlign: "center",
     paddingHorizontal: spacing.lg,
+  },
+  customMealModal: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
+    justifyContent: "flex-start",
+  },
+  customMealHeading: {
+    ...typography.title,
+  },
+  customMealSub: {
+    ...typography.caption,
+  },
+  customMealActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    flexWrap: "wrap",
   },
   pressed: {
     opacity: 0.7,

@@ -51,6 +51,7 @@ def add_recipe_to_shopping_list(
     *,
     list_id: int,
     recipe: GeneratedRecipe,
+    skip_pantry_check: bool = False,
 ) -> tuple[list[ShoppingListItemRead], list[str]]:
     inventory = db.query(Ingredient).all()
     existing_items = (
@@ -62,7 +63,9 @@ def add_recipe_to_shopping_list(
 
     for line in recipe.ingredients:
         parsed = parse_recipe_ingredient_line(line.name, line.quantity)
-        if _pantry_covers_line(parsed.name, inventory, recipe.uses_from_pantry):
+        if not skip_pantry_check and _pantry_covers_line(
+            parsed.name, inventory, recipe.uses_from_pantry
+        ):
             skipped.append(parsed.name)
             continue
 

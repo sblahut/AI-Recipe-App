@@ -72,7 +72,12 @@ def shopping_from_recipe(
     else:
         raise HTTPException(status_code=400, detail="Provide recipe or saved_recipe_id")
 
-    added, skipped = add_recipe_to_shopping_list(db, list_id=body.list_id, recipe=recipe)
+    added, skipped = add_recipe_to_shopping_list(
+        db,
+        list_id=body.list_id,
+        recipe=recipe,
+        skip_pantry_check=body.skip_pantry_check,
+    )
     return ShoppingFromRecipeResponse(added=added, skipped_in_pantry=skipped)
 
 
@@ -89,6 +94,7 @@ def shopping_from_meal_plan(
             list_id=body.list_id,
             start_date=body.start_date,
             end_date=body.end_date,
+            skip_pantry_check=body.skip_pantry_check,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

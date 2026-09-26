@@ -1,5 +1,13 @@
 import {
-  GENERATE_RECIPE_FROM_INGREDIENTS_LABEL,
+  GENERATE_RECIPES_LABEL,
+  MEAL_PLAN_COOKED_LABEL,
+  PANTRY_ADD_RECEIPT_FROM_IMAGE_LABEL,
+  RECIPE_CHEF_BAR_SUBTITLE,
+  RECIPE_CHEF_CHAT_LABEL,
+  RECIPE_CHEF_OFFLINE_CHIP,
+  RECIPE_CHEF_SHORT_LABEL,
+  RECIPE_USE_PANTRY_INGREDIENTS_LABEL,
+  RECIPE_USE_PUBLIX_BOGO_LABEL,
   RECIPE_MEAL_PLAN_BUTTON_LABEL,
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
   SHOPPING_OPEN_LIST_LABEL,
@@ -10,11 +18,19 @@ import {
 
 describe("uiActionLabels", () => {
   it("uses recipe and shopping action labels", () => {
+    expect(PANTRY_ADD_RECEIPT_FROM_IMAGE_LABEL).toBe("Add receipt from image");
     expect(SHOPPING_STOCK_FROM_LIST_LABEL).toBe("Add to pantry");
     expect(SHOPPING_OPEN_LIST_LABEL).toBe("Shop this list");
     expect(RECIPE_SHOPPING_LIST_BUTTON_LABEL).toBe("+ Shopping list");
     expect(RECIPE_MEAL_PLAN_BUTTON_LABEL).toBe("+ Meal plan");
-    expect(GENERATE_RECIPE_FROM_INGREDIENTS_LABEL).toBe("Generate Recipe from Ingredients");
+    expect(MEAL_PLAN_COOKED_LABEL).toBe("Cooked");
+    expect(GENERATE_RECIPES_LABEL).toBe("Generate Recipes");
+    expect(RECIPE_CHEF_CHAT_LABEL).toBe("Ask the Chef");
+    expect(RECIPE_CHEF_SHORT_LABEL).toBe("Chef");
+    expect(RECIPE_CHEF_BAR_SUBTITLE).toBe("Refine ideas together");
+    expect(RECIPE_CHEF_OFFLINE_CHIP).toBe("Offline");
+    expect(RECIPE_USE_PANTRY_INGREDIENTS_LABEL).toBe("Use ingredients from pantry");
+    expect(RECIPE_USE_PUBLIX_BOGO_LABEL).toBe("Use ingredients from Publix BOGO list");
   });
 
   it("builds share accessibility labels", () => {

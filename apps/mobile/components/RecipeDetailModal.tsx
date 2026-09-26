@@ -1,8 +1,12 @@
-import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/ui/AppButton";
+import { DismissibleModal } from "@/components/ui/DismissibleModal";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
+import { RecipeSourceNotes } from "@/components/RecipeSourceNotes";
+import { formatModelDisplayText } from "@/lib/formatModelDisplayText";
 import type { GeneratedRecipe } from "@/lib/schemas";
 
 type Props = {
@@ -14,26 +18,33 @@ type Props = {
 
 export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: Props) {
   const { colors } = useAppTheme();
+  const { preferences } = useUserPreferences();
+  const showPrepProminent = preferences.showPrepTimeProminent ?? true;
+  const showStepNumbers = preferences.showStepNumbers ?? true;
 
   if (!recipe) {
     return null;
   }
 
-  const title = titleOverride ?? recipe.title;
+  const title = formatModelDisplayText(titleOverride ?? recipe.title);
+  const prepLabel = recipe.prep_minutes != null ? `${recipe.prep_minutes} min prep` : null;
   const metaParts = [
     recipe.servings != null ? `Serves ${recipe.servings}` : null,
-    recipe.prep_minutes != null ? `${recipe.prep_minutes} min` : null,
+    ...(showPrepProminent ? [] : [prepLabel]),
     `${recipe.ingredients.length} ingredients`,
   ].filter((part): part is string => part != null);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <DismissibleModal visible={visible} onClose={onClose} variant="bottomSheet">
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Title area */}
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
 
           {/* Meta pills */}
+          {showPrepProminent && prepLabel ? (
+            <Text style={[styles.prepHeadline, { color: colors.primary }]}>{prepLabel}</Text>
+          ) : null}
           <View style={styles.metaRow}>
             {metaParts.map((part) => (
               <View key={part} style={[styles.metaPill, { backgroundColor: colors.overlay }]}>
@@ -50,7 +61,8 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
                 <Text style={[styles.emptyNote, { color: colors.textMuted }]}>No ingredients listed.</Text>
               ) : (
                 recipe.ingredients.map((line, index) => {
-                  const qty = line.quantity?.trim();
+                  const name = formatModelDisplayText(line.name);
+                  const qty = line.quantity ? formatModelDisplayText(line.quantity.trim()) : "";
                   const isLast = index === recipe.ingredients.length - 1;
                   return (
                     <View
@@ -60,7 +72,7 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
                         !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
                       ]}
                     >
-                      <Text style={[styles.ingredientName, { color: colors.text }]}>{line.name}</Text>
+                      <Text style={[styles.ingredientName, { color: colors.text }]}>{name}</Text>
                       {qty ? (
                         <Text style={[styles.ingredientQty, { color: colors.textMuted }]}>{qty}</Text>
                       ) : null}
@@ -71,14 +83,7 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
             </View>
           </View>
 
-          {/* Pantry match */}
-          {recipe.uses_from_pantry && recipe.uses_from_pantry.length > 0 ? (
-            <View style={[styles.pantryNote, { backgroundColor: colors.successMuted }]}>
-              <Text style={[styles.pantryNoteText, { color: colors.success }]}>
-                {recipe.uses_from_pantry.length} ingredient{recipe.uses_from_pantry.length === 1 ? "" : "s"} already in your pantry
-              </Text>
-            </View>
-          ) : null}
+          <RecipeSourceNotes recipe={recipe} colors={colors} />
 
           {/* Steps */}
           <View style={styles.section}>
@@ -88,10 +93,16 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
             ) : (
               recipe.steps.map((step, index) => (
                 <View key={`${title}-step-${index}`} style={styles.stepRow}>
-                  <View style={[styles.stepNumber, { backgroundColor: colors.primaryMuted }]}>
-                    <Text style={[styles.stepNumberText, { color: colors.primary }]}>{index + 1}</Text>
-                  </View>
-                  <Text style={[styles.stepText, { color: colors.textSecondary }]}>{step}</Text>
+                  {showStepNumbers ? (
+                    <View style={[styles.stepNumber, { backgroundColor: colors.primaryMuted }]}>
+                      <Text style={[styles.stepNumberText, { color: colors.primary }]}>
+                        {index + 1}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                    {formatModelDisplayText(step)}
+                  </Text>
                 </View>
               ))
             )}
@@ -102,12 +113,15 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
           <AppButton label="Close" variant="secondary" onPress={onClose} />
         </View>
       </View>
-    </Modal>
+    </DismissibleModal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flexShrink: 1,
+    maxHeight: "100%",
+  },
   scroll: {
     padding: spacing.xl,
     paddingBottom: spacing.xxxl,
@@ -115,6 +129,10 @@ const styles = StyleSheet.create({
   title: {
     ...typography.display,
     marginBottom: spacing.md,
+  },
+  prepHeadline: {
+    ...typography.title,
+    marginBottom: spacing.sm,
   },
   metaRow: {
     flexDirection: "row",
@@ -160,15 +178,6 @@ const styles = StyleSheet.create({
   emptyNote: {
     ...typography.body,
     padding: spacing.lg,
-  },
-  pantryNote: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    marginBottom: spacing.xl,
-  },
-  pantryNoteText: {
-    ...typography.captionMedium,
   },
   stepRow: {
     flexDirection: "row",
