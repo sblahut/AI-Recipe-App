@@ -1,3 +1,10 @@
+/** Recipes tab: multi-turn chef chat. */
+export const RECIPE_CHEF_CHAT_LABEL = "Chef chat";
+
+/** Recipes tab: open chef chat to refine recipe ideas. */
+export const RECIPE_CHEF_CHAT_HINT =
+  "Have a back-and-forth with the chef to clarify ideas or refine recipes. Pantry and Publix BOGO checkboxes still apply to each message.";
+
 /** Open checklist view while shopping (Shop tab). */
 export const SHOPPING_OPEN_LIST_LABEL = "Shop this list";
 

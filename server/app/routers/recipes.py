@@ -1,12 +1,18 @@
+import json
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import Ingredient, SavedRecipe
+from app.models import Ingredient, RecipeChatMessage, RecipeChatSession, SavedRecipe
 from app.schemas import (
+    GeneratedRecipe,
+    RecipeChatMessageRead,
+    RecipeChatSendRequest,
+    RecipeChatSendResponse,
     RecipeGenerateRequest,
     RecipeGenerateResponse,
     RecipeGenerateSourcesRequest,
@@ -19,6 +25,13 @@ from app.schemas import (
 )
 from app.services import ollama
 from app.services.publix_bogo import PublixBogoError, fetch_publix_bogo_titles
+from app.services.recipe_chat import (
+    RecipeChatOptions,
+    create_chat_session,
+    load_session_messages,
+    send_recipe_chat_message,
+)
+from app.services.recipe_inventory_lines import format_ingredient_line
 from app.services.recipe_persist import (
     import_recipe_favorite_flag,
     import_recipe_should_persist,
@@ -30,16 +43,37 @@ router = APIRouter(prefix="/recipes", tags=["recipes"])
 
 
 def _format_line(row: Ingredient) -> str:
-    parts = [row.name]
-    if row.quantity is not None:
-        unit = row.unit or ""
-        kind = row.quantity_kind or "count"
-        parts.append(f"({row.quantity} {unit}, {kind})".strip())
-    if row.expires_at:
-        exp_date = row.expires_at.date()
-        verb = "expired" if exp_date <= date.today() else "expires"
-        parts.append(f"{verb} {exp_date.isoformat()}")
-    return " ".join(parts)
+    return format_ingredient_line(row)
+
+
+def _parse_message_recipes(recipes_json: str | None) -> list[GeneratedRecipe]:
+    if not recipes_json:
+        return []
+    try:
+        raw = json.loads(recipes_json)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(raw, list):
+        return []
+    recipes: list[GeneratedRecipe] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            recipes.append(GeneratedRecipe.model_validate(item))
+        except ValidationError:
+            continue
+    return recipes
+
+
+def _chat_message_to_read(row: RecipeChatMessage) -> RecipeChatMessageRead:
+    return RecipeChatMessageRead(
+        id=row.id,
+        role=row.role,
+        content=row.content,
+        recipes=_parse_message_recipes(row.recipes_json),
+        created_at=row.created_at,
+    )
 
 
 @router.post("/generate", response_model=RecipeGenerateResponse)
@@ -237,6 +271,71 @@ async def import_recipe(
         saved = SavedRecipeRead.from_orm_row(row)
 
     return RecipeImportResponse(recipe=recipe, saved_recipe=saved)
+
+
+@router.post("/chat/send", response_model=RecipeChatSendResponse)
+async def send_recipe_chat(
+    body: RecipeChatSendRequest, db: Session = Depends(get_db)
+) -> RecipeChatSendResponse:
+    session: RecipeChatSession | None = None
+    if body.session_id is not None:
+        session = db.get(RecipeChatSession, body.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+    else:
+        session = create_chat_session(db)
+
+    options = RecipeChatOptions(
+        use_pantry=body.use_pantry,
+        use_publix_bogo=body.use_publix_bogo,
+        idea_query=body.query,
+        count=body.count,
+        constraints=body.constraints,
+        prioritize_expiring=body.prioritize_expiring,
+        publix_store_number=body.publix_store_number,
+    )
+
+    try:
+        reply = await send_recipe_chat_message(
+            db,
+            session=session,
+            user_message=body.message,
+            options=options,
+        )
+    except ollama.OllamaError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    saved_reads: list[SavedRecipeRead] = []
+    if reply.recipes:
+        persist = (
+            body.persist_generated
+            if body.persist_generated is not None
+            else settings.default_persist_generated_recipes
+        )
+        if persist:
+            saved_reads = persist_generated_recipes_as_favorites(db, reply.recipes)
+
+    messages = [
+        _chat_message_to_read(row) for row in load_session_messages(db, session.id)
+    ]
+    reply_kind = "recipes" if reply.recipes else "message"
+    return RecipeChatSendResponse(
+        session_id=session.id,
+        reply_kind=reply_kind,
+        assistant_message=reply.assistant_text,
+        recipes=reply.recipes,
+        saved_recipes=saved_reads,
+        messages=messages,
+    )
+
+
+@router.delete("/chat/sessions/{session_id}", status_code=204)
+def delete_recipe_chat_session(session_id: int, db: Session = Depends(get_db)) -> None:
+    row = db.get(RecipeChatSession, session_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    db.delete(row)
+    db.commit()
 
 
 @router.get("/saved", response_model=list[SavedRecipeRead])

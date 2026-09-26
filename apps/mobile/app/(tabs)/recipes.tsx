@@ -13,6 +13,7 @@ import {
 import type { TextInput } from "react-native";
 import { z } from "zod";
 
+import { RecipeChefChatModal } from "@/components/RecipeChefChatModal";
 import { RecipeDetailModal } from "@/components/RecipeDetailModal";
 import { AppButton } from "@/components/ui/AppButton";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
@@ -42,6 +43,8 @@ import {
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
   RECIPE_USE_PANTRY_INGREDIENTS_LABEL,
   RECIPE_USE_PUBLIX_BOGO_LABEL,
+  RECIPE_CHEF_CHAT_HINT,
+  RECIPE_CHEF_CHAT_LABEL,
   shareRecipeAccessibilityLabel,
 } from "@/lib/uiActionLabels";
 import { recipeListKey } from "@/lib/recipeListKey";
@@ -54,6 +57,7 @@ import {
   savedRecipeReadSchema,
   shoppingListSchema,
   type GeneratedRecipe,
+  type RecipeChatMessage,
   type SavedRecipe,
   type ShoppingList,
 } from "@/lib/schemas";
@@ -75,6 +79,10 @@ export default function RecipesScreen() {
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [detailRecipe, setDetailRecipe] = useState<GeneratedRecipe | null>(null);
   const [detailTitle, setDetailTitle] = useState<string | undefined>();
+  const [chefChatOpen, setChefChatOpen] = useState(false);
+  const [chefChatSessionId, setChefChatSessionId] = useState<number | null>(null);
+  const [chefChatMessages, setChefChatMessages] = useState<RecipeChatMessage[]>([]);
+  const [chefChatSeedQuery, setChefChatSeedQuery] = useState("");
   const [aiSearchExpanded, setAiSearchExpanded] = useState(true);
   const [importExpanded, setImportExpanded] = useState(true);
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
@@ -322,8 +330,88 @@ export default function RecipesScreen() {
     setDetailTitle(titleOverride);
   };
 
+  const chefChatContext = useMemo(
+    () => ({
+      usePantry: usePantryIngredients,
+      usePublixBogo: usePublixBogoIngredients,
+      ideaQuery: chefChatSeedQuery,
+      count: preferences.defaultRecipeCount ?? 3,
+      ...(aiConstraints ? { constraints: aiConstraints } : {}),
+      prioritizeExpiring: preferences.prioritizeExpiringWhenGenerating ?? true,
+      persistGenerated: preferences.autoPersistGeneratedRecipes ?? false,
+      ...(usePublixBogoIngredients
+        ? { publixStoreNumber: resolvePublixStoreNumberForApi(preferences) }
+        : {}),
+    }),
+    [
+      aiConstraints,
+      chefChatSeedQuery,
+      preferences,
+      usePantryIngredients,
+      usePublixBogoIngredients,
+    ],
+  );
+
+  const openChefChat = () => {
+    dismissSearch();
+    if (!ready.serverOk) {
+      Alert.alert(
+        "Server offline",
+        "Start the recipe API (server/run.ps1) and set the home server URL in Settings.",
+      );
+      return;
+    }
+    if (ready.ollamaOk === false) {
+      Alert.alert("Ollama offline", "Chef chat needs Ollama on your home PC (same model as Generate).");
+      return;
+    }
+    if (usePantryIngredients && ready.ingredientCount === 0) {
+      Alert.alert(
+        "No pantry items",
+        "Add items on the Pantry tab or turn off “Use ingredients from pantry”.",
+      );
+      return;
+    }
+    if (chefChatSessionId == null && chefChatMessages.length === 0) {
+      setChefChatSeedQuery(recipeIdeaQuery.trim());
+    }
+    setRecipeIdeaQuery("");
+    setChefChatOpen(true);
+  };
+
+  const resetChefChatThread = () => {
+    setChefChatSessionId(null);
+    setChefChatMessages([]);
+    setChefChatSeedQuery("");
+  };
+
   return (
     <Screen scroll scrollRef={scrollRef} contentContainerStyle={styles.scroll}>
+      <RecipeChefChatModal
+        visible={chefChatOpen}
+        onClose={() => setChefChatOpen(false)}
+        serverUrl={serverUrl}
+        context={chefChatContext}
+        sessionId={chefChatSessionId}
+        messages={chefChatMessages}
+        onThreadUpdate={(id, threadMessages) => {
+          setChefChatSessionId(id);
+          setChefChatMessages(threadMessages);
+        }}
+        onNewConversation={resetChefChatThread}
+        onRecipes={(recipes) => {
+          if (recipes.length > 0) {
+            markScrollToGenerated();
+            setGenerated((prev) => [...recipes, ...prev]);
+          }
+        }}
+        onFavoritesChanged={() => void loadFavorites()}
+        onOpenRecipe={(recipe) => {
+          setChefChatOpen(false);
+          openRecipeDetail(recipe);
+        }}
+      />
+
       <RecipeDetailModal
         visible={detailRecipe != null}
         recipe={detailRecipe}
@@ -370,6 +458,18 @@ export default function RecipesScreen() {
             dismissSearch();
             void generateRecipes();
           }}
+        />
+        <View style={styles.generateSectionTopRow}>
+          <InfoHint
+            title={RECIPE_CHEF_CHAT_LABEL}
+            message={RECIPE_CHEF_CHAT_HINT}
+            accessibilityLabel="About chef chat"
+          />
+        </View>
+        <AppButton
+          label={RECIPE_CHEF_CHAT_LABEL}
+          variant="secondary"
+          onPress={openChefChat}
         />
       </CollapsibleSection>
 

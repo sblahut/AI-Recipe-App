@@ -313,6 +313,30 @@ async def generate_text_json(prompt: str) -> object:
     return _extract_json(raw)
 
 
+async def chat_completion(
+    messages: list[dict[str, str]],
+    *,
+    temperature: float = 0.6,
+) -> str:
+    payload = {
+        "model": settings.ollama_text_model,
+        "messages": messages,
+        "stream": False,
+        "options": {"temperature": temperature},
+    }
+
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        r = await client.post(f"{settings.ollama_host}/api/chat", json=payload)
+        if not r.is_success:
+            raise OllamaError(f"Ollama chat failed: {r.status_code} {r.text}")
+        data = r.json()
+        message = data.get("message") or {}
+        raw = message.get("content", "")
+        if not isinstance(raw, str) or not raw.strip():
+            raise OllamaError("Model returned an empty response")
+        return raw.strip()
+
+
 async def generate_vision_json(prompt: str, image_base64: str) -> object:
     payload = {
         "model": settings.ollama_vision_model,

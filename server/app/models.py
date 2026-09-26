@@ -66,6 +66,38 @@ class MealPlanEntry(Base):
     saved_recipe: Mapped["SavedRecipe"] = relationship(back_populates="meal_plan_entries")
 
 
+class RecipeChatSession(Base):
+    __tablename__ = "recipe_chat_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    messages: Mapped[list["RecipeChatMessage"]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="RecipeChatMessage.id",
+    )
+
+
+class RecipeChatMessage(Base):
+    __tablename__ = "recipe_chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("recipe_chat_sessions.id", ondelete="CASCADE"),
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text)
+    recipes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    session: Mapped["RecipeChatSession"] = relationship(back_populates="messages")
+
+
 class ShoppingList(Base):
     __tablename__ = "shopping_lists"
 

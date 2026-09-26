@@ -87,6 +87,25 @@ export const recipeGenerateResponseSchema = z.object({
   saved_recipes: z.array(savedRecipeReadSchema).optional().default([]),
 });
 
+export const recipeChatMessageSchema = z.object({
+  id: z.number(),
+  role: z.string(),
+  content: z.string(),
+  recipes: z.array(generatedRecipeSchema).optional().default([]),
+  created_at: z.string(),
+});
+export type RecipeChatMessage = z.infer<typeof recipeChatMessageSchema>;
+
+export const recipeChatSendResponseSchema = z.object({
+  session_id: z.number(),
+  reply_kind: z.enum(["message", "recipes"]),
+  assistant_message: z.string(),
+  recipes: z.array(generatedRecipeSchema).optional().default([]),
+  saved_recipes: z.array(savedRecipeReadSchema).optional().default([]),
+  messages: z.array(recipeChatMessageSchema),
+});
+export type RecipeChatSendResponse = z.infer<typeof recipeChatSendResponseSchema>;
+
 export const recipeImportResponseSchema = z.object({
   recipe: generatedRecipeSchema,
   saved_recipe: savedRecipeReadSchema.nullable().optional(),

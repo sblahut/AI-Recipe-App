@@ -220,6 +220,38 @@ class RecipeGenerateResponse(BaseModel):
     saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
 
 
+class RecipeChatSendRequest(BaseModel):
+    session_id: int | None = None
+    message: str = Field(min_length=1, max_length=2000)
+    use_pantry: bool = False
+    use_publix_bogo: bool = False
+    query: str | None = Field(default=None, max_length=500)
+    count: int = Field(default=3, ge=1, le=10)
+    constraints: str | None = None
+    prioritize_expiring: bool = True
+    persist_generated: bool | None = None
+    publix_store_number: int | None = Field(default=None, ge=1)
+
+
+class RecipeChatMessageRead(BaseModel):
+    id: int
+    role: str
+    content: str
+    recipes: list[GeneratedRecipe] = Field(default_factory=list)
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RecipeChatSendResponse(BaseModel):
+    session_id: int
+    reply_kind: Literal["message", "recipes"]
+    assistant_message: str
+    recipes: list[GeneratedRecipe] = Field(default_factory=list)
+    saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
+    messages: list[RecipeChatMessageRead]
+
+
 class RecipeSearchRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500)
     count: int = Field(default=3, ge=1, le=10)
