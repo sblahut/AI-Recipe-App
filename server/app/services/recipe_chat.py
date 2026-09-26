@@ -8,8 +8,8 @@ from app.models import RecipeChatMessage, RecipeChatSession
 from app.schemas import GeneratedRecipe
 from app.services import ollama
 from app.services.display_text import normalize_display_text, normalize_generated_recipe
-from app.services.recipe_inventory_lines import gather_bogo_lines, gather_pantry_lines
 from app.services.publix_bogo import PublixBogoError
+from app.services.recipe_inventory_lines import gather_bogo_lines, gather_pantry_lines
 
 MAX_CHAT_HISTORY_MESSAGES = 24
 

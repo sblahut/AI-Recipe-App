@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.models import RecipeChatMessage
 from app.services.recipe_chat import chat_session_preview
@@ -38,7 +38,7 @@ def test_chat_session_preview_uses_first_user_message() -> None:
             role="user",
             content="Quick pasta with pantry staples",
             recipes_json=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         ),
         RecipeChatMessage(
             id=2,
@@ -46,7 +46,7 @@ def test_chat_session_preview_uses_first_user_message() -> None:
             role="assistant",
             content="Here is an idea",
             recipes_json=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         ),
     ]
     db = _FakeDb({RecipeChatMessage: messages})

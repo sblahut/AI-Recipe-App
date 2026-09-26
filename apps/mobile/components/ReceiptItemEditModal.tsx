@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/ui/AppButton";
@@ -32,47 +32,59 @@ type Props = {
   onSave: (updated: ReceiptReviewItemFields) => void;
 };
 
-export function ReceiptItemEditModal({
-  visible,
+function itemFormKey(item: ReceiptReviewItemFields): string {
+  return [
+    item.name,
+    item.quantity_kind,
+    item.unit ?? "",
+    item.quantity ?? "",
+    item.location,
+  ].join("\0");
+}
+
+function initialLocationPreset(
+  item: ReceiptReviewItemFields,
+  customZones: string[],
+): { preset: string; custom: string } {
+  const loc = item.location.trim();
+  if (customZones.includes(loc)) {
+    return { preset: loc, custom: "" };
+  }
+  if ((INVENTORY_LOCATIONS as readonly string[]).includes(loc)) {
+    return { preset: loc === "Other" ? "Other" : loc, custom: "" };
+  }
+  if (loc) {
+    return { preset: "Other", custom: loc };
+  }
+  return { preset: "Pantry", custom: "" };
+}
+
+type FormProps = {
+  item: ReceiptReviewItemFields;
+  resolvedUnits: Record<QuantityKind, string[]>;
+  customZones: string[];
+  onClose: () => void;
+  onSave: (updated: ReceiptReviewItemFields) => void;
+};
+
+function ReceiptItemEditForm({
   item,
-  unitsByKind,
+  resolvedUnits,
+  customZones,
   onClose,
   onSave,
-}: Props) {
+}: FormProps) {
   const { colors } = useAppTheme();
-  const { preferences } = useUserPreferences();
-  const resolvedUnits = useMemo(() => mergeQuantityUnitsFromApi(unitsByKind), [unitsByKind]);
+  const initialLocation = initialLocationPreset(item, customZones);
 
-  const [name, setName] = useState("");
-  const [quantityKind, setQuantityKind] = useState<QuantityKind>("count");
-  const [unit, setUnit] = useState("each");
-  const [quantity, setQuantity] = useState("");
-  const [locationPreset, setLocationPreset] = useState("Pantry");
-  const [customLocation, setCustomLocation] = useState("");
-
-  useEffect(() => {
-    if (!item || !visible) {
-      return;
-    }
-    setName(item.name);
-    setQuantityKind(item.quantity_kind);
-    setUnit(item.unit ?? resolvedUnits[item.quantity_kind][0] ?? "each");
-    setQuantity(item.quantity != null ? String(item.quantity) : "");
-    const loc = item.location.trim();
-    if (preferences.customZones.includes(loc)) {
-      setLocationPreset(loc);
-      setCustomLocation("");
-    } else if ((INVENTORY_LOCATIONS as readonly string[]).includes(loc)) {
-      setLocationPreset(loc === "Other" ? "Other" : loc);
-      setCustomLocation("");
-    } else if (loc) {
-      setLocationPreset("Other");
-      setCustomLocation(loc);
-    } else {
-      setLocationPreset("Pantry");
-      setCustomLocation("");
-    }
-  }, [item, visible, preferences.customZones, resolvedUnits]);
+  const [name, setName] = useState(item.name);
+  const [quantityKind, setQuantityKind] = useState<QuantityKind>(item.quantity_kind);
+  const [unit, setUnit] = useState(
+    item.unit ?? resolvedUnits[item.quantity_kind][0] ?? "each",
+  );
+  const [quantity, setQuantity] = useState(item.quantity != null ? String(item.quantity) : "");
+  const [locationPreset, setLocationPreset] = useState(initialLocation.preset);
+  const [customLocation, setCustomLocation] = useState(initialLocation.custom);
 
   const unitOptions = useMemo(
     () => unitsForKind(quantityKind, resolvedUnits, unit),
@@ -110,96 +122,120 @@ export function ReceiptItemEditModal({
 
   const locationChips = useMemo(() => {
     const builtins = INVENTORY_LOCATIONS.filter((loc) => loc !== "Other");
-    return [...builtins, ...preferences.customZones];
-  }, [preferences.customZones]);
+    return [...builtins, ...customZones];
+  }, [customZones]);
+
+  return (
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={[styles.title, { color: colors.text }]}>Edit item</Text>
+
+      <AppTextField label="Name" value={name} onChangeText={setName} />
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>Storage</Text>
+        <View style={styles.chipWrap}>
+          {locationChips.map((loc) => (
+            <Chip
+              key={loc}
+              label={loc}
+              selected={locationPreset === loc}
+              onPress={() => {
+                setLocationPreset(loc);
+                setCustomLocation("");
+              }}
+            />
+          ))}
+          <Chip
+            label="Other"
+            selected={locationPreset === "Other"}
+            onPress={() => setLocationPreset("Other")}
+          />
+        </View>
+        {locationPreset === "Other" ? (
+          <AppTextField
+            label="Custom location"
+            value={customLocation}
+            onChangeText={setCustomLocation}
+            placeholder="Garage, spice rack…"
+          />
+        ) : null}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>Measurement</Text>
+        <View style={styles.chipRow}>
+          {(["count", "weight", "volume"] as const).map((kind) => (
+            <Chip
+              key={kind}
+              label={kind}
+              selected={quantityKind === kind}
+              onPress={() => selectKind(kind)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.quantityRow}>
+        <View style={styles.quantityField}>
+          <AppTextField
+            label="Quantity"
+            value={quantity}
+            onChangeText={setQuantity}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 2"
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>Unit / size</Text>
+        <View style={styles.chipWrap}>
+          {unitOptions.map((u) => (
+            <Chip
+              key={u}
+              label={formatUnitLabel(u)}
+              selected={unit === u}
+              onPress={() => setUnit(u)}
+              capitalize={false}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.actions}>
+        <AppButton label="Save" onPress={save} disabled={!name.trim()} />
+        <AppButton label="Cancel" variant="ghost" onPress={onClose} />
+      </View>
+    </ScrollView>
+  );
+}
+
+export function ReceiptItemEditModal({
+  visible,
+  item,
+  unitsByKind,
+  onClose,
+  onSave,
+}: Props) {
+  const { preferences } = useUserPreferences();
+  const resolvedUnits = useMemo(() => mergeQuantityUnitsFromApi(unitsByKind), [unitsByKind]);
 
   return (
     <DismissibleModal visible={visible} onClose={onClose} variant="bottomSheet">
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={[styles.title, { color: colors.text }]}>Edit item</Text>
-
-        <AppTextField label="Name" value={name} onChangeText={setName} />
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.text }]}>Storage</Text>
-          <View style={styles.chipWrap}>
-            {locationChips.map((loc) => (
-              <Chip
-                key={loc}
-                label={loc}
-                selected={locationPreset === loc}
-                onPress={() => {
-                  setLocationPreset(loc);
-                  setCustomLocation("");
-                }}
-              />
-            ))}
-            <Chip
-              label="Other"
-              selected={locationPreset === "Other"}
-              onPress={() => setLocationPreset("Other")}
-            />
-          </View>
-          {locationPreset === "Other" ? (
-            <AppTextField
-              label="Custom location"
-              value={customLocation}
-              onChangeText={setCustomLocation}
-              placeholder="Garage, spice rack…"
-            />
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.text }]}>Measurement</Text>
-          <View style={styles.chipRow}>
-            {(["count", "weight", "volume"] as const).map((kind) => (
-              <Chip
-                key={kind}
-                label={kind}
-                selected={quantityKind === kind}
-                onPress={() => selectKind(kind)}
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.quantityRow}>
-          <View style={styles.quantityField}>
-            <AppTextField
-              label="Quantity"
-              value={quantity}
-              onChangeText={setQuantity}
-              keyboardType="decimal-pad"
-              placeholder="e.g. 2"
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.text }]}>Unit / size</Text>
-          <View style={styles.chipWrap}>
-            {unitOptions.map((u) => (
-              <Chip
-                key={u}
-                label={formatUnitLabel(u)}
-                selected={unit === u}
-                onPress={() => setUnit(u)}
-                capitalize={false}
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.actions}>
-          <AppButton label="Save" onPress={save} disabled={!name.trim()} />
-          <AppButton label="Cancel" variant="ghost" onPress={onClose} />
-        </View>
-      </ScrollView>
+      {visible && item ? (
+        <ReceiptItemEditForm
+          key={itemFormKey(item)}
+          item={item}
+          resolvedUnits={resolvedUnits}
+          customZones={preferences.customZones}
+          onClose={onClose}
+          onSave={onSave}
+        />
+      ) : null}
     </DismissibleModal>
   );
 }

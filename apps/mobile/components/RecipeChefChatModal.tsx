@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -100,17 +100,10 @@ export function RecipeChefChatModal({
     }
   }, [serverUrl]);
 
-  useEffect(() => {
-    if (visible && historyOpen) {
-      void loadHistory();
-    }
-  }, [visible, historyOpen, loadHistory]);
-
-  useEffect(() => {
-    if (!visible) {
-      setHistoryOpen(false);
-    }
-  }, [visible]);
+  const handleClose = () => {
+    setHistoryOpen(false);
+    onClose();
+  };
 
   const listData = useMemo((): ListItem[] => {
     const items: ListItem[] = messages.map((message) => ({ kind: "message", message }));
@@ -139,6 +132,7 @@ export function RecipeChefChatModal({
 
   const openHistory = () => {
     setHistoryOpen(true);
+    void loadHistory();
   };
 
   const closeHistory = () => {
@@ -280,7 +274,7 @@ export function RecipeChefChatModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
       <KeyboardAvoidingView
         style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top }]}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -289,7 +283,7 @@ export function RecipeChefChatModal({
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <View style={styles.headerLeading}>
             <Pressable
-              onPress={onClose}
+              onPress={handleClose}
               hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel="Close chef chat"
