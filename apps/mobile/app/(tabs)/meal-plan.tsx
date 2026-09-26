@@ -1,9 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
 import { AppButton } from "@/components/ui/AppButton";
+import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { InfoHint } from "@/components/ui/InfoHint";
@@ -17,6 +28,7 @@ import {
   skipPantryCheckFromPreferences,
 } from "@/lib/shoppingListTarget";
 import { apiFetch, apiJson } from "@/lib/api";
+import { saveCustomMealRecipeTitle } from "@/lib/mealPlanCustomMeal";
 import {
   mealPlanShopAlertMessage,
   mealPlanShopAlertTitle,
@@ -47,6 +59,7 @@ import {
 
 export default function MealPlanScreen() {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { serverUrl } = useServerSettings();
   const { preferences } = useUserPreferences();
   const weekStartsOnDay = preferences.weekStartsOnDay ?? 1;
@@ -64,6 +77,12 @@ export default function MealPlanScreen() {
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [loading, setLoading] = useState(true);
   const [shopLoading, setShopLoading] = useState(false);
+  const [customMealTarget, setCustomMealTarget] = useState<{
+    planDate: string;
+    mealSlot: MealSlot;
+  } | null>(null);
+  const [customMealTitle, setCustomMealTitle] = useState("");
+  const [customMealSaving, setCustomMealSaving] = useState(false);
 
   const weekRange = useMemo(() => weekRangeFromWeekStart(weekStart), [weekStart]);
   const weekDays = useMemo(() => daysInWeek(weekStart), [weekStart]);
@@ -124,33 +143,74 @@ export default function MealPlanScreen() {
     });
   }, [refresh]);
 
-  const pickRecipeAndAdd = (planDate: string, mealSlot: MealSlot) => {
-    if (savedRecipes.length === 0) {
-      Alert.alert(
-        "No saved recipes",
-        "Save or favorite a recipe on the Recipes tab, then assign it here.",
-      );
+  const addMealPlanEntry = async (
+    planDate: string,
+    mealSlot: MealSlot,
+    savedRecipeId: number,
+  ) => {
+    await apiFetch("/meal-plan", {
+      baseUrl: serverUrl,
+      method: "POST",
+      body: JSON.stringify({
+        plan_date: planDate,
+        meal_slot: mealSlot,
+        saved_recipe_id: savedRecipeId,
+      }),
+    });
+    await loadPlan();
+  };
+
+  const openCustomMealModal = (planDate: string, mealSlot: MealSlot) => {
+    setCustomMealTitle("");
+    setCustomMealTarget({ planDate, mealSlot });
+  };
+
+  const closeCustomMealModal = () => {
+    if (customMealSaving) {
       return;
     }
+    setCustomMealTarget(null);
+    setCustomMealTitle("");
+  };
+
+  const submitCustomMeal = () => {
+    if (!customMealTarget) {
+      return;
+    }
+    const { planDate, mealSlot } = customMealTarget;
+    setCustomMealSaving(true);
+    void (async () => {
+      try {
+        const savedRecipeId = await saveCustomMealRecipeTitle(customMealTitle, serverUrl);
+        await addMealPlanEntry(planDate, mealSlot, savedRecipeId);
+        setCustomMealTarget(null);
+        setCustomMealTitle("");
+      } catch (e) {
+        Alert.alert("Add meal", e instanceof Error ? e.message : "Could not add meal");
+      } finally {
+        setCustomMealSaving(false);
+      }
+    })();
+  };
+
+  const pickRecipeAndAdd = (planDate: string, mealSlot: MealSlot) => {
+    const favoriteRecipes = savedRecipes.filter((row) => row.favorite);
+    const recipeOptions = favoriteRecipes.length > 0 ? favoriteRecipes : savedRecipes;
+
     Alert.alert(
       MEAL_SLOT_LABELS[mealSlot],
-      `Pick a recipe for ${planDate}`,
+      `Add a meal for ${planDate}`,
       [
-        ...savedRecipes.map((row) => ({
+        {
+          text: "Meal Not in Favorites",
+          onPress: () => openCustomMealModal(planDate, mealSlot),
+        },
+        ...recipeOptions.map((row) => ({
           text: row.title,
           onPress: () => {
             void (async () => {
               try {
-                await apiFetch("/meal-plan", {
-                  baseUrl: serverUrl,
-                  method: "POST",
-                  body: JSON.stringify({
-                    plan_date: planDate,
-                    meal_slot: mealSlot,
-                    saved_recipe_id: row.id,
-                  }),
-                });
-                await loadPlan();
+                await addMealPlanEntry(planDate, mealSlot, row.id);
               } catch (e) {
                 Alert.alert("Add failed", e instanceof Error ? e.message : "Unknown error");
               }
@@ -254,6 +314,51 @@ export default function MealPlanScreen() {
 
   return (
     <Screen scroll contentContainerStyle={styles.scroll}>
+      <Modal
+        visible={customMealTarget != null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeCustomMealModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={[
+            styles.customMealModal,
+            {
+              backgroundColor: colors.background,
+              paddingTop: insets.top + spacing.lg,
+            },
+          ]}
+          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+        >
+          <Text style={[styles.customMealHeading, { color: colors.text }]}>Meal Not in Favorites</Text>
+          {customMealTarget ? (
+            <Text style={[styles.customMealSub, { color: colors.textMuted }]}>
+              {customMealTarget.planDate} · {MEAL_SLOT_LABELS[customMealTarget.mealSlot]}
+            </Text>
+          ) : null}
+          <AppTextField
+            label="Meal name"
+            placeholder="e.g. Pizza night, leftovers, tacos…"
+            value={customMealTitle}
+            onChangeText={setCustomMealTitle}
+            autoFocus
+          />
+          <View style={styles.customMealActions}>
+            <AppButton
+              label="Cancel"
+              variant="ghost"
+              onPress={closeCustomMealModal}
+              disabled={customMealSaving}
+            />
+            <AppButton
+              label={customMealSaving ? "Saving…" : "Add to plan"}
+              loading={customMealSaving}
+              onPress={submitCustomMeal}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
       {/* Week navigation */}
       <View style={styles.weekNav}>
         <Pressable
@@ -363,8 +468,8 @@ export default function MealPlanScreen() {
       {!loading && savedRecipes.length === 0 ? (
         <EmptyState
           icon="star-outline"
-          title="Save recipes first"
-          subtitle="Star or save recipes on the Recipes tab, then assign them to your weekly plan."
+          title="No saved recipes yet"
+          subtitle="Tap + on a day and choose Meal Not in Favorites, or star recipes on the Recipes tab to pick them here."
         />
       ) : null}
 
@@ -470,6 +575,25 @@ const styles = StyleSheet.create({
     ...typography.caption,
     textAlign: "center",
     paddingHorizontal: spacing.lg,
+  },
+  customMealModal: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
+    justifyContent: "flex-start",
+  },
+  customMealHeading: {
+    ...typography.title,
+  },
+  customMealSub: {
+    ...typography.caption,
+  },
+  customMealActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    flexWrap: "wrap",
   },
   pressed: {
     opacity: 0.7,
