@@ -13,6 +13,7 @@ import {
 import type { TextInput } from "react-native";
 import { z } from "zod";
 
+import { AskTheChefBar } from "@/components/AskTheChefBar";
 import { RecipeChefChatModal } from "@/components/RecipeChefChatModal";
 import { RecipeDetailModal } from "@/components/RecipeDetailModal";
 import { AppButton } from "@/components/ui/AppButton";
@@ -44,8 +45,6 @@ import {
   RECIPE_SHOPPING_LIST_BUTTON_LABEL,
   RECIPE_USE_PANTRY_INGREDIENTS_LABEL,
   RECIPE_USE_PUBLIX_BOGO_LABEL,
-  RECIPE_CHEF_CHAT_HINT,
-  RECIPE_CHEF_CHAT_LABEL,
   shareRecipeAccessibilityLabel,
 } from "@/lib/uiActionLabels";
 import { recipeListKey } from "@/lib/recipeListKey";
@@ -363,7 +362,7 @@ export default function RecipesScreen() {
       return;
     }
     if (ready.ollamaOk === false) {
-      Alert.alert("Ollama offline", "Chef chat needs Ollama on your home PC (same model as Generate).");
+      Alert.alert("Ollama offline", "Ask the Chef needs Ollama on your home PC (same model as Generate).");
       return;
     }
     if (usePantryIngredients && ready.ingredientCount === 0) {
@@ -387,7 +386,18 @@ export default function RecipesScreen() {
   };
 
   return (
-    <Screen scroll scrollRef={scrollRef} contentContainerStyle={styles.scroll}>
+    <Screen
+      scroll
+      scrollRef={scrollRef}
+      contentContainerStyle={styles.scroll}
+      header={
+        <AskTheChefBar
+          ready={ready}
+          hasSession={chefChatSessionId != null || chefChatMessages.length > 0}
+          onPress={openChefChat}
+        />
+      }
+    >
       <RecipeChefChatModal
         visible={chefChatOpen}
         onClose={() => setChefChatOpen(false)}
@@ -459,18 +469,6 @@ export default function RecipesScreen() {
             dismissSearch();
             void generateRecipes();
           }}
-        />
-        <View style={styles.generateSectionTopRow}>
-          <InfoHint
-            title={RECIPE_CHEF_CHAT_LABEL}
-            message={RECIPE_CHEF_CHAT_HINT}
-            accessibilityLabel="About chef chat"
-          />
-        </View>
-        <AppButton
-          label={RECIPE_CHEF_CHAT_LABEL}
-          variant="secondary"
-          onPress={openChefChat}
         />
       </CollapsibleSection>
 

@@ -1,5 +1,17 @@
-/** Recipes tab: multi-turn chef chat. */
-export const RECIPE_CHEF_CHAT_LABEL = "Chef chat";
+/** Recipes tab: multi-turn chef conversation (sticky bar title). */
+export const RECIPE_CHEF_CHAT_LABEL = "Ask the Chef";
+
+/** Short chrome title for the chef sheet. */
+export const RECIPE_CHEF_SHORT_LABEL = "Chef";
+
+/** Sticky bar subtitle when starting a new thread. */
+export const RECIPE_CHEF_BAR_SUBTITLE = "Refine ideas together";
+
+/** Sticky bar subtitle when a thread already exists. */
+export const RECIPE_CHEF_RESUME_SUBTITLE = "Resume conversation";
+
+/** Chip on the Chef bar when the home server or Ollama is down. */
+export const RECIPE_CHEF_OFFLINE_CHIP = "Offline";
 
 /** Recipes tab: open chef chat to refine recipe ideas. */
 export const RECIPE_CHEF_CHAT_HINT =

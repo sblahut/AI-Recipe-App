@@ -1,5 +1,9 @@
 import {
   GENERATE_RECIPES_LABEL,
+  RECIPE_CHEF_BAR_SUBTITLE,
+  RECIPE_CHEF_CHAT_LABEL,
+  RECIPE_CHEF_OFFLINE_CHIP,
+  RECIPE_CHEF_SHORT_LABEL,
   RECIPE_USE_PANTRY_INGREDIENTS_LABEL,
   RECIPE_USE_PUBLIX_BOGO_LABEL,
   RECIPE_MEAL_PLAN_BUTTON_LABEL,
@@ -17,6 +21,10 @@ describe("uiActionLabels", () => {
     expect(RECIPE_SHOPPING_LIST_BUTTON_LABEL).toBe("+ Shopping list");
     expect(RECIPE_MEAL_PLAN_BUTTON_LABEL).toBe("+ Meal plan");
     expect(GENERATE_RECIPES_LABEL).toBe("Generate Recipes");
+    expect(RECIPE_CHEF_CHAT_LABEL).toBe("Ask the Chef");
+    expect(RECIPE_CHEF_SHORT_LABEL).toBe("Chef");
+    expect(RECIPE_CHEF_BAR_SUBTITLE).toBe("Refine ideas together");
+    expect(RECIPE_CHEF_OFFLINE_CHIP).toBe("Offline");
     expect(RECIPE_USE_PANTRY_INGREDIENTS_LABEL).toBe("Use ingredients from pantry");
     expect(RECIPE_USE_PUBLIX_BOGO_LABEL).toBe("Use ingredients from Publix BOGO list");
   });

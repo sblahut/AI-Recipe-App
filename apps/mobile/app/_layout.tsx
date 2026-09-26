@@ -45,6 +45,13 @@ function RootStack() {
             headerBackButtonDisplayMode: "minimal",
           }}
         />
+        <Stack.Screen
+          name="settings"
+          options={{
+            title: "Settings",
+            headerBackButtonDisplayMode: "minimal",
+          }}
+        />
       </Stack>
     </>
   );

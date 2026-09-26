@@ -1,4 +1,6 @@
 import {
+  chefFeaturesAvailable,
+  homeServerHeaderStatus,
   homeServerReadyFromHealth,
   homeServerStatusLines,
 } from "@/lib/homeServerReady";
@@ -50,5 +52,42 @@ describe("homeServerStatusLines", () => {
     expect(lines[0]?.ok).toBe(false);
     expect(lines[1]?.label).toBe("AI model status unknown");
     expect(lines[2]?.label).toBe("Add ingredients on the Pantry tab");
+  });
+});
+
+describe("homeServerHeaderStatus", () => {
+  it("marks a healthy server and Ollama as ok", () => {
+    expect(
+      homeServerHeaderStatus({ serverOk: true, ollamaOk: true, ingredientCount: 2 }),
+    ).toEqual({ tone: "ok", accessibilityLabel: "Home server connected" });
+  });
+
+  it("uses server_down when the API is unreachable", () => {
+    expect(
+      homeServerHeaderStatus({ serverOk: false, ollamaOk: null, ingredientCount: 0 }),
+    ).toEqual({ tone: "server_down", accessibilityLabel: "Home server offline" });
+  });
+
+  it("uses ollama_down when the API is up but the model is not", () => {
+    expect(
+      homeServerHeaderStatus({ serverOk: true, ollamaOk: false, ingredientCount: 3 }),
+    ).toEqual({ tone: "ollama_down", accessibilityLabel: "Ollama offline" });
+  });
+});
+
+describe("chefFeaturesAvailable", () => {
+  it("is true only when the server is up and Ollama is not explicitly down", () => {
+    expect(chefFeaturesAvailable({ serverOk: true, ollamaOk: true, ingredientCount: 1 })).toBe(
+      true,
+    );
+    expect(chefFeaturesAvailable({ serverOk: true, ollamaOk: null, ingredientCount: 1 })).toBe(
+      true,
+    );
+    expect(chefFeaturesAvailable({ serverOk: true, ollamaOk: false, ingredientCount: 1 })).toBe(
+      false,
+    );
+    expect(chefFeaturesAvailable({ serverOk: false, ollamaOk: true, ingredientCount: 1 })).toBe(
+      false,
+    );
   });
 });

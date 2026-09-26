@@ -1,7 +1,18 @@
 import Constants from "expo-constants";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Image, Keyboard, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Image,
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type ScrollView,
+} from "react-native";
 
 import { HomeServerStatusCard } from "@/components/HomeServerStatusCard";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
@@ -102,7 +113,21 @@ type SettingsSectionId =
   | "connect"
   | "data";
 
+const COLLAPSED_SECTIONS: Record<SettingsSectionId, boolean> = {
+  profile: false,
+  appearance: false,
+  kitchen: false,
+  aiRecipes: false,
+  shoppingPantry: false,
+  mealPlan: false,
+  stores: false,
+  about: false,
+  connect: false,
+  data: false,
+};
+
 export default function SettingsScreen() {
+  const params = useLocalSearchParams<{ section?: string }>();
   const { colors } = useAppTheme();
   const { serverUrl, loading } = useServerSettings();
   const {
@@ -142,7 +167,9 @@ export default function SettingsScreen() {
   const constraintPersistSkip = useRef(true);
   const [expandedSections, setExpandedSections] = useState<
     Partial<Record<SettingsSectionId, boolean>>
-  >({});
+  >(() => (params.section === "about" ? { ...COLLAPSED_SECTIONS, about: true } : {}));
+  const scrollRef = useRef<ScrollView>(null);
+  const aboutSectionY = useRef(0);
 
   const isSectionExpanded = useCallback(
     (id: SettingsSectionId) => isCollapsibleExpanded(id, expandedSections, true),
@@ -239,6 +266,17 @@ export default function SettingsScreen() {
       void loadShoppingLists();
     }, [loadShoppingLists]),
   );
+
+  const onAboutSectionLayout = (event: LayoutChangeEvent) => {
+    aboutSectionY.current = event.nativeEvent.layout.y;
+    if (params.section !== "about") {
+      return;
+    }
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, aboutSectionY.current - spacing.sm),
+      animated: true,
+    });
+  };
 
   useEffect(() => {
     if (avoidPersistSkip.current) {
@@ -430,7 +468,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <Screen scroll contentContainerStyle={styles.sections}>
+    <Screen scroll scrollRef={scrollRef} contentContainerStyle={styles.sections}>
       <CollapsibleSection
         title="Profile"
         expanded={isSectionExpanded("profile")}
@@ -992,12 +1030,13 @@ export default function SettingsScreen() {
         )}
       </CollapsibleSection>
 
-      <CollapsibleSection
-        title="About"
-        expanded={isSectionExpanded("about")}
-        onToggle={() => toggleSection("about")}
-        leadingIcon="information-circle-outline"
-      >
+      <View onLayout={onAboutSectionLayout}>
+        <CollapsibleSection
+          title="About"
+          expanded={isSectionExpanded("about")}
+          onToggle={() => toggleSection("about")}
+          leadingIcon="information-circle-outline"
+        >
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           AI Recipe · version {appVersion}
         </Text>
@@ -1015,7 +1054,8 @@ export default function SettingsScreen() {
           }}
         />
         <HomeServerStatusCard />
-      </CollapsibleSection>
+        </CollapsibleSection>
+      </View>
 
       <CollapsibleSection
         title="Connect this phone"

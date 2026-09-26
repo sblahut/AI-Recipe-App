@@ -20,6 +20,7 @@ import { spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { MODAL_BACKDROP_COLOR } from "@/components/ui/DismissibleModal";
 import { apiJson } from "@/lib/api";
+import { RECIPE_CHEF_SHORT_LABEL } from "@/lib/uiActionLabels";
 import { formatModelDisplayText } from "@/lib/formatModelDisplayText";
 import { fetchRecipeChatSession, fetchRecipeChatSessions } from "@/lib/recipeChatSessions";
 import {
@@ -286,7 +287,7 @@ export function RecipeChefChatModal({
               onPress={handleClose}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="Close chef chat"
+              accessibilityLabel="Close Chef"
             >
               <Ionicons name="close" size={26} color={colors.text} />
             </Pressable>
@@ -300,7 +301,7 @@ export function RecipeChefChatModal({
             </Pressable>
           </View>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            Chef chat
+              {RECIPE_CHEF_SHORT_LABEL}
           </Text>
           <Pressable
             onPress={startNewConversation}
