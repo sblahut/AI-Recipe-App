@@ -20,7 +20,7 @@ export function resolveDefaultShoppingList(
 }
 
 export function skipPantryCheckFromPreferences(
-  preferences: Pick<UserPreferences, "omitPantryItemsFromShoppingLists">,
+  preferences: Partial<Pick<UserPreferences, "omitPantryItemsFromShoppingLists">>,
 ): boolean {
   return !(preferences.omitPantryItemsFromShoppingLists ?? true);
 }
