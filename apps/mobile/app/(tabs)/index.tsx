@@ -37,12 +37,16 @@ import {
   formatIngredientExpirationPhrase,
   isExpirationDue,
 } from "@/lib/expirationDate";
-import { formatUnitLabel } from "@/lib/quantityUnits";
+import {
+  defaultUnitsByKind,
+  formatUnitLabel,
+  mergeQuantityUnitsFromApi,
+} from "@/lib/quantityUnits";
+import { PANTRY_ADD_RECEIPT_FROM_IMAGE_LABEL } from "@/lib/uiActionLabels";
 import { isCollapsibleExpanded } from "@/lib/collapsibleExpanded";
 import { storageSectionIdForItem } from "@/lib/inventoryStorageSection";
 import { formatFilteredSectionTitle } from "@/lib/recipeSectionTitle";
 import { textMatchesSearch } from "@/lib/textSearch";
-import { defaultUnitsByKind, mergeQuantityUnitsFromApi } from "@/lib/quantityUnits";
 import {
   ingredientSchema,
   quantityUnitsSchema,
@@ -452,7 +456,9 @@ export default function IngredientsScreen() {
           ]}
         >
           <Ionicons name="image-outline" size={22} color={colors.primary} />
-          <Text style={[styles.actionLabel, { color: colors.text }]}>Add from image</Text>
+          <Text style={[styles.actionLabel, { color: colors.text }]}>
+            {PANTRY_ADD_RECEIPT_FROM_IMAGE_LABEL}
+          </Text>
         </Pressable>
       </View>
 

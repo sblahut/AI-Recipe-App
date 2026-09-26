@@ -20,6 +20,9 @@ export const RECIPE_CHEF_CHAT_HINT =
 /** Open checklist view while shopping (Shop tab). */
 export const SHOPPING_OPEN_LIST_LABEL = "Shop this list";
 
+/** Pantry tab: import purchased items from a receipt photo. */
+export const PANTRY_ADD_RECEIPT_FROM_IMAGE_LABEL = "Add receipt from image";
+
 /** Move purchased list lines into Pantry inventory. */
 export const SHOPPING_STOCK_FROM_LIST_LABEL = "Add to pantry";
 
