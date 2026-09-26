@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import ColorPicker, { HueCircular, Panel1, Preview, Swatches } from "reanimated-color-picker";
 
 import { AppButton } from "@/components/ui/AppButton";
+import { DismissibleModal } from "@/components/ui/DismissibleModal";
 import { spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { normalizeHexColor } from "@/lib/themePalette";
@@ -28,9 +29,8 @@ function ThemeColorPickerSheet({ title, value, swatches, onClose, onSave }: Shee
   };
 
   return (
-    <Pressable
+    <View
       style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onPress={(e) => e.stopPropagation()}
     >
       <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
       <ColorPicker
@@ -54,7 +54,7 @@ function ThemeColorPickerSheet({ title, value, swatches, onClose, onSave }: Shee
         <AppButton label="Cancel" variant="ghost" onPress={onClose} />
         <AppButton label="Use color" onPress={save} />
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -76,29 +76,22 @@ export function ThemeColorPickerModal({
   onSave,
 }: Props) {
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        {visible ? (
-          <ThemeColorPickerSheet
-            key={value}
-            title={title}
-            value={value}
-            swatches={swatches}
-            onClose={onClose}
-            onSave={onSave}
-          />
-        ) : null}
-      </Pressable>
-    </Modal>
+    <DismissibleModal visible={visible} onClose={onClose} variant="bottomSheet">
+      {visible ? (
+        <ThemeColorPickerSheet
+          key={value}
+          title={title}
+          value={value}
+          swatches={swatches}
+          onClose={onClose}
+          onSave={onSave}
+        />
+      ) : null}
+    </DismissibleModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
   sheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -107,7 +100,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl,
     gap: spacing.md,
-    maxHeight: "92%",
+    maxHeight: "100%",
   },
   title: {
     ...typography.headline,

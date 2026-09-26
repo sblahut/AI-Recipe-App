@@ -1,19 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import {
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { AppButton } from "@/components/ui/AppButton";
-import { elevatedShadow, radius, spacing, typography } from "@/constants/theme";
+import { DismissibleModal } from "@/components/ui/DismissibleModal";
+import { spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 type Props = {
@@ -32,24 +23,14 @@ export function InfoHint({
   iconSize = 22,
 }: Props) {
   const { colors } = useAppTheme();
-  const [webPanelVisible, setWebPanelVisible] = useState(false);
+  const [panelVisible, setPanelVisible] = useState(false);
 
-  const isWeb = Platform.OS === "web";
-
-  const openWebPanel = () => {
-    setWebPanelVisible(true);
+  const openPanel = () => {
+    setPanelVisible(true);
   };
 
-  const closeWebPanel = () => {
-    setWebPanelVisible(false);
-  };
-
-  const showDialog = () => {
-    if (isWeb) {
-      openWebPanel();
-      return;
-    }
-    Alert.alert(title, message);
+  const closePanel = () => {
+    setPanelVisible(false);
   };
 
   return (
@@ -60,44 +41,18 @@ export function InfoHint({
           accessibilityLabel={accessibilityLabel}
           accessibilityHint={message}
           hitSlop={8}
-          onPress={showDialog}
-          {...(isWeb
-            ? {
-                onHoverIn: openWebPanel,
-                onFocus: openWebPanel,
-              }
-            : {})}
+          onPress={openPanel}
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
           <Ionicons name="information-circle-outline" size={iconSize} color={colors.textMuted} />
         </Pressable>
       </View>
 
-      {isWeb ? (
-        <Modal
-          visible={webPanelVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={closeWebPanel}
-        >
-          <Pressable style={styles.webBackdrop} onPress={closeWebPanel}>
-            <Pressable
-              style={[
-                styles.webPanel,
-                elevatedShadow(),
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Text style={[styles.webTitle, { color: colors.text }]}>{title}</Text>
-              <Text style={[styles.webMessage, { color: colors.textSecondary }]}>{message}</Text>
-              <AppButton label="Got it" variant="secondary" compact onPress={closeWebPanel} />
-            </Pressable>
-          </Pressable>
-        </Modal>
-      ) : null}
+      <DismissibleModal visible={panelVisible} onClose={closePanel} variant="center">
+        <Text style={[styles.panelTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.panelMessage, { color: colors.textSecondary }]}>{message}</Text>
+        <AppButton label="Got it" variant="secondary" compact onPress={closePanel} />
+      </DismissibleModal>
     </>
   );
 }
@@ -107,25 +62,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  webBackdrop: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.xl,
-    backgroundColor: "rgba(45, 36, 32, 0.45)",
-  },
-  webPanel: {
-    width: "100%",
-    maxWidth: 440,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: spacing.xl,
-    gap: spacing.md,
-  },
-  webTitle: {
+  panelTitle: {
     ...typography.headline,
   },
-  webMessage: {
+  panelMessage: {
     ...typography.body,
     lineHeight: 24,
   },

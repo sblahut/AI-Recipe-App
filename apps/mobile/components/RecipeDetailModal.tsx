@@ -1,6 +1,7 @@
-import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/ui/AppButton";
+import { DismissibleModal } from "@/components/ui/DismissibleModal";
 import { radius, spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
@@ -33,7 +34,7 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
   ].filter((part): part is string => part != null);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <DismissibleModal visible={visible} onClose={onClose} variant="bottomSheet">
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Title area */}
@@ -108,12 +109,15 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
           <AppButton label="Close" variant="secondary" onPress={onClose} />
         </View>
       </View>
-    </Modal>
+    </DismissibleModal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flexShrink: 1,
+    maxHeight: "100%",
+  },
   scroll: {
     padding: spacing.xl,
     paddingBottom: spacing.xxxl,

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -15,6 +14,7 @@ import { z } from "zod";
 
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
+import { DismissibleModal } from "@/components/ui/DismissibleModal";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { InfoHint } from "@/components/ui/InfoHint";
@@ -314,11 +314,10 @@ export default function MealPlanScreen() {
 
   return (
     <Screen scroll contentContainerStyle={styles.scroll}>
-      <Modal
+      <DismissibleModal
         visible={customMealTarget != null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closeCustomMealModal}
+        onClose={closeCustomMealModal}
+        variant="bottomSheet"
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -326,7 +325,7 @@ export default function MealPlanScreen() {
             styles.customMealModal,
             {
               backgroundColor: colors.background,
-              paddingTop: insets.top + spacing.lg,
+              paddingTop: spacing.lg,
             },
           ]}
           keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
@@ -358,7 +357,7 @@ export default function MealPlanScreen() {
             />
           </View>
         </KeyboardAvoidingView>
-      </Modal>
+      </DismissibleModal>
       {/* Week navigation */}
       <View style={styles.weekNav}>
         <Pressable
