@@ -29,7 +29,10 @@ export const SHOPPING_STOCK_FROM_LIST_HINT =
 
 /** Info hint for Plan tab “Shop for this week”. */
 export const MEAL_PLAN_SHOP_WEEK_HINT =
-  "Builds a shopping list from your planned meals for this week. Ingredients you already track in Pantry are skipped so you only shop for what is missing.";
+  "Builds a shopping list from meals that are not marked cooked this week. Ingredients you already track in Pantry are skipped so you only shop for what is missing.";
+
+/** Plan tab: mark a scheduled meal as cooked. */
+export const MEAL_PLAN_COOKED_LABEL = "Cooked";
 
 /** Recipe card: add recipe lines to a shopping list. */
 export const RECIPE_SHOPPING_LIST_BUTTON_LABEL = "+ Shopping list";

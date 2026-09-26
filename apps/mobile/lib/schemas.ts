@@ -166,9 +166,20 @@ export const mealPlanEntrySchema = z.object({
   meal_slot: mealSlotSchema,
   saved_recipe_id: z.number(),
   recipe_title: z.string(),
+  cooked: z.boolean().optional().default(false),
   created_at: z.string(),
 });
 export type MealPlanEntry = z.infer<typeof mealPlanEntrySchema>;
+
+export const mealPlanCookResponseSchema = z.object({
+  entry: mealPlanEntrySchema,
+  removed: z.array(z.string()).optional().default([]),
+  reduced: z.array(z.string()).optional().default([]),
+  missing: z.array(z.string()).optional().default([]),
+  skipped: z.array(z.string()).optional().default([]),
+  no_ingredient_lines: z.boolean().optional().default(false),
+});
+export type MealPlanCookResponse = z.infer<typeof mealPlanCookResponseSchema>;
 
 export const shoppingFromMealPlanResponseSchema = z.object({
   added: z.array(shoppingListItemSchema),

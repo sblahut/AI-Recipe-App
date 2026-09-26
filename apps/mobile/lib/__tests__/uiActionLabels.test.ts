@@ -1,5 +1,6 @@
 import {
   GENERATE_RECIPES_LABEL,
+  MEAL_PLAN_COOKED_LABEL,
   RECIPE_CHEF_BAR_SUBTITLE,
   RECIPE_CHEF_CHAT_LABEL,
   RECIPE_CHEF_OFFLINE_CHIP,
@@ -20,6 +21,7 @@ describe("uiActionLabels", () => {
     expect(SHOPPING_OPEN_LIST_LABEL).toBe("Shop this list");
     expect(RECIPE_SHOPPING_LIST_BUTTON_LABEL).toBe("+ Shopping list");
     expect(RECIPE_MEAL_PLAN_BUTTON_LABEL).toBe("+ Meal plan");
+    expect(MEAL_PLAN_COOKED_LABEL).toBe("Cooked");
     expect(GENERATE_RECIPES_LABEL).toBe("Generate Recipes");
     expect(RECIPE_CHEF_CHAT_LABEL).toBe("Ask the Chef");
     expect(RECIPE_CHEF_SHORT_LABEL).toBe("Chef");

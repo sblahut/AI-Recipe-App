@@ -61,6 +61,7 @@ class MealPlanEntry(Base):
         ForeignKey("saved_recipes.id", ondelete="CASCADE"),
         index=True,
     )
+    cooked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     saved_recipe: Mapped["SavedRecipe"] = relationship(back_populates="meal_plan_entries")

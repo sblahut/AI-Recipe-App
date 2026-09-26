@@ -413,6 +413,7 @@ class MealPlanEntryUpdate(BaseModel):
     plan_date: str | None = Field(default=None, max_length=10)
     meal_slot: MealSlotField | None = None
     saved_recipe_id: int | None = None
+    cooked: bool | None = None
 
     @field_validator("plan_date")
     @classmethod
@@ -431,9 +432,24 @@ class MealPlanEntryRead(BaseModel):
     meal_slot: MealSlotField
     saved_recipe_id: int
     recipe_title: str
+    cooked: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MealPlanCookRequest(BaseModel):
+    cooked: bool
+    consume_pantry: bool = False
+
+
+class MealPlanCookResponse(BaseModel):
+    entry: MealPlanEntryRead
+    removed: list[str] = Field(default_factory=list)
+    reduced: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
+    no_ingredient_lines: bool = False
 
 
 class ShoppingFromMealPlanRequest(BaseModel):

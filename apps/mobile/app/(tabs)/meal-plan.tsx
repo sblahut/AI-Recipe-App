@@ -34,7 +34,12 @@ import {
   mealPlanShopAlertTitle,
   mealPlanShopResultFromApi,
 } from "@/lib/shoppingFromMealPlanAlert";
-import { MEAL_PLAN_SHOP_WEEK_HINT } from "@/lib/uiActionLabels";
+import {
+  mealPlanCookedAccessibilityLabel,
+  mealPlanCookedPantryMessage,
+  mealPlanCookedPantryTitle,
+} from "@/lib/mealPlanCookedAlert";
+import { MEAL_PLAN_COOKED_LABEL, MEAL_PLAN_SHOP_WEEK_HINT } from "@/lib/uiActionLabels";
 import {
   MEAL_SLOT_LABELS,
   MEAL_SLOTS,
@@ -48,6 +53,7 @@ import {
   weekRangeFromWeekStart,
 } from "@/lib/mealPlanWeek";
 import {
+  mealPlanCookResponseSchema,
   mealPlanEntrySchema,
   savedRecipeReadSchema,
   shoppingFromMealPlanResponseSchema,
@@ -232,6 +238,58 @@ export default function MealPlanScreen() {
     ]);
   };
 
+  const applyCookedResult = async (
+    entry: MealPlanEntry,
+    cooked: boolean,
+    consumePantry: boolean,
+  ) => {
+    const raw = await apiJson<unknown>(`/meal-plan/${entry.id}/cooked`, {
+      baseUrl: serverUrl,
+      method: "POST",
+      body: JSON.stringify({ cooked, consume_pantry: consumePantry }),
+    });
+    const result = mealPlanCookResponseSchema.parse(raw);
+    setEntries((current) =>
+      current.map((row) => (row.id === result.entry.id ? result.entry : row)),
+    );
+    if (cooked && consumePantry) {
+      Alert.alert(mealPlanCookedPantryTitle(result), mealPlanCookedPantryMessage(result));
+    }
+  };
+
+  const promptCooked = (entry: MealPlanEntry) => {
+    if (entry.cooked) {
+      void applyCookedResult(entry, false, false).catch((e: unknown) => {
+        Alert.alert("Meal plan", e instanceof Error ? e.message : "Could not update meal");
+      });
+      return;
+    }
+
+    Alert.alert(
+      "Cooked?",
+      `Remove ingredients for “${entry.recipe_title}” from Pantry?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Keep pantry",
+          onPress: () => {
+            void applyCookedResult(entry, true, false).catch((e: unknown) => {
+              Alert.alert("Meal plan", e instanceof Error ? e.message : "Could not update meal");
+            });
+          },
+        },
+        {
+          text: "Remove from pantry",
+          onPress: () => {
+            void applyCookedResult(entry, true, true).catch((e: unknown) => {
+              Alert.alert("Meal plan", e instanceof Error ? e.message : "Could not update meal");
+            });
+          },
+        },
+      ],
+    );
+  };
+
   const removeEntry = (entry: MealPlanEntry) => {
     Alert.alert("Remove meal?", `${entry.recipe_title} (${MEAL_SLOT_LABELS[entry.meal_slot]})`, [
       { text: "Cancel", style: "cancel" },
@@ -286,6 +344,13 @@ export default function MealPlanScreen() {
   const shopThisWeek = () => {
     if (entries.length === 0) {
       Alert.alert("Nothing planned", "Add meals to this week before building a shopping list.");
+      return;
+    }
+    if (entries.every((entry) => entry.cooked)) {
+      Alert.alert(
+        "Nothing to shop",
+        "Every meal this week is marked cooked. Uncheck Cooked if you still need groceries.",
+      );
       return;
     }
     if (lists.length === 0) {
@@ -441,22 +506,63 @@ export default function MealPlanScreen() {
                 </Text>
               ) : (
                 dayEntries.map((entry) => (
-                  <Pressable
+                  <View
                     key={entry.id}
-                    onLongPress={() => removeEntry(entry)}
-                    style={({ pressed }) => [
-                      styles.entryRow,
-                      { borderTopColor: colors.borderSubtle },
-                      pressed && styles.pressed,
-                    ]}
+                    style={[styles.entryRow, { borderTopColor: colors.borderSubtle }]}
                   >
-                    <View style={[styles.slotTag, { backgroundColor: colors.overlay }]}>
-                      <Text style={[styles.slotTagText, { color: colors.textMuted }]}>
-                        {MEAL_SLOT_LABELS[entry.meal_slot]}
+                    <Pressable
+                      onLongPress={() => removeEntry(entry)}
+                      style={({ pressed }) => [styles.entryMain, pressed && styles.pressed]}
+                    >
+                      <View style={[styles.slotTag, { backgroundColor: colors.overlay }]}>
+                        <Text style={[styles.slotTagText, { color: colors.textMuted }]}>
+                          {MEAL_SLOT_LABELS[entry.meal_slot]}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.entryTitle,
+                          { color: entry.cooked ? colors.textMuted : colors.text },
+                          entry.cooked ? styles.entryTitleCooked : null,
+                        ]}
+                      >
+                        {entry.recipe_title}
                       </Text>
-                    </View>
-                    <Text style={[styles.entryTitle, { color: colors.text }]}>{entry.recipe_title}</Text>
-                  </Pressable>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: entry.cooked }}
+                      accessibilityLabel={mealPlanCookedAccessibilityLabel(
+                        entry.recipe_title,
+                        entry.cooked,
+                      )}
+                      onPress={() => promptCooked(entry)}
+                      hitSlop={8}
+                      style={styles.cookedWrap}
+                    >
+                      <View
+                        style={[
+                          styles.cookedBox,
+                          {
+                            borderColor: entry.cooked ? colors.accent : colors.border,
+                            backgroundColor: entry.cooked ? colors.accent : "transparent",
+                          },
+                        ]}
+                      >
+                        {entry.cooked ? (
+                          <Ionicons name="checkmark" size={14} color={colors.onAccent} />
+                        ) : null}
+                      </View>
+                      <Text
+                        style={[
+                          styles.cookedLabel,
+                          { color: entry.cooked ? colors.accent : colors.textMuted },
+                        ]}
+                      >
+                        {MEAL_PLAN_COOKED_LABEL}
+                      </Text>
+                    </Pressable>
+                  </View>
                 ))
               )}
             </Card>
@@ -554,6 +660,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  entryMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minWidth: 0,
+  },
   slotTag: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
@@ -569,6 +682,26 @@ const styles = StyleSheet.create({
   entryTitle: {
     ...typography.bodyMedium,
     flex: 1,
+  },
+  entryTitleCooked: {
+    textDecorationLine: "line-through",
+  },
+  cookedWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    flexShrink: 0,
+  },
+  cookedBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cookedLabel: {
+    ...typography.captionMedium,
   },
   hint: {
     ...typography.caption,
