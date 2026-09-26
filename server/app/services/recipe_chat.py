@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models import RecipeChatMessage, RecipeChatSession
 from app.schemas import GeneratedRecipe
 from app.services import ollama
+from app.services.display_text import normalize_display_text, normalize_generated_recipe
 from app.services.recipe_inventory_lines import gather_bogo_lines, gather_pantry_lines
 from app.services.publix_bogo import PublixBogoError
 
@@ -78,9 +79,14 @@ Rules:
 - Honor pantry and BOGO lists only when provided in context; do not invent pantry stock.
 - {_RECIPE_SHAPE}
 
-Response format — return ONLY one JSON object (no markdown):
+Response format — return ONLY one JSON object (no markdown fences, no ``` blocks):
 {{"kind":"message","content":"your question or reply"}} OR
 {{"kind":"recipes","message":"optional short intro","recipes":[...]}}
+
+Plain text rules for all string fields (content, message, titles, steps):
+- No markdown (no **, *, #, or backticks).
+- Use real line breaks inside JSON strings when needed, not the two-character sequence backslash-n.
+- Write steps as short plain sentences in the steps array, not one markdown blob.
 
 Context for this turn:
 {context}
@@ -96,7 +102,7 @@ def parse_assistant_reply(raw: str) -> RecipeChatReply:
     try:
         parsed = ollama._extract_json(text)
     except ollama.OllamaError:
-        return RecipeChatReply(kind="message", assistant_text=text, recipes=[])
+        return RecipeChatReply(kind="message", assistant_text=normalize_display_text(text), recipes=[])
 
     if not isinstance(parsed, dict):
         return RecipeChatReply(kind="message", assistant_text=text, recipes=[])
@@ -105,8 +111,12 @@ def parse_assistant_reply(raw: str) -> RecipeChatReply:
     if kind == "message":
         content = parsed.get("content")
         if isinstance(content, str) and content.strip():
-            return RecipeChatReply(kind="message", assistant_text=content.strip(), recipes=[])
-        return RecipeChatReply(kind="message", assistant_text=text, recipes=[])
+            return RecipeChatReply(
+                kind="message",
+                assistant_text=normalize_display_text(content),
+                recipes=[],
+            )
+        return RecipeChatReply(kind="message", assistant_text=normalize_display_text(text), recipes=[])
 
     recipes_raw = parsed.get("recipes")
     if recipes_raw is None and isinstance(parsed.get("title"), str):
@@ -121,18 +131,24 @@ def parse_assistant_reply(raw: str) -> RecipeChatReply:
             if not isinstance(item, dict):
                 continue
             try:
-                recipes.append(GeneratedRecipe.model_validate(item))
+                recipes.append(normalize_generated_recipe(GeneratedRecipe.model_validate(item)))
             except ValidationError:
                 continue
         if recipes:
-            assistant_text = intro_text or f"Here are {len(recipes)} recipe idea(s)."
+            assistant_text = normalize_display_text(intro_text) if intro_text else (
+                f"Here are {len(recipes)} recipe idea(s)."
+            )
             return RecipeChatReply(kind="recipes", assistant_text=assistant_text, recipes=recipes)
 
     content = parsed.get("content")
     if isinstance(content, str) and content.strip():
-        return RecipeChatReply(kind="message", assistant_text=content.strip(), recipes=[])
+        return RecipeChatReply(
+            kind="message",
+            assistant_text=normalize_display_text(content),
+            recipes=[],
+        )
 
-    return RecipeChatReply(kind="message", assistant_text=text, recipes=[])
+    return RecipeChatReply(kind="message", assistant_text=normalize_display_text(text), recipes=[])
 
 
 async def _append_bogo_to_context(options: RecipeChatOptions, context: str) -> str:
@@ -176,6 +192,55 @@ def load_session_messages(db: Session, session_id: int) -> list[RecipeChatMessag
         .order_by(RecipeChatMessage.id)
         .all()
     )
+
+
+def _truncate_preview(text: str, max_len: int = 80) -> str:
+    cleaned = normalize_display_text(text).replace("\n", " ").strip()
+    if not cleaned:
+        return "Chef chat"
+    if len(cleaned) <= max_len:
+        return cleaned
+    return cleaned[: max_len - 3].rstrip() + "..."
+
+
+def chat_session_preview(db: Session, session_id: int) -> str:
+    first_user = (
+        db.query(RecipeChatMessage)
+        .filter(RecipeChatMessage.session_id == session_id, RecipeChatMessage.role == "user")
+        .order_by(RecipeChatMessage.id)
+        .first()
+    )
+    if first_user:
+        return _truncate_preview(first_user.content)
+    first_any = (
+        db.query(RecipeChatMessage)
+        .filter(RecipeChatMessage.session_id == session_id)
+        .order_by(RecipeChatMessage.id)
+        .first()
+    )
+    if first_any:
+        return _truncate_preview(first_any.content)
+    return "Chef chat"
+
+
+def list_chat_sessions(db: Session, *, limit: int = 50) -> list[tuple[RecipeChatSession, int, str]]:
+    sessions = (
+        db.query(RecipeChatSession)
+        .order_by(RecipeChatSession.updated_at.desc())
+        .limit(limit)
+        .all()
+    )
+    summaries: list[tuple[RecipeChatSession, int, str]] = []
+    for session in sessions:
+        count = (
+            db.query(RecipeChatMessage)
+            .filter(RecipeChatMessage.session_id == session.id)
+            .count()
+        )
+        if count == 0:
+            continue
+        summaries.append((session, count, chat_session_preview(db, session.id)))
+    return summaries
 
 
 async def send_recipe_chat_message(

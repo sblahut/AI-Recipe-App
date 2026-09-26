@@ -6,6 +6,7 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { RecipeSourceNotes } from "@/components/RecipeSourceNotes";
+import { formatModelDisplayText } from "@/lib/formatModelDisplayText";
 import type { GeneratedRecipe } from "@/lib/schemas";
 
 type Props = {
@@ -25,7 +26,7 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
     return null;
   }
 
-  const title = titleOverride ?? recipe.title;
+  const title = formatModelDisplayText(titleOverride ?? recipe.title);
   const prepLabel = recipe.prep_minutes != null ? `${recipe.prep_minutes} min prep` : null;
   const metaParts = [
     recipe.servings != null ? `Serves ${recipe.servings}` : null,
@@ -60,7 +61,8 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
                 <Text style={[styles.emptyNote, { color: colors.textMuted }]}>No ingredients listed.</Text>
               ) : (
                 recipe.ingredients.map((line, index) => {
-                  const qty = line.quantity?.trim();
+                  const name = formatModelDisplayText(line.name);
+                  const qty = line.quantity ? formatModelDisplayText(line.quantity.trim()) : "";
                   const isLast = index === recipe.ingredients.length - 1;
                   return (
                     <View
@@ -70,7 +72,7 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
                         !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
                       ]}
                     >
-                      <Text style={[styles.ingredientName, { color: colors.text }]}>{line.name}</Text>
+                      <Text style={[styles.ingredientName, { color: colors.text }]}>{name}</Text>
                       {qty ? (
                         <Text style={[styles.ingredientQty, { color: colors.textMuted }]}>{qty}</Text>
                       ) : null}
@@ -98,7 +100,9 @@ export function RecipeDetailModal({ visible, recipe, titleOverride, onClose }: P
                       </Text>
                     </View>
                   ) : null}
-                  <Text style={[styles.stepText, { color: colors.textSecondary }]}>{step}</Text>
+                  <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                    {formatModelDisplayText(step)}
+                  </Text>
                 </View>
               ))
             )}

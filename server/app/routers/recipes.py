@@ -11,6 +11,8 @@ from app.models import Ingredient, RecipeChatMessage, RecipeChatSession, SavedRe
 from app.schemas import (
     GeneratedRecipe,
     RecipeChatMessageRead,
+    RecipeChatSessionDetail,
+    RecipeChatSessionSummary,
     RecipeChatSendRequest,
     RecipeChatSendResponse,
     RecipeGenerateRequest,
@@ -25,9 +27,11 @@ from app.schemas import (
 )
 from app.services import ollama
 from app.services.publix_bogo import PublixBogoError, fetch_publix_bogo_titles
+from app.services.display_text import normalize_display_text, normalize_generated_recipe
 from app.services.recipe_chat import (
     RecipeChatOptions,
     create_chat_session,
+    list_chat_sessions,
     load_session_messages,
     send_recipe_chat_message,
 )
@@ -60,17 +64,21 @@ def _parse_message_recipes(recipes_json: str | None) -> list[GeneratedRecipe]:
         if not isinstance(item, dict):
             continue
         try:
-            recipes.append(GeneratedRecipe.model_validate(item))
+            recipes.append(normalize_generated_recipe(GeneratedRecipe.model_validate(item)))
         except ValidationError:
             continue
     return recipes
+
+
+def _normalize_recipes(recipes: list[GeneratedRecipe]) -> list[GeneratedRecipe]:
+    return [normalize_generated_recipe(r) for r in recipes]
 
 
 def _chat_message_to_read(row: RecipeChatMessage) -> RecipeChatMessageRead:
     return RecipeChatMessageRead(
         id=row.id,
         role=row.role,
-        content=row.content,
+        content=normalize_display_text(row.content),
         recipes=_parse_message_recipes(row.recipes_json),
         created_at=row.created_at,
     )
@@ -107,6 +115,7 @@ async def generate_recipes(
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
+    recipes = _normalize_recipes(recipes)
     persist = (
         body.persist_generated
         if body.persist_generated is not None
@@ -142,6 +151,7 @@ async def generate_recipes_from_publix_bogo(
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
+    recipes = _normalize_recipes(recipes)
     persist = (
         body.persist_generated
         if body.persist_generated is not None
@@ -208,6 +218,7 @@ async def generate_recipes_from_sources(
         except ollama.OllamaError as e:
             raise HTTPException(status_code=502, detail=str(e)) from e
 
+    recipes = _normalize_recipes(recipes)
     persist = (
         body.persist_generated
         if body.persist_generated is not None
@@ -229,6 +240,7 @@ async def search_recipes(
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
+    recipes = _normalize_recipes(recipes)
     persist = (
         body.persist_generated
         if body.persist_generated is not None
@@ -251,7 +263,7 @@ async def import_recipe(
             raise HTTPException(status_code=400, detail=str(e)) from e
 
     try:
-        recipe = await ollama.import_recipe_from_text(source_text)
+        recipe = normalize_generated_recipe(await ollama.import_recipe_from_text(source_text))
     except ollama.OllamaError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
@@ -322,10 +334,35 @@ async def send_recipe_chat(
     return RecipeChatSendResponse(
         session_id=session.id,
         reply_kind=reply_kind,
-        assistant_message=reply.assistant_text,
-        recipes=reply.recipes,
+        assistant_message=normalize_display_text(reply.assistant_text),
+        recipes=_normalize_recipes(reply.recipes),
         saved_recipes=saved_reads,
         messages=messages,
+    )
+
+
+@router.get("/chat/sessions", response_model=list[RecipeChatSessionSummary])
+def list_recipe_chat_sessions(db: Session = Depends(get_db)) -> list[RecipeChatSessionSummary]:
+    return [
+        RecipeChatSessionSummary(
+            id=session.id,
+            updated_at=session.updated_at,
+            preview=preview,
+            message_count=count,
+        )
+        for session, count, preview in list_chat_sessions(db)
+    ]
+
+
+@router.get("/chat/sessions/{session_id}", response_model=RecipeChatSessionDetail)
+def get_recipe_chat_session(session_id: int, db: Session = Depends(get_db)) -> RecipeChatSessionDetail:
+    row = db.get(RecipeChatSession, session_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    return RecipeChatSessionDetail(
+        id=row.id,
+        updated_at=row.updated_at,
+        messages=[_chat_message_to_read(m) for m in load_session_messages(db, session_id)],
     )
 
 

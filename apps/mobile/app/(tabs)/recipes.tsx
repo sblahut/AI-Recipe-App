@@ -35,6 +35,7 @@ import { findFavoriteMatch } from "@/lib/recipeFavorites";
 import { buildRecipeAiConstraints } from "@/lib/recipeAiConstraints";
 import { resolvePublixStoreNumberForApi } from "@/lib/publixStoreNumber";
 import { promptAddRecipeToShoppingList } from "@/lib/recipeShoppingList";
+import { formatModelDisplayText } from "@/lib/formatModelDisplayText";
 import { formatRecipeShare, shareText } from "@/lib/shareContent";
 import {
   GENERATE_RECIPES_LABEL,
@@ -687,7 +688,7 @@ function RecipeCard({
   onAddToMealPlan,
   onShare,
 }: RecipeCardProps) {
-  const title = titleOverride ?? recipe.title;
+  const title = formatModelDisplayText(titleOverride ?? recipe.title);
   const sourceMeta = formatRecipeSourceMetaLine(recipe);
   const subtitle =
     meta ??

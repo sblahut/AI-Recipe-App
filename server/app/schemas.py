@@ -252,6 +252,19 @@ class RecipeChatSendResponse(BaseModel):
     messages: list[RecipeChatMessageRead]
 
 
+class RecipeChatSessionSummary(BaseModel):
+    id: int
+    updated_at: datetime
+    preview: str
+    message_count: int
+
+
+class RecipeChatSessionDetail(BaseModel):
+    id: int
+    updated_at: datetime
+    messages: list[RecipeChatMessageRead]
+
+
 class RecipeSearchRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500)
     count: int = Field(default=3, ge=1, le=10)

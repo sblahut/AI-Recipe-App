@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,11 +18,15 @@ import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
 import { spacing, typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { apiFetch, apiJson } from "@/lib/api";
+import { MODAL_BACKDROP_COLOR } from "@/components/ui/DismissibleModal";
+import { apiJson } from "@/lib/api";
+import { formatModelDisplayText } from "@/lib/formatModelDisplayText";
+import { fetchRecipeChatSession, fetchRecipeChatSessions } from "@/lib/recipeChatSessions";
 import {
   recipeChatSendResponseSchema,
   type GeneratedRecipe,
   type RecipeChatMessage,
+  type RecipeChatSessionSummary,
 } from "@/lib/schemas";
 
 export type RecipeChefChatContext = {
@@ -76,6 +80,37 @@ export function RecipeChefChatModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingUserText, setPendingUserText] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historySessions, setHistorySessions] = useState<RecipeChatSessionSummary[]>([]);
+  const [loadingSessionId, setLoadingSessionId] = useState<number | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const sessions = await fetchRecipeChatSessions(serverUrl);
+      setHistorySessions(sessions);
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : "Could not load past chats");
+      setHistorySessions([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [serverUrl]);
+
+  useEffect(() => {
+    if (visible && historyOpen) {
+      void loadHistory();
+    }
+  }, [visible, historyOpen, loadHistory]);
+
+  useEffect(() => {
+    if (!visible) {
+      setHistoryOpen(false);
+    }
+  }, [visible]);
 
   const listData = useMemo((): ListItem[] => {
     const items: ListItem[] = messages.map((message) => ({ kind: "message", message }));
@@ -94,22 +129,42 @@ export function RecipeChefChatModal({
     });
   };
 
-  const startNewConversation = async () => {
-    if (sessionId != null) {
-      try {
-        await apiFetch(`/recipes/chat/sessions/${sessionId}`, {
-          baseUrl: serverUrl,
-          method: "DELETE",
-        });
-      } catch {
-        // Local reset still applies if delete fails.
-      }
-    }
+  const startNewConversation = () => {
     setDraft("");
     setError(null);
     setPendingUserText(null);
     setSending(false);
     onNewConversation();
+  };
+
+  const openHistory = () => {
+    setHistoryOpen(true);
+  };
+
+  const closeHistory = () => {
+    setHistoryOpen(false);
+    setHistoryError(null);
+  };
+
+  const selectHistorySession = async (id: number) => {
+    if (loadingSessionId != null) {
+      return;
+    }
+    setLoadingSessionId(id);
+    setHistoryError(null);
+    try {
+      const detail = await fetchRecipeChatSession(serverUrl, id);
+      onThreadUpdate(detail.id, detail.messages);
+      setDraft("");
+      setError(null);
+      setPendingUserText(null);
+      closeHistory();
+      scrollToEnd();
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : "Could not open chat");
+    } finally {
+      setLoadingSessionId(null);
+    }
   };
 
   const sendMessage = async () => {
@@ -179,7 +234,9 @@ export function RecipeChefChatModal({
     }
 
     const isUser = item.kind === "pending_user" || item.message.role === "user";
-    const content = item.kind === "pending_user" ? item.content : item.message.content;
+    const rawContent = item.kind === "pending_user" ? item.content : item.message.content;
+    const content =
+      item.kind === "pending_user" ? rawContent : formatModelDisplayText(rawContent);
     const recipes = item.kind === "message" ? item.message.recipes : [];
 
     return (
@@ -194,7 +251,9 @@ export function RecipeChefChatModal({
             },
           ]}
         >
-          <Text style={[styles.bubbleText, { color: colors.text }]}>{content}</Text>
+          <Text style={[styles.bubbleText, { color: colors.text }]} selectable>
+            {content}
+          </Text>
           {recipes.length > 0 ? (
             <View style={styles.recipeList}>
               {recipes.map((recipe, index) => (
@@ -204,7 +263,9 @@ export function RecipeChefChatModal({
                   style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
                 >
                   <Card style={styles.recipeCard}>
-                    <Text style={[styles.recipeTitle, { color: colors.text }]}>{recipe.title}</Text>
+                    <Text style={[styles.recipeTitle, { color: colors.text }]}>
+                      {formatModelDisplayText(recipe.title)}
+                    </Text>
                     <Text style={[styles.recipeMeta, { color: colors.textMuted }]}>
                       Tap to view ingredients and steps
                     </Text>
@@ -226,12 +287,29 @@ export function RecipeChefChatModal({
         keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
       >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close chef chat">
-            <Ionicons name="close" size={26} color={colors.text} />
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Chef chat</Text>
+          <View style={styles.headerLeading}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Close chef chat"
+            >
+              <Ionicons name="close" size={26} color={colors.text} />
+            </Pressable>
+            <Pressable
+              onPress={openHistory}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Past chef chats"
+            >
+              <Ionicons name="menu" size={26} color={colors.text} />
+            </Pressable>
+          </View>
+          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+            Chef chat
+          </Text>
           <Pressable
-            onPress={() => void startNewConversation()}
+            onPress={startNewConversation}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="New conversation"
@@ -239,6 +317,100 @@ export function RecipeChefChatModal({
             <Text style={[styles.newChat, { color: colors.primary }]}>New</Text>
           </Pressable>
         </View>
+
+        {historyOpen ? (
+          <View style={styles.historyOverlay}>
+            <View
+              style={[
+                styles.historyPanel,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  paddingTop: insets.top,
+                  paddingBottom: Math.max(insets.bottom, spacing.md),
+                },
+              ]}
+            >
+              <View style={[styles.historyHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.historyTitle, { color: colors.text }]}>Past chats</Text>
+                <Pressable
+                  onPress={closeHistory}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close past chats panel"
+                >
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </Pressable>
+              </View>
+              {historyLoading ? (
+                <View style={styles.historyCentered}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              ) : historyError ? (
+                <Text style={[styles.historyError, { color: colors.danger }]}>{historyError}</Text>
+              ) : historySessions.length === 0 ? (
+                <Text style={[styles.historyEmpty, { color: colors.textMuted }]}>
+                  No saved chats yet. Tap New to start another thread — your current chat stays on the
+                  server.
+                </Text>
+              ) : (
+                <FlatList
+                  data={historySessions}
+                  keyExtractor={(item) => `session-${item.id}`}
+                  contentContainerStyle={styles.historyList}
+                  renderItem={({ item }) => {
+                    const isActive = sessionId === item.id;
+                    const isLoading = loadingSessionId === item.id;
+                    const when = new Date(item.updated_at).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    });
+                    return (
+                      <Pressable
+                        onPress={() => void selectHistorySession(item.id)}
+                        disabled={isLoading}
+                        style={({ pressed }) => [
+                          styles.historyRow,
+                          {
+                            borderColor: colors.border,
+                            backgroundColor: isActive ? colors.primaryMuted : colors.surface,
+                            opacity: pressed || isLoading ? 0.85 : 1,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.historyPreview, { color: colors.text }]}
+                          numberOfLines={2}
+                        >
+                          {formatModelDisplayText(item.preview)}
+                        </Text>
+                        <Text style={[styles.historyMeta, { color: colors.textMuted }]}>
+                          {when} · {item.message_count} messages
+                          {isActive ? " · current" : ""}
+                        </Text>
+                        {isLoading ? (
+                          <ActivityIndicator
+                            style={styles.historyRowSpinner}
+                            color={colors.primary}
+                            size="small"
+                          />
+                        ) : null}
+                      </Pressable>
+                    );
+                  }}
+                />
+              )}
+            </View>
+            <Pressable
+              style={[styles.historyBackdrop, { backgroundColor: MODAL_BACKDROP_COLOR }]}
+              onPress={closeHistory}
+              accessibilityRole="button"
+              accessibilityLabel="Close past chats"
+            />
+          </View>
+        ) : null}
 
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Ask follow-ups, refine ideas, or request new recipes. Pantry and BOGO toggles from the Recipes tab
@@ -312,9 +484,77 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
+    gap: spacing.sm,
+  },
+  headerLeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
   headerTitle: {
     ...typography.headline,
+    flex: 1,
+    textAlign: "center",
+  },
+  historyOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 10,
+    flexDirection: "row",
+  },
+  historyBackdrop: {
+    flex: 1,
+  },
+  historyPanel: {
+    flex: 1,
+    maxWidth: 360,
+    borderRightWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  historyTitle: {
+    ...typography.headline,
+  },
+  historyList: {
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  historyRow: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  historyPreview: {
+    ...typography.body,
+  },
+  historyMeta: {
+    ...typography.caption,
+  },
+  historyRowSpinner: {
+    marginTop: spacing.xs,
+  },
+  historyCentered: {
+    padding: spacing.xl,
+    alignItems: "center",
+  },
+  historyEmpty: {
+    ...typography.body,
+    padding: spacing.lg,
+  },
+  historyError: {
+    ...typography.caption,
+    padding: spacing.lg,
   },
   newChat: {
     ...typography.button,

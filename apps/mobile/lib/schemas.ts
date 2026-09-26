@@ -106,6 +106,21 @@ export const recipeChatSendResponseSchema = z.object({
 });
 export type RecipeChatSendResponse = z.infer<typeof recipeChatSendResponseSchema>;
 
+export const recipeChatSessionSummarySchema = z.object({
+  id: z.number(),
+  updated_at: z.string(),
+  preview: z.string(),
+  message_count: z.number(),
+});
+export type RecipeChatSessionSummary = z.infer<typeof recipeChatSessionSummarySchema>;
+
+export const recipeChatSessionDetailSchema = z.object({
+  id: z.number(),
+  updated_at: z.string(),
+  messages: z.array(recipeChatMessageSchema),
+});
+export type RecipeChatSessionDetail = z.infer<typeof recipeChatSessionDetailSchema>;
+
 export const recipeImportResponseSchema = z.object({
   recipe: generatedRecipeSchema,
   saved_recipe: savedRecipeReadSchema.nullable().optional(),
