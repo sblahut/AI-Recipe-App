@@ -13,6 +13,7 @@
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:coverage": "jest --ci --coverage",
     "fix-deps": "npx expo install --fix"
   },
   "dependencies": {

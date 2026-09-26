@@ -1,6 +1,7 @@
 import {
   GENERATE_RECIPES_LABEL,
   MEAL_PLAN_COOKED_LABEL,
+  PANTRY_ADD_RECEIPT_FROM_IMAGE_LABEL,
   RECIPE_CHEF_BAR_SUBTITLE,
   RECIPE_CHEF_CHAT_LABEL,
   RECIPE_CHEF_OFFLINE_CHIP,
@@ -17,6 +18,7 @@ import {
 
 describe("uiActionLabels", () => {
   it("uses recipe and shopping action labels", () => {
+    expect(PANTRY_ADD_RECEIPT_FROM_IMAGE_LABEL).toBe("Add receipt from image");
     expect(SHOPPING_STOCK_FROM_LIST_LABEL).toBe("Add to pantry");
     expect(SHOPPING_OPEN_LIST_LABEL).toBe("Shop this list");
     expect(RECIPE_SHOPPING_LIST_BUTTON_LABEL).toBe("+ Shopping list");

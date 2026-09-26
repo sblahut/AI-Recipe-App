@@ -39,3 +39,7 @@ skip-magic-trailing-comma = false
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

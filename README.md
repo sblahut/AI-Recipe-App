@@ -324,6 +324,7 @@ These match the CI jobs **Unit tests (server)** and **Unit tests (mobile)** (not
 cd server
 pip install -r requirements-dev.txt   # first time
 python -m pytest tests -q
+python -m pytest tests --cov=app --cov-report=term-missing:skip-covered
 ```
 
 **Mobile:**
@@ -332,6 +333,7 @@ python -m pytest tests -q
 cd apps/mobile
 npm install   # first time
 npm test
+npm run test:coverage
 ```
 
 **All unit tests** (PowerShell, from repo root):
