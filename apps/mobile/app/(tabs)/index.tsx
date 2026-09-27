@@ -507,7 +507,7 @@ export default function IngredientsScreen() {
       <View style={styles.searchPad}>
         <SearchField
           ref={searchInputRef}
-          placeholder="Search by name, location, or barcode"
+          placeholder="Search by ingredient, area, or barcode"
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCapitalize="none"
