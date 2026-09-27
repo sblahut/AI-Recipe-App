@@ -3,6 +3,7 @@ import { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 import type { ColorValue } from "react-native";
 
+import { TabHeaderActions } from "@/components/TabHeaderActions";
 import { typography } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -26,6 +27,7 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: colors.background },
         headerTitleStyle: { ...typography.headline, color: colors.text },
         headerShadowVisible: false,
+        headerRight: () => <TabHeaderActions />,
         tabBarStyle: {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.tabBarBorder,
@@ -57,10 +59,6 @@ export default function TabLayout() {
       <Tabs.Screen
         name="shopping"
         options={{ title: "Shop", tabBarIcon: tabIcon("cart-outline") }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{ title: "Settings", tabBarIcon: tabIcon("settings-outline") }}
       />
     </Tabs>
   );

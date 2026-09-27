@@ -12,6 +12,7 @@ type Props = {
   onToggle: () => void;
   children: ReactNode;
   leadingIcon?: keyof typeof Ionicons.glyphMap;
+  onHeaderLongPress?: () => void;
 };
 
 export function CollapsibleSection({
@@ -20,6 +21,7 @@ export function CollapsibleSection({
   onToggle,
   children,
   leadingIcon,
+  onHeaderLongPress,
 }: Props) {
   const { colors } = useAppTheme();
 
@@ -29,6 +31,7 @@ export function CollapsibleSection({
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         onPress={onToggle}
+        onLongPress={onHeaderLongPress}
         style={({ pressed }) => [styles.header, pressed && styles.pressed]}
       >
         <View style={styles.titleRow}>

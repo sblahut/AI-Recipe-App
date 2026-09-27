@@ -68,11 +68,39 @@ class IngredientBulkCreate(BaseModel):
     items: list[IngredientCreate]
 
 
+class ProposedIngredientItem(QuantityFieldsMixin):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class ReceiptProposeRequest(BaseModel):
+    image_base64: str | None = Field(default=None, min_length=64)
+    text: str | None = Field(default=None, max_length=50_000)
+    url: str | None = Field(default=None, max_length=2048)
+
+    @model_validator(mode="after")
+    def exactly_one_purchase_source(self) -> "ReceiptProposeRequest":
+        image = (self.image_base64 or "").strip()
+        text = (self.text or "").strip()
+        url = (self.url or "").strip()
+        filled = sum(1 for value in (image, text, url) if value)
+        if filled != 1:
+            raise ValueError("Provide exactly one of image_base64, text, or url")
+        if text and len(text) < 20:
+            raise ValueError("text must be at least 20 characters")
+        return self
+
+
+class ReceiptProposeResponse(BaseModel):
+    items: list[ProposedIngredientItem]
+
+
 class ProductRead(BaseModel):
     barcode: str
     name: str
     brand: str | None = None
     default_quantity_kind: QuantityKindField | None = None
+    default_quantity: float | None = None
+    default_unit: str | None = None
     source: str | None = None
 
     model_config = {"from_attributes": True}
@@ -83,6 +111,8 @@ class ProductCreate(BaseModel):
     name: str
     brand: str | None = None
     default_quantity_kind: QuantityKindField | None = None
+    default_quantity: float | None = None
+    default_unit: str | None = None
 
 
 class BarcodeScanRequest(QuantityFieldsMixin):
@@ -97,6 +127,10 @@ class BarcodeScanRequest(QuantityFieldsMixin):
     register_product: bool = Field(
         default=False,
         description="When barcode is unknown, save manual_name to the local product catalog",
+    )
+    use_product_defaults: bool = Field(
+        default=True,
+        description="When true, quantity is package count and size comes from the product catalog",
     )
     expires_at: datetime | None = None
 
@@ -117,7 +151,39 @@ class RecipeGenerateRequest(BaseModel):
     prioritize_expiring: bool = True
     persist_generated: bool | None = Field(
         default=None,
-        description="When true, save each generated recipe (non-favorite). When omitted, uses server default.",
+        description="When true, save each generated recipe as a favorite. When omitted, uses server default.",
+    )
+
+
+class RecipePublixBogoGenerateRequest(BaseModel):
+    count: int = Field(default=3, ge=1, le=10)
+    constraints: str | None = None
+    persist_generated: bool | None = Field(
+        default=None,
+        description="When true, save each generated recipe as a favorite. When omitted, uses server default.",
+    )
+    publix_store_number: int | None = Field(
+        default=None,
+        ge=1,
+        description="Publix store number for weekly-ad pricing. Falls back to server PUBLIX_STORE_NUMBER.",
+    )
+
+
+class RecipeGenerateSourcesRequest(BaseModel):
+    use_pantry: bool = False
+    use_publix_bogo: bool = False
+    query: str | None = Field(default=None, max_length=500)
+    count: int = Field(default=3, ge=1, le=10)
+    constraints: str | None = None
+    prioritize_expiring: bool = True
+    persist_generated: bool | None = Field(
+        default=None,
+        description="When true, save each generated recipe as a favorite. When omitted, uses server default.",
+    )
+    publix_store_number: int | None = Field(
+        default=None,
+        ge=1,
+        description="Publix store number for weekly-ad BOGO. Falls back to server PUBLIX_STORE_NUMBER.",
     )
 
 
@@ -146,6 +212,7 @@ class GeneratedRecipe(BaseModel):
     ingredients: list[RecipeIngredient]
     steps: list[str]
     uses_from_pantry: list[str] = Field(default_factory=list)
+    uses_from_publix_bogo: list[str] = Field(default_factory=list)
 
 
 class RecipeGenerateResponse(BaseModel):
@@ -153,12 +220,58 @@ class RecipeGenerateResponse(BaseModel):
     saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
 
 
+class RecipeChatSendRequest(BaseModel):
+    session_id: int | None = None
+    message: str = Field(min_length=1, max_length=2000)
+    use_pantry: bool = False
+    use_publix_bogo: bool = False
+    query: str | None = Field(default=None, max_length=500)
+    count: int = Field(default=3, ge=1, le=10)
+    constraints: str | None = None
+    prioritize_expiring: bool = True
+    persist_generated: bool | None = None
+    publix_store_number: int | None = Field(default=None, ge=1)
+
+
+class RecipeChatMessageRead(BaseModel):
+    id: int
+    role: str
+    content: str
+    recipes: list[GeneratedRecipe] = Field(default_factory=list)
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RecipeChatSendResponse(BaseModel):
+    session_id: int
+    reply_kind: Literal["message", "recipes"]
+    assistant_message: str
+    recipes: list[GeneratedRecipe] = Field(default_factory=list)
+    saved_recipes: list["SavedRecipeRead"] = Field(default_factory=list)
+    messages: list[RecipeChatMessageRead]
+
+
+class RecipeChatSessionSummary(BaseModel):
+    id: int
+    updated_at: datetime
+    preview: str
+    message_count: int
+
+
+class RecipeChatSessionDetail(BaseModel):
+    id: int
+    updated_at: datetime
+    messages: list[RecipeChatMessageRead]
+
+
 class RecipeSearchRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500)
     count: int = Field(default=3, ge=1, le=10)
+    constraints: str | None = None
     persist_generated: bool | None = Field(
         default=None,
-        description="When true, save each result (non-favorite). When omitted, uses server default.",
+        description="When true, save each result as a favorite. When omitted, uses server default.",
     )
 
 
@@ -263,6 +376,7 @@ class ShoppingFromRecipeRequest(BaseModel):
     list_id: int
     recipe: GeneratedRecipe | None = None
     saved_recipe_id: int | None = None
+    skip_pantry_check: bool = False
 
     @model_validator(mode="after")
     def exactly_one_recipe_source(self) -> "ShoppingFromRecipeRequest":
@@ -299,6 +413,7 @@ class MealPlanEntryUpdate(BaseModel):
     plan_date: str | None = Field(default=None, max_length=10)
     meal_slot: MealSlotField | None = None
     saved_recipe_id: int | None = None
+    cooked: bool | None = None
 
     @field_validator("plan_date")
     @classmethod
@@ -317,15 +432,31 @@ class MealPlanEntryRead(BaseModel):
     meal_slot: MealSlotField
     saved_recipe_id: int
     recipe_title: str
+    cooked: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MealPlanCookRequest(BaseModel):
+    cooked: bool
+    consume_pantry: bool = False
+
+
+class MealPlanCookResponse(BaseModel):
+    entry: MealPlanEntryRead
+    removed: list[str] = Field(default_factory=list)
+    reduced: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
+    no_ingredient_lines: bool = False
 
 
 class ShoppingFromMealPlanRequest(BaseModel):
     list_id: int
     start_date: str = Field(max_length=10)
     end_date: str = Field(max_length=10)
+    skip_pantry_check: bool = False
 
     @model_validator(mode="after")
     def validate_range(self) -> "ShoppingFromMealPlanRequest":

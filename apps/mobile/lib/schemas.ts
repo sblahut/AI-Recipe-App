@@ -18,6 +18,18 @@ export const ingredientSchema = z.object({
 });
 export type Ingredient = z.infer<typeof ingredientSchema>;
 
+export const proposedIngredientSchema = z.object({
+  name: z.string(),
+  quantity: z.number().nullable().optional(),
+  quantity_kind: quantityKindSchema.optional(),
+  unit: z.string().nullable().optional(),
+});
+export type ProposedIngredient = z.infer<typeof proposedIngredientSchema>;
+
+export const receiptProposeResponseSchema = z.object({
+  items: z.array(proposedIngredientSchema),
+});
+
 export const ingredientCreateSchema = z.object({
   name: z.string(),
   quantity: z.number().nullable().optional(),
@@ -57,6 +69,7 @@ export const generatedRecipeSchema = z.object({
   ingredients: z.array(recipeIngredientSchema),
   steps: z.array(z.string()),
   uses_from_pantry: z.array(z.string()).optional(),
+  uses_from_publix_bogo: z.array(z.string()).optional(),
 });
 export type GeneratedRecipe = z.infer<typeof generatedRecipeSchema>;
 
@@ -73,6 +86,40 @@ export const recipeGenerateResponseSchema = z.object({
   recipes: z.array(generatedRecipeSchema),
   saved_recipes: z.array(savedRecipeReadSchema).optional().default([]),
 });
+
+export const recipeChatMessageSchema = z.object({
+  id: z.number(),
+  role: z.string(),
+  content: z.string(),
+  recipes: z.array(generatedRecipeSchema).optional().default([]),
+  created_at: z.string(),
+});
+export type RecipeChatMessage = z.infer<typeof recipeChatMessageSchema>;
+
+export const recipeChatSendResponseSchema = z.object({
+  session_id: z.number(),
+  reply_kind: z.enum(["message", "recipes"]),
+  assistant_message: z.string(),
+  recipes: z.array(generatedRecipeSchema).optional().default([]),
+  saved_recipes: z.array(savedRecipeReadSchema).optional().default([]),
+  messages: z.array(recipeChatMessageSchema),
+});
+export type RecipeChatSendResponse = z.infer<typeof recipeChatSendResponseSchema>;
+
+export const recipeChatSessionSummarySchema = z.object({
+  id: z.number(),
+  updated_at: z.string(),
+  preview: z.string(),
+  message_count: z.number(),
+});
+export type RecipeChatSessionSummary = z.infer<typeof recipeChatSessionSummarySchema>;
+
+export const recipeChatSessionDetailSchema = z.object({
+  id: z.number(),
+  updated_at: z.string(),
+  messages: z.array(recipeChatMessageSchema),
+});
+export type RecipeChatSessionDetail = z.infer<typeof recipeChatSessionDetailSchema>;
 
 export const recipeImportResponseSchema = z.object({
   recipe: generatedRecipeSchema,
@@ -119,9 +166,20 @@ export const mealPlanEntrySchema = z.object({
   meal_slot: mealSlotSchema,
   saved_recipe_id: z.number(),
   recipe_title: z.string(),
+  cooked: z.boolean().optional().default(false),
   created_at: z.string(),
 });
 export type MealPlanEntry = z.infer<typeof mealPlanEntrySchema>;
+
+export const mealPlanCookResponseSchema = z.object({
+  entry: mealPlanEntrySchema,
+  removed: z.array(z.string()).optional().default([]),
+  reduced: z.array(z.string()).optional().default([]),
+  missing: z.array(z.string()).optional().default([]),
+  skipped: z.array(z.string()).optional().default([]),
+  no_ingredient_lines: z.boolean().optional().default(false),
+});
+export type MealPlanCookResponse = z.infer<typeof mealPlanCookResponseSchema>;
 
 export const shoppingFromMealPlanResponseSchema = z.object({
   added: z.array(shoppingListItemSchema),
@@ -135,7 +193,12 @@ export const productReadSchema = z.object({
   barcode: z.string(),
   name: z.string(),
   brand: z.string().nullable().optional(),
+  default_quantity_kind: z.enum(["count", "weight", "volume"]).nullable().optional(),
+  default_quantity: z.number().nullable().optional(),
+  default_unit: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
 });
+export type ProductRead = z.infer<typeof productReadSchema>;
 
 export const barcodeScanResponseSchema = z.object({
   barcode: z.string(),

@@ -13,7 +13,7 @@ from app.schemas import (
 from app.services.barcode import normalize_barcode
 from app.services.inventory_merge import upsert_ingredient
 from app.services.openfoodfacts_lookup import lookup_product
-from app.units import default_unit
+from app.services.scan_quantity import resolve_scan_quantity
 
 router = APIRouter(tags=["products"])
 
@@ -21,13 +21,17 @@ router = APIRouter(tags=["products"])
 def _resolve_quantity_fields(
     body: BarcodeScanRequest, product: Product | None
 ) -> tuple[str, float | None, str | None]:
-    kind = body.quantity_kind
-    if product and product.default_quantity_kind and body.unit is None:
-        kind = product.default_quantity_kind
-    unit = body.unit
-    quantity = body.quantity
-    if quantity is not None and unit is None:
-        unit = default_unit(kind)
+    packages = body.quantity if body.quantity is not None else 1.0
+    try:
+        kind, quantity, unit = resolve_scan_quantity(
+            use_product_defaults=body.use_product_defaults,
+            packages=packages,
+            quantity_kind=body.quantity_kind,
+            unit=body.unit,
+            product=product,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return kind, quantity, unit
 
 
@@ -38,6 +42,8 @@ def _upsert_product(
     name: str,
     brand: str | None = None,
     default_quantity_kind: str | None = None,
+    default_quantity: float | None = None,
+    default_unit: str | None = None,
     source: str,
 ) -> Product:
     code = normalize_barcode(barcode)
@@ -48,12 +54,18 @@ def _upsert_product(
         row.source = source
         if default_quantity_kind is not None:
             row.default_quantity_kind = default_quantity_kind
+        if default_quantity is not None:
+            row.default_quantity = default_quantity
+        if default_unit is not None:
+            row.default_unit = default_unit
     else:
         row = Product(
             barcode=code,
             name=name,
             brand=brand,
             default_quantity_kind=default_quantity_kind,
+            default_quantity=default_quantity,
+            default_unit=default_unit,
             source=source,
         )
         db.add(row)
@@ -75,6 +87,8 @@ def _resolve_product(db: Session, code: str) -> Product | None:
         name=looked_up.name,
         brand=looked_up.brand,
         default_quantity_kind=looked_up.default_quantity_kind,
+        default_quantity=looked_up.default_quantity,
+        default_unit=looked_up.default_unit,
         source="openfoodfacts_api",
     )
 
@@ -99,6 +113,8 @@ def create_product(body: ProductCreate, db: Session = Depends(get_db)) -> Produc
         name=body.name.strip(),
         brand=body.brand,
         default_quantity_kind=body.default_quantity_kind,
+        default_quantity=body.default_quantity,
+        default_unit=body.default_unit,
         source="manual",
     )
 

@@ -15,6 +15,14 @@ export type StoreChain = (typeof STORE_CHAINS)[number];
 
 export const PUBLIX_WEEKLY_AD = "https://www.publix.com/savings/weekly-ad";
 
+export const PUBLIX_WEEKLY_AD_BOGO = "https://www.publix.com/savings/weekly-ad/bogo";
+
+/** Default store for weekly-ad BOGO APIs — Chancellor Crossing, Fredericksburg VA. */
+export const DEFAULT_PUBLIX_STORE_NUMBER = 1885;
+
+export const PUBLIX_CHANCELLOR_CROSSING_URL =
+  "https://www.publix.com/locations/1885-chancellor-crossing";
+
 const WEEKLY_AD_URLS: Record<StoreChain, string | null> = {
   Publix: PUBLIX_WEEKLY_AD,
   "Food Lion": "https://www.foodlion.com/weekly-ad",

@@ -30,10 +30,25 @@ function RootStack() {
         />
         <Stack.Screen name="scan" options={{ title: "Scan barcode", presentation: "modal" }} />
         <Stack.Screen
+          name="receipt-import"
+          options={{
+            title: "Receipt or invoice",
+            headerBackTitle: "Pantry",
+            headerBackButtonDisplayMode: "minimal",
+          }}
+        />
+        <Stack.Screen
           name="shopping-list/[listId]"
           options={{
             title: "Shopping list",
             headerBackTitle: "Shop",
+            headerBackButtonDisplayMode: "minimal",
+          }}
+        />
+        <Stack.Screen
+          name="settings"
+          options={{
+            title: "Settings",
             headerBackButtonDisplayMode: "minimal",
           }}
         />

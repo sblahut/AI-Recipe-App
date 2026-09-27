@@ -4,8 +4,8 @@ Family kitchen inventory and recipe app: **100% offline on your home network**. 
 
 ## Goals
 
-- **Fast recipe generation** from what you have on hand (primary daily flow).
-- **Import recipes** by pasting text (no URL scraping yet).
+- **Fast recipe generation** from pantry, optional **Publix weekly-ad BOGO** deals, or both (primary daily flow).
+- **Import recipes** by pasting text or a recipe URL (server fetches the page, then Ollama parses it).
 - **Barcode scan** to add inventory and shopping-list items (local product DB, no GPU).
 - **Manual inventory entry** with **count, weight, or volume** amounts.
 - **Save recipes** (favorites and optional auto-save on generate/import).
@@ -26,7 +26,7 @@ Phone (Expo / React Native)          Home PC (Windows)
 
 | Layer | Choice | Notes |
 |--------|--------|--------|
-| Mobile | Expo (`apps/mobile/`) | Pantry, recipes, shopping, settings, barcode scan |
+| Mobile | Expo (`apps/mobile/`) | Pantry, recipes (pantry/BOGO/sources), meal plan, shopping, settings, barcode scan |
 | Backend | Python FastAPI | `server/` |
 | Database | SQLite | File: `server/data/app.db` (gitignored) |
 | Recipes | Ollama text model | Default: `mistral:7b`, keep warm for speed |
@@ -258,6 +258,8 @@ Then Settings can use `https://<machine>.<tailnet>.ts.net`. Requires **HTTPS Cer
 | POST | `/products` | Register a barcode product in the family catalog |
 | POST | `/scan/barcode` | UPC lookup + add to inventory or shopping list |
 | POST | `/recipes/generate` | AI recipes from inventory (optional auto-save) |
+| POST | `/recipes/generate/publix-bogo` | AI recipes from current Publix BOGO titles for a store |
+| POST | `/recipes/generate/sources` | AI recipes from selected sources (pantry, BOGO, optional idea query) |
 | POST | `/recipes/search` | AI recipe ideas from a text query (ignores pantry) |
 | POST | `/recipes/import` | Parse pasted text or fetch a recipe URL, then Ollama (optional save) |
 | GET/POST/DELETE | `/recipes/saved` | Store and browse family recipes |
@@ -269,8 +271,8 @@ Then Settings can use `https://<machine>.<tailnet>.ts.net`. Requires **HTTPS Cer
 ## Usage flow
 
 1. **Stock the pantry** — scan barcodes or add items manually with the right kind/unit.
-2. **Cook** — generate from pantry, paste-import a recipe, star favorites.
-3. **Plan** — assign saved recipes to days on the **Plan** tab; **Shop this week** fills a list.
+2. **Cook** — generate from pantry and/or Publix BOGO (store # in **Settings**), paste-import or URL-import, star favorites.
+3. **Plan** — assign saved recipes to days on the **Plan** tab (or add a custom meal name if it is not in favorites); **Shop this week** fills a list.
 4. **Shop** — build lists, open list view to check off items, scan in the store.
 
 ## Barcode catalog
@@ -279,24 +281,27 @@ Packaged goods are resolved from the local **`products`** table (Open Food Facts
 
 ### Import Open Food Facts (offline)
 
-1. Download the JSONL export (large file, several GB compressed):  
+1. Download the JSONL export (large file, several GB compressed) into `server/data/imports/`:  
    https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz  
-2. Save under `server/data/imports/` (gitignored except the small sample file).
-3. Run the import:
+   Or from `server/`: `.\scripts\download-open-food-facts.ps1`
+2. Run the import (US products only by default):
 
    ```powershell
    cd server
-   .\.venv\Scripts\Activate.ps1
-   python scripts/import_open_food_facts.py --input data/imports/openfoodfacts-products.jsonl.gz --country en:united-states
+   .\import-products.ps1 -ImportPath data\imports\openfoodfacts-products.jsonl.gz
    ```
 
    Test on the committed sample:
 
    ```powershell
-   python scripts/import_open_food_facts.py --input data/imports/sample.openfoodfacts.jsonl
+   .\import-products.ps1 -ImportPath data\imports\sample.openfoodfacts.jsonl -Country ""
    ```
 
-   Options: `--limit N`, `--dry-run`, `--country en:united-states`.
+   Options: `--limit N`, `--dry-run`, `--country en:united-states` (empty string = all countries).
+
+   Import stores **package size** (`default_quantity`, `default_unit`, `default_quantity_kind`). Scans multiply that by **how many packages** you enter on the phone. Unknown barcodes still fall back to live OFF lookup when the PC has internet.
+
+   After import succeeds, you may **delete** `server/data/imports/openfoodfacts-products.jsonl.gz` to free disk; the catalog remains in `server/data/app.db`. You do **not** need to revert application code — those changes are how barcode scans use the catalog.
 
 ### Manual entry paths
 
@@ -319,6 +324,7 @@ These match the CI jobs **Unit tests (server)** and **Unit tests (mobile)** (not
 cd server
 pip install -r requirements-dev.txt   # first time
 python -m pytest tests -q
+python -m pytest tests --cov=app --cov-report=term-missing:skip-covered
 ```
 
 **Mobile:**
@@ -327,6 +333,7 @@ python -m pytest tests -q
 cd apps/mobile
 npm install   # first time
 npm test
+npm run test:coverage
 ```
 
 **All unit tests** (PowerShell, from repo root):
@@ -366,7 +373,7 @@ Verbose server run: `python -m pytest tests -v`. CI uses `npm test -- --ci` in `
 
 - **TestFlight** iOS build so phones do not need Expo / Metro off-LAN (API + Tailscale URL is already documented above).
 
-Product **`default_quantity_kind`** is inferred during OFF import and live OFF barcode lookup (e.g. milk → volume). Re-run the import script to backfill existing rows.
+Product **package defaults** (`default_quantity_kind`, `default_quantity`, `default_unit`) are inferred during OFF import and live OFF lookup. Re-run the import script to backfill existing catalog rows.
 
 ## Environment variables
 
@@ -378,6 +385,7 @@ Copy `server/.env.example` to `server/.env`:
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama API |
 | `OLLAMA_TEXT_MODEL` | `mistral:7b` | Recipe generate & import |
 | `DEFAULT_PERSIST_GENERATED_RECIPES` | `false` | Auto-save generate/import when client omits `persist` |
+| `PUBLIX_STORE_NUMBER` | `1885` | Default Publix store for BOGO recipe endpoints when the client omits `publix_store_number` |
 
 ## License
 

@@ -8,8 +8,9 @@ import {
   addDays,
   formatPlanDate,
   formatWeekRangeLabel,
-  mondayOnOrBefore,
+  weekStartOnOrBefore,
 } from "@/lib/mealPlanWeek";
+import type { WeekStartsOnDay } from "@/lib/userPreferences";
 import { findFavoriteMatch } from "@/lib/recipeFavorites";
 import type { GeneratedRecipe, SavedRecipe } from "@/lib/schemas";
 import { savedRecipeReadSchema } from "@/lib/schemas";
@@ -86,13 +87,15 @@ export async function promptAddRecipeToMealPlan(
   recipe: GeneratedRecipe,
   serverUrl: string,
   favorites: SavedRecipe[],
+  weekStartsOnDay: WeekStartsOnDay = 1,
 ): Promise<void> {
   try {
     const savedRecipeId = await ensureSavedFavorite(recipe, favorites, serverUrl);
+    const weekStart = weekStartOnOrBefore(new Date(), weekStartsOnDay);
     Alert.alert("Add to meal plan", recipe.title, [
       ...MEAL_SLOTS.map((slot) => ({
         text: MEAL_SLOT_LABELS[slot],
-        onPress: () => pickPlanDate(savedRecipeId, slot, serverUrl, mondayOnOrBefore(new Date())),
+        onPress: () => pickPlanDate(savedRecipeId, slot, serverUrl, weekStart),
       })),
       { text: "Cancel", style: "cancel" },
     ]);

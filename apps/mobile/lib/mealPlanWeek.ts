@@ -8,6 +8,17 @@ export const MEAL_SLOT_LABELS: Record<MealSlot, string> = {
   snack: "Snack",
 };
 
+/** Week-start weekday for meal plan (0 = Sunday … 6 = Saturday). */
+export const WEEK_START_DAY_OPTIONS: { day: number; label: string }[] = [
+  { day: 0, label: "Sunday" },
+  { day: 1, label: "Monday" },
+  { day: 2, label: "Tuesday" },
+  { day: 3, label: "Wednesday" },
+  { day: 4, label: "Thursday" },
+  { day: 5, label: "Friday" },
+  { day: 6, label: "Saturday" },
+];
+
 /** Local calendar day as YYYY-MM-DD. */
 export function formatPlanDate(date: Date): string {
   const y = date.getFullYear();
@@ -30,11 +41,16 @@ export function addDays(date: Date, days: number): Date {
   return next;
 }
 
+/** Start of the calendar week containing `date`, for a given week-start weekday (0=Sun … 6=Sat). */
+export function weekStartOnOrBefore(date: Date, weekStartsOnDay: number): Date {
+  const day = date.getDay();
+  const diff = (day - weekStartsOnDay + 7) % 7;
+  return addDays(date, -diff);
+}
+
 /** Monday on or before the given local date. */
 export function mondayOnOrBefore(date: Date): Date {
-  const day = date.getDay();
-  const diff = day === 0 ? 6 : day - 1;
-  return addDays(date, -diff);
+  return weekStartOnOrBefore(date, 1);
 }
 
 export function weekRangeFromWeekStart(weekStartMonday: Date): { start: string; end: string } {

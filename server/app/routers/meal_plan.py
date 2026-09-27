@@ -1,9 +1,19 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import MealPlanEntry, SavedRecipe
-from app.schemas import MealPlanEntryCreate, MealPlanEntryRead, MealPlanEntryUpdate
+from app.schemas import (
+    GeneratedRecipe,
+    MealPlanCookRequest,
+    MealPlanCookResponse,
+    MealPlanEntryCreate,
+    MealPlanEntryRead,
+    MealPlanEntryUpdate,
+)
+from app.services.consume_recipe_from_pantry import consume_recipe_from_pantry
 from app.services.meal_plan_range import (
     meal_slot_sort_key,
     parse_plan_date,
@@ -21,6 +31,7 @@ def _entry_to_read(row: MealPlanEntry) -> MealPlanEntryRead:
         meal_slot=row.meal_slot,  # type: ignore[arg-type]
         saved_recipe_id=row.saved_recipe_id,
         recipe_title=title,
+        cooked=bool(row.cooked),
         created_at=row.created_at,
     )
 
@@ -101,6 +112,8 @@ def update_meal_plan_entry(
         row.meal_slot = body.meal_slot
     if body.saved_recipe_id is not None:
         row.saved_recipe_id = body.saved_recipe_id
+    if body.cooked is not None:
+        row.cooked = body.cooked
 
     db.commit()
     db.refresh(row)
@@ -111,6 +124,48 @@ def update_meal_plan_entry(
         .one()
     )
     return _entry_to_read(row)
+
+
+@router.post("/{entry_id}/cooked", response_model=MealPlanCookResponse)
+def mark_meal_plan_cooked(
+    entry_id: int,
+    body: MealPlanCookRequest,
+    db: Session = Depends(get_db),
+) -> MealPlanCookResponse:
+    row = (
+        db.query(MealPlanEntry)
+        .options(joinedload(MealPlanEntry.saved_recipe))
+        .filter(MealPlanEntry.id == entry_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Meal plan entry not found")
+
+    consume = None
+    if body.cooked and body.consume_pantry:
+        saved = row.saved_recipe or db.get(SavedRecipe, row.saved_recipe_id)
+        if not saved:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        recipe = GeneratedRecipe.model_validate(json.loads(saved.payload_json))
+        consume = consume_recipe_from_pantry(db, recipe)
+
+    row.cooked = body.cooked
+    db.commit()
+    db.refresh(row)
+    row = (
+        db.query(MealPlanEntry)
+        .options(joinedload(MealPlanEntry.saved_recipe))
+        .filter(MealPlanEntry.id == row.id)
+        .one()
+    )
+    return MealPlanCookResponse(
+        entry=_entry_to_read(row),
+        removed=consume.removed if consume else [],
+        reduced=consume.reduced if consume else [],
+        missing=consume.missing if consume else [],
+        skipped=consume.skipped if consume else [],
+        no_ingredient_lines=consume.no_ingredient_lines if consume else False,
+    )
 
 
 @router.delete("/{entry_id}", status_code=204)

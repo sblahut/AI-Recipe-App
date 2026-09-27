@@ -1,4 +1,4 @@
-import type { ReactElement, RefObject } from "react";
+import type { ReactElement, ReactNode, RefObject } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -17,6 +17,8 @@ type Props = ViewProps & {
   scroll?: boolean;
   padded?: boolean;
   loading?: boolean;
+  /** Fixed content above the scroll view (e.g. sticky Chef bar). */
+  header?: ReactNode;
   contentContainerStyle?: object;
   refreshControl?: ReactElement<RefreshControlProps>;
   scrollRef?: RefObject<ScrollView | null>;
@@ -26,6 +28,7 @@ export function Screen({
   scroll = false,
   padded = true,
   loading = false,
+  header,
   style,
   contentContainerStyle,
   refreshControl,
@@ -50,6 +53,7 @@ export function Screen({
   if (scroll) {
     return (
       <SafeAreaView style={[styles.fill, { backgroundColor: colors.background }]} edges={["bottom"]}>
+        {header ? <View style={[pad, styles.headerSlot]}>{header}</View> : null}
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={[pad, styles.scrollContent, contentContainerStyle]}
@@ -79,6 +83,7 @@ export function Screen({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   padded: { paddingHorizontal: spacing.lg },
+  headerSlot: { paddingTop: spacing.md, paddingBottom: spacing.sm },
   scrollContent: { paddingBottom: spacing.xxxl, gap: spacing.lg },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

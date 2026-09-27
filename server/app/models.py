@@ -13,6 +13,8 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(512))
     brand: Mapped[str | None] = mapped_column(String(256), nullable=True)
     default_quantity_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    default_quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    default_unit: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
@@ -59,9 +61,42 @@ class MealPlanEntry(Base):
         ForeignKey("saved_recipes.id", ondelete="CASCADE"),
         index=True,
     )
+    cooked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     saved_recipe: Mapped["SavedRecipe"] = relationship(back_populates="meal_plan_entries")
+
+
+class RecipeChatSession(Base):
+    __tablename__ = "recipe_chat_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    messages: Mapped[list["RecipeChatMessage"]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="RecipeChatMessage.id",
+    )
+
+
+class RecipeChatMessage(Base):
+    __tablename__ = "recipe_chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("recipe_chat_sessions.id", ondelete="CASCADE"),
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text)
+    recipes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    session: Mapped["RecipeChatSession"] = relationship(back_populates="messages")
 
 
 class ShoppingList(Base):

@@ -10,7 +10,8 @@ Return ONLY a JSON object with key "recipes" (array). Each recipe must have:
 title (string), servings (integer), prep_minutes (integer),
 ingredients (array of {{name, quantity}} where quantity is a string like "2" or "1 cup"),
 steps (array of strings),
-uses_from_pantry (empty array []).
+uses_from_pantry (empty array []),
+uses_from_publix_bogo (empty array []).
 
 Request: {trimmed}
 """

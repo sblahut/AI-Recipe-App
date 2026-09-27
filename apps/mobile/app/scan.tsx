@@ -20,6 +20,7 @@ import { radius, spacing, typography } from "@/constants/theme";
 import { useServerSettings } from "@/contexts/ServerSettingsContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { apiJson } from "@/lib/api";
+import { formatProductPackage } from "@/lib/formatProductPackage";
 import { parseServerUrlFromQr, phoneUnreachableHomeServerReason } from "@/lib/parseServerUrlFromQr";
 import {
   barcodeScanResponseSchema,
@@ -38,6 +39,7 @@ type ScanParams = {
 type PendingScan = {
   barcode: string;
   productName: string | null;
+  packageLabel: string | null;
   resolving: boolean;
 };
 
@@ -192,15 +194,19 @@ function BarcodeScanScreen() {
     const qty = options?.quantity ?? 1;
     setBusy(true);
     try {
+      const manual = Boolean(options?.nameOverride);
       const body: Record<string, unknown> = {
         barcode,
         target,
         manual_name: options?.nameOverride ?? null,
-        register_product: Boolean(options?.nameOverride),
+        register_product: manual,
         quantity: qty,
-        quantity_kind: "count",
-        unit: "each",
+        use_product_defaults: !manual,
       };
+      if (manual) {
+        body.quantity_kind = "count";
+        body.unit = "each";
+      }
       if (target === "shopping_list" && listId != null) {
         body.shopping_list_id = listId;
       }
@@ -249,7 +255,7 @@ function BarcodeScanScreen() {
   const beginConfirmScan = (barcode: string) => {
     setQuantity("1");
     setExpiresAt(null);
-    setPending({ barcode, productName: null, resolving: true });
+    setPending({ barcode, productName: null, packageLabel: null, resolving: true });
     void (async () => {
       try {
         const raw = await apiJson<unknown>(`/products/${barcode}`, { baseUrl: serverUrl });
@@ -259,7 +265,12 @@ function BarcodeScanScreen() {
           setLastBarcode(barcode);
           return;
         }
-        setPending({ barcode, productName: product.name, resolving: false });
+        setPending({
+          barcode,
+          productName: product.name,
+          packageLabel: formatProductPackage(product),
+          resolving: false,
+        });
       } catch {
         setPending(null);
         setLastBarcode(barcode);
@@ -376,9 +387,10 @@ function BarcodeScanScreen() {
               <>
                 <Text style={[styles.sheetMeta, { color: colors.textMuted }]}>
                   {storageLocation ? `Add to ${storageLocation}` : "Add to pantry"}
+                  {pending.packageLabel ? ` · ${pending.packageLabel} per package` : ""}
                 </Text>
                 <AppTextField
-                  label="Quantity"
+                  label={pending.packageLabel ? "How many packages?" : "Quantity"}
                   value={quantity}
                   onChangeText={setQuantity}
                   keyboardType="decimal-pad"
