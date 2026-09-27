@@ -13,7 +13,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 
 export const MODAL_BACKDROP_COLOR = "rgba(45, 36, 32, 0.45)";
 
-export type DismissibleModalVariant = "center" | "bottomSheet";
+export type DismissibleModalVariant = "center" | "bottomSheet" | "topSheet";
 
 type Props = {
   visible: boolean;
@@ -34,7 +34,7 @@ export function DismissibleModal({
 }: Props) {
   const { colors } = useAppTheme();
   const resolvedAnimation =
-    animationType ?? (variant === "bottomSheet" ? "slide" : "fade");
+    animationType ?? (variant === "bottomSheet" || variant === "topSheet" ? "slide" : "fade");
 
   return (
     <Modal
@@ -60,6 +60,24 @@ export function DismissibleModal({
           >
             {children}
           </View>
+        </View>
+      ) : variant === "topSheet" ? (
+        <View style={[styles.fill, { backgroundColor: MODAL_BACKDROP_COLOR }]}>
+          <View
+            style={[
+              styles.topSheet,
+              { backgroundColor: colors.background, borderColor: colors.border },
+              sheetStyle,
+            ]}
+          >
+            {children}
+          </View>
+          <Pressable
+            style={styles.dismissArea}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss dialog"
+          />
         </View>
       ) : (
         <Pressable
@@ -113,6 +131,13 @@ const styles = StyleSheet.create({
     maxHeight: "92%",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  topSheet: {
+    width: "100%",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
