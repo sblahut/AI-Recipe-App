@@ -2,8 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  InteractionManager,
   Pressable,
   StyleSheet,
   Text,
@@ -167,8 +166,10 @@ export default function MealPlanScreen() {
   };
 
   const openCustomMealModal = (planDate: string, mealSlot: MealSlot) => {
-    setCustomMealTitle("");
-    setCustomMealTarget({ planDate, mealSlot });
+    InteractionManager.runAfterInteractions(() => {
+      setCustomMealTitle("");
+      setCustomMealTarget({ planDate, mealSlot });
+    });
   };
 
   const closeCustomMealModal = () => {
@@ -378,51 +379,8 @@ export default function MealPlanScreen() {
   const today = formatPlanDate(new Date());
 
   return (
-    <Screen scroll contentContainerStyle={styles.scroll}>
-      <DismissibleModal
-        visible={customMealTarget != null}
-        onClose={closeCustomMealModal}
-        variant="bottomSheet"
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={[
-            styles.customMealModal,
-            {
-              backgroundColor: colors.background,
-              paddingTop: spacing.lg,
-            },
-          ]}
-          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
-        >
-          <Text style={[styles.customMealHeading, { color: colors.text }]}>Meal Not in Favorites</Text>
-          {customMealTarget ? (
-            <Text style={[styles.customMealSub, { color: colors.textMuted }]}>
-              {customMealTarget.planDate} · {MEAL_SLOT_LABELS[customMealTarget.mealSlot]}
-            </Text>
-          ) : null}
-          <AppTextField
-            label="Meal name"
-            placeholder="e.g. Pizza night, leftovers, tacos…"
-            value={customMealTitle}
-            onChangeText={setCustomMealTitle}
-            autoFocus
-          />
-          <View style={styles.customMealActions}>
-            <AppButton
-              label="Cancel"
-              variant="ghost"
-              onPress={closeCustomMealModal}
-              disabled={customMealSaving}
-            />
-            <AppButton
-              label={customMealSaving ? "Saving…" : "Add to plan"}
-              loading={customMealSaving}
-              onPress={submitCustomMeal}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </DismissibleModal>
+    <>
+      <Screen scroll contentContainerStyle={styles.scroll}>
       {/* Week navigation */}
       <View style={styles.weekNav}>
         <Pressable
@@ -579,7 +537,53 @@ export default function MealPlanScreen() {
       ) : null}
 
       <Text style={[styles.hint, { color: colors.textMuted }]}>Long-press a meal to remove it.</Text>
-    </Screen>
+      </Screen>
+
+      <DismissibleModal
+        visible={customMealTarget != null}
+        onClose={closeCustomMealModal}
+        variant="topSheet"
+      >
+        <View
+          style={[
+            styles.customMealModal,
+            {
+              backgroundColor: colors.background,
+              paddingTop: insets.top + spacing.lg,
+              paddingBottom: spacing.xl,
+            },
+          ]}
+        >
+          <Text style={[styles.customMealHeading, { color: colors.text }]}>Meal Not in Favorites</Text>
+          {customMealTarget ? (
+            <Text style={[styles.customMealSub, { color: colors.textMuted }]}>
+              {customMealTarget.planDate} · {MEAL_SLOT_LABELS[customMealTarget.mealSlot]}
+            </Text>
+          ) : null}
+          <AppTextField
+            label="Meal name"
+            placeholder="e.g. Pizza night, leftovers, tacos…"
+            value={customMealTitle}
+            onChangeText={setCustomMealTitle}
+            autoFocus={customMealTarget != null}
+          />
+          <View style={styles.customMealActions}>
+            <AppButton
+              label="Cancel"
+              variant="ghost"
+              onPress={closeCustomMealModal}
+              disabled={customMealSaving}
+            />
+            <AppButton
+              label={customMealSaving ? "Saving…" : "Add to plan"}
+              loading={customMealSaving}
+              onPress={submitCustomMeal}
+              disabled={customMealSaving || customMealTitle.trim().length < 1}
+            />
+          </View>
+        </View>
+      </DismissibleModal>
+    </>
   );
 }
 
@@ -709,11 +713,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   customMealModal: {
-    flex: 1,
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
     gap: spacing.lg,
-    justifyContent: "flex-start",
   },
   customMealHeading: {
     ...typography.title,

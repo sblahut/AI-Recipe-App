@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SwipeableRow } from "@/components/SwipeableRow";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { Card } from "@/components/ui/Card";
@@ -22,7 +24,12 @@ import { MODAL_BACKDROP_COLOR } from "@/components/ui/DismissibleModal";
 import { apiJson } from "@/lib/api";
 import { RECIPE_CHEF_SHORT_LABEL } from "@/lib/uiActionLabels";
 import { formatModelDisplayText } from "@/lib/formatModelDisplayText";
-import { fetchRecipeChatSession, fetchRecipeChatSessions } from "@/lib/recipeChatSessions";
+import {
+  deleteRecipeChatSession,
+  fetchRecipeChatSession,
+  fetchRecipeChatSessions,
+} from "@/lib/recipeChatSessions";
+import { formatRecipeChatShare, shareText } from "@/lib/shareContent";
 import {
   recipeChatSendResponseSchema,
   type GeneratedRecipe,
@@ -86,6 +93,8 @@ export function RecipeChefChatModal({
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historySessions, setHistorySessions] = useState<RecipeChatSessionSummary[]>([]);
   const [loadingSessionId, setLoadingSessionId] = useState<number | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
+  const [sharingSessionId, setSharingSessionId] = useState<number | null>(null);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -139,6 +148,62 @@ export function RecipeChefChatModal({
   const closeHistory = () => {
     setHistoryOpen(false);
     setHistoryError(null);
+  };
+
+  const removeSessionFromHistory = (id: number) => {
+    setHistorySessions((prev) => prev.filter((session) => session.id !== id));
+    if (sessionId === id) {
+      startNewConversation();
+    }
+  };
+
+  const performDeleteSession = async (id: number) => {
+    if (deletingSessionId != null) {
+      return;
+    }
+    setDeletingSessionId(id);
+    setHistoryError(null);
+    try {
+      await deleteRecipeChatSession(serverUrl, id);
+      removeSessionFromHistory(id);
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : "Could not delete chat");
+    } finally {
+      setDeletingSessionId(null);
+    }
+  };
+
+  const confirmDeleteSession = (item: RecipeChatSessionSummary) => {
+    const preview = formatModelDisplayText(item.preview);
+    const snippet =
+      preview.length > 80 ? `${preview.slice(0, 77).trimEnd()}…` : preview || "this chat";
+    Alert.alert("Delete chat", `Remove "${snippet}" from past chats?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          void performDeleteSession(item.id);
+        },
+      },
+    ]);
+  };
+
+  const shareHistorySession = async (item: RecipeChatSessionSummary) => {
+    if (sharingSessionId != null) {
+      return;
+    }
+    setSharingSessionId(item.id);
+    setHistoryError(null);
+    try {
+      const detail = await fetchRecipeChatSession(serverUrl, item.id);
+      const title = formatModelDisplayText(item.preview).trim() || "Chef chat";
+      await shareText(title, formatRecipeChatShare(detail));
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : "Could not share chat");
+    } finally {
+      setSharingSessionId(null);
+    }
   };
 
   const selectHistorySession = async (id: number) => {
@@ -356,43 +421,102 @@ export function RecipeChefChatModal({
                   renderItem={({ item }) => {
                     const isActive = sessionId === item.id;
                     const isLoading = loadingSessionId === item.id;
+                    const isDeleting = deletingSessionId === item.id;
+                    const isSharing = sharingSessionId === item.id;
+                    const rowBusy = isLoading || isDeleting || isSharing;
                     const when = new Date(item.updated_at).toLocaleString(undefined, {
                       month: "short",
                       day: "numeric",
                       hour: "numeric",
                       minute: "2-digit",
                     });
+                    const preview = formatModelDisplayText(item.preview);
                     return (
-                      <Pressable
-                        onPress={() => void selectHistorySession(item.id)}
-                        disabled={isLoading}
-                        style={({ pressed }) => [
-                          styles.historyRow,
-                          {
-                            borderColor: colors.border,
-                            backgroundColor: isActive ? colors.primaryMuted : colors.surface,
-                            opacity: pressed || isLoading ? 0.85 : 1,
-                          },
-                        ]}
+                      <SwipeableRow
+                        onDelete={() => confirmDeleteSession(item)}
+                        enabled={!rowBusy}
+                        label="Delete"
                       >
-                        <Text
-                          style={[styles.historyPreview, { color: colors.text }]}
-                          numberOfLines={2}
+                        <View
+                          style={[
+                            styles.historyRow,
+                            {
+                              borderColor: colors.border,
+                              backgroundColor: isActive ? colors.primaryMuted : colors.surface,
+                              opacity: rowBusy ? 0.85 : 1,
+                            },
+                          ]}
                         >
-                          {formatModelDisplayText(item.preview)}
-                        </Text>
-                        <Text style={[styles.historyMeta, { color: colors.textMuted }]}>
-                          {when} · {item.message_count} messages
-                          {isActive ? " · current" : ""}
-                        </Text>
-                        {isLoading ? (
-                          <ActivityIndicator
-                            style={styles.historyRowSpinner}
-                            color={colors.primary}
-                            size="small"
-                          />
-                        ) : null}
-                      </Pressable>
+                          <View style={styles.historyRowBody}>
+                            <View style={styles.historyRowHeader}>
+                              <Pressable
+                                onPress={() => void selectHistorySession(item.id)}
+                                disabled={rowBusy}
+                                style={({ pressed }) => [
+                                  styles.historyRowMain,
+                                  { opacity: pressed ? 0.9 : 1 },
+                                ]}
+                              >
+                                <Text
+                                  style={[styles.historyPreview, { color: colors.text }]}
+                                  numberOfLines={2}
+                                >
+                                  {preview}
+                                </Text>
+                                <Text style={[styles.historyMeta, { color: colors.textMuted }]}>
+                                  {when} · {item.message_count} messages
+                                  {isActive ? " · current" : ""}
+                                </Text>
+                                {isLoading ? (
+                                  <ActivityIndicator
+                                    style={styles.historyRowSpinner}
+                                    color={colors.primary}
+                                    size="small"
+                                  />
+                                ) : null}
+                              </Pressable>
+                              <View style={styles.historyRowActions}>
+                                <Pressable
+                                  onPress={() => void shareHistorySession(item)}
+                                  disabled={rowBusy}
+                                  hitSlop={8}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Share chat: ${preview}`}
+                                  style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                                >
+                                  {isSharing ? (
+                                    <ActivityIndicator color={colors.primary} size="small" />
+                                  ) : (
+                                    <Ionicons
+                                      name="share-outline"
+                                      size={20}
+                                      color={colors.textMuted}
+                                    />
+                                  )}
+                                </Pressable>
+                                <Pressable
+                                  onPress={() => confirmDeleteSession(item)}
+                                  disabled={rowBusy}
+                                  hitSlop={8}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Delete chat: ${preview}`}
+                                  style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                                >
+                                  {isDeleting ? (
+                                    <ActivityIndicator color={colors.danger} size="small" />
+                                  ) : (
+                                    <Ionicons
+                                      name="trash-outline"
+                                      size={20}
+                                      color={colors.danger}
+                                    />
+                                  )}
+                                </Pressable>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      </SwipeableRow>
                     );
                   }}
                 />
@@ -527,8 +651,25 @@ const styles = StyleSheet.create({
   historyRow: {
     borderWidth: 1,
     borderRadius: 10,
+    overflow: "hidden",
+  },
+  historyRowBody: {
     padding: spacing.md,
+  },
+  historyRowHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  historyRowMain: {
+    flex: 1,
     gap: spacing.xs,
+  },
+  historyRowActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingTop: 2,
   },
   historyPreview: {
     ...typography.body,

@@ -18,6 +18,7 @@ from app.services.purchase_item_filters import (
 from app.services.receipt_ocr import ocr_image_bytes_to_text
 
 MAX_RECEIPT_IMAGE_BYTES = 4 * 1024 * 1024
+MAX_RECEIPT_PHOTOS = 8
 MIN_PURCHASE_TEXT_CHARS = 20
 MIN_OCR_TEXT_CHARS = 40
 
@@ -131,13 +132,32 @@ async def propose_items_from_purchase_text(
 
 
 async def propose_items_from_receipt_image(image_base64: str) -> list[ProposedIngredientItem]:
-    image_bytes = receipt_image_bytes(image_base64)
-    ocr_text = ocr_image_bytes_to_text(image_bytes).strip()
+    return await propose_items_from_receipt_images([image_base64])
 
-    if len(ocr_text) >= MIN_OCR_TEXT_CHARS:
+
+async def propose_items_from_receipt_images(
+    images_base64: list[str],
+) -> list[ProposedIngredientItem]:
+    if not images_base64:
+        raise ollama.OllamaError("No receipt photos provided")
+    if len(images_base64) > MAX_RECEIPT_PHOTOS:
+        raise ollama.OllamaError(f"At most {MAX_RECEIPT_PHOTOS} photos per receipt")
+
+    ocr_parts: list[str] = []
+    image_bytes_list: list[bytes] = []
+    for index, image_base64 in enumerate(images_base64, start=1):
+        image_bytes = receipt_image_bytes(image_base64)
+        image_bytes_list.append(image_bytes)
+        ocr_text = ocr_image_bytes_to_text(image_bytes).strip()
+        if ocr_text:
+            ocr_parts.append(f"--- Receipt photo {index} ---\n{ocr_text}")
+
+    combined_ocr = "\n\n".join(ocr_parts)
+
+    if len(combined_ocr) >= MIN_OCR_TEXT_CHARS:
         try:
             return await propose_items_from_purchase_text(
-                ocr_text,
+                combined_ocr,
                 source_hint=_photo_failure_hint(),
             )
         except ollama.OllamaError:
@@ -145,12 +165,14 @@ async def propose_items_from_receipt_image(image_base64: str) -> list[ProposedIn
                 raise
 
     if settings.receipt_vision_fallback:
-        normalized = base64.b64encode(image_bytes).decode("ascii")
-        parsed = await ollama.generate_vision_json(_PURCHASE_VISION_PROMPT, normalized)
-        items = parse_proposed_receipt_items(parsed)
-        return validate_purchase_extraction(items, source_hint=_photo_failure_hint())
+        merged: list[ProposedIngredientItem] = []
+        for image_bytes in image_bytes_list:
+            normalized = base64.b64encode(image_bytes).decode("ascii")
+            parsed = await ollama.generate_vision_json(_PURCHASE_VISION_PROMPT, normalized)
+            merged.extend(parse_proposed_receipt_items(parsed))
+        return validate_purchase_extraction(merged, source_hint=_photo_failure_hint())
 
-    if len(ocr_text) < MIN_OCR_TEXT_CHARS:
+    if len(combined_ocr) < MIN_OCR_TEXT_CHARS:
         raise ollama.OllamaError(
             f"Could not read enough text from the photo. {_photo_failure_hint()}"
         )
@@ -160,11 +182,14 @@ async def propose_items_from_receipt_image(image_base64: str) -> list[ProposedIn
 async def propose_items_from_purchase_document(
     *,
     image_base64: str | None = None,
+    images_base64: list[str] | None = None,
     text: str | None = None,
     url: str | None = None,
 ) -> list[ProposedIngredientItem]:
+    if images_base64:
+        return await propose_items_from_receipt_images(images_base64)
     if image_base64:
-        return await propose_items_from_receipt_image(image_base64)
+        return await propose_items_from_receipt_image(image_base64.strip())
     if text:
         return await propose_items_from_purchase_text(text)
     if url:

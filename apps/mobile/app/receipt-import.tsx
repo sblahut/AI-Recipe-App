@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,7 +33,8 @@ import {
   mergeQuantityUnitsFromApi,
 } from "@/lib/quantityUnits";
 import {
-  pickReceiptImageBase64,
+  MAX_RECEIPT_PHOTOS,
+  pickReceiptPhotos,
   receiptImageSourceOptions,
   type ReceiptImageSource,
 } from "@/lib/pickReceiptImage";
@@ -45,6 +47,12 @@ const DEFAULT_ITEM_LOCATION = "Pantry";
 type ReviewRow = ReceiptReviewItemFields & {
   id: string;
   selected: boolean;
+};
+
+type PendingReceiptPhoto = {
+  id: string;
+  uri: string;
+  base64: string;
 };
 
 function formatProposedQty(item: ReceiptReviewItemFields): string {
@@ -77,7 +85,9 @@ export default function ReceiptImportScreen() {
   const { preferences } = useUserPreferences();
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<PendingReceiptPhoto[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzingPhotoCount, setAnalyzingPhotoCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [unitsByKind, setUnitsByKind] = useState(defaultUnitsByKind());
@@ -117,28 +127,82 @@ export default function ReceiptImportScreen() {
         return;
       }
       setAnalyzing(true);
+      if (source.kind === "images") {
+        setAnalyzingPhotoCount(source.imagesBase64.length);
+      } else if (source.kind === "image") {
+        setAnalyzingPhotoCount(1);
+      } else {
+        setAnalyzingPhotoCount(0);
+      }
       try {
         const items = await proposePurchaseItems(source, serverUrl);
         setRows(toReviewRows(items, DEFAULT_ITEM_LOCATION));
+        setPendingPhotos([]);
       } catch (e) {
         Alert.alert("Could not read document", e instanceof Error ? e.message : "Import failed");
       } finally {
         setAnalyzing(false);
+        setAnalyzingPhotoCount(0);
       }
     },
     [ready.ollamaOk, serverUrl],
   );
 
-  const pickImage = async (source: ReceiptImageSource) => {
-    try {
-      const base64 = await pickReceiptImageBase64(source);
-      if (!base64) {
-        return;
+  const appendPhotos = (photos: { uri: string; base64: string }[]) => {
+    if (photos.length === 0) {
+      return;
+    }
+    setPendingPhotos((prev) => {
+      const remaining = MAX_RECEIPT_PHOTOS - prev.length;
+      if (remaining <= 0) {
+        return prev;
       }
-      await runPropose({ kind: "image", imageBase64: base64 });
+      if (photos.length > remaining) {
+        Alert.alert(
+          "Photo limit",
+          `Only ${remaining} more photo${remaining === 1 ? "" : "s"} can be added (max ${MAX_RECEIPT_PHOTOS}).`,
+        );
+      }
+      const next = photos.slice(0, remaining).map((photo) => ({
+        id: `photo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        uri: photo.uri,
+        base64: photo.base64,
+      }));
+      return [...prev, ...next];
+    });
+  };
+
+  const addPhotos = async (source: ReceiptImageSource) => {
+    try {
+      const pickOptions =
+        source === "camera"
+          ? { existingCount: pendingPhotos.length, maxNew: 1 }
+          : { existingCount: pendingPhotos.length };
+      const photos = await pickReceiptPhotos(source, pickOptions);
+      appendPhotos(photos);
     } catch (e) {
       Alert.alert("Photo", e instanceof Error ? e.message : "Could not use that photo");
     }
+  };
+
+  const removePendingPhoto = (id: string) => {
+    setPendingPhotos((prev) => prev.filter((photo) => photo.id !== id));
+  };
+
+  const readPendingReceipt = async () => {
+    if (pendingPhotos.length === 0) {
+      Alert.alert("Add photos", "Take or choose at least one receipt photo first.");
+      return;
+    }
+    const firstPhoto = pendingPhotos[0];
+    if (pendingPhotos.length === 1 && firstPhoto) {
+      await runPropose({ kind: "image", imageBase64: firstPhoto.base64 });
+      return;
+    }
+    await runPropose({
+      kind: "images",
+      imagesBase64: pendingPhotos.map((photo) => photo.base64),
+    });
   };
 
   const updateRow = (id: string, patch: Partial<ReviewRow>) => {
@@ -189,7 +253,9 @@ export default function ReceiptImportScreen() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.statusText, { color: colors.textMuted }]}>
-            Reading receipt or invoice…
+            {analyzingPhotoCount > 1
+              ? `Reading ${analyzingPhotoCount} receipt photos…`
+              : "Reading receipt or invoice…"}
           </Text>
         </View>
       </Screen>
@@ -297,35 +363,82 @@ export default function ReceiptImportScreen() {
   return (
     <Screen>
       <Text style={[styles.lead, { color: colors.textMuted }]}>
-        Take a photo or choose an image of a receipt or invoice. You will review line items and
-        pick storage for each one before adding to your pantry.
+        Add one or more photos of a receipt or invoice (use multiple shots for long receipts). Tap Read
+        receipt when you are done, then review line items and storage before adding to pantry.
       </Text>
 
       <View style={styles.photoRow}>
         {receiptImageSourceOptions().map((source) => (
           <Pressable
             key={source}
-            onPress={() => void pickImage(source)}
+            onPress={() => void addPhotos(source)}
+            disabled={pendingPhotos.length >= MAX_RECEIPT_PHOTOS}
             style={({ pressed }) => [
               styles.photoCard,
               {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
-                opacity: pressed ? 0.85 : 1,
+                opacity: pressed || pendingPhotos.length >= MAX_RECEIPT_PHOTOS ? 0.85 : 1,
               },
             ]}
           >
             <Ionicons
-              name={source === "camera" ? "camera-outline" : "image-outline"}
+              name={source === "camera" ? "camera-outline" : "images-outline"}
               size={22}
               color={colors.primary}
             />
             <Text style={[styles.photoLabel, { color: colors.text }]}>
-              {source === "camera" ? "Take photo" : "Choose photo"}
+              {source === "camera" ? "Take photo" : "Choose photos"}
             </Text>
           </Pressable>
         ))}
       </View>
+
+      {pendingPhotos.length > 0 ? (
+        <View style={styles.pendingSection}>
+          <Text style={[styles.pendingHeading, { color: colors.text }]}>
+            {pendingPhotos.length} photo{pendingPhotos.length === 1 ? "" : "s"} selected
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbRow}
+          >
+            {pendingPhotos.map((photo, index) => (
+              <View key={photo.id} style={styles.thumbWrap}>
+                <Image
+                  source={{ uri: photo.uri }}
+                  style={[styles.thumb, { borderColor: colors.border }]}
+                  accessibilityLabel={`Receipt photo ${index + 1}`}
+                />
+                <Pressable
+                  onPress={() => removePendingPhoto(photo.id)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove receipt photo ${index + 1}`}
+                  style={({ pressed }) => [
+                    styles.thumbRemove,
+                    { backgroundColor: colors.danger, opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <Ionicons name="close" size={14} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+          <AppButton
+            label="Read receipt"
+            onPress={() => void readPendingReceipt()}
+            disabled={pendingPhotos.length === 0}
+          />
+        </View>
+      ) : null}
+
+      {pendingPhotos.length > 0 && pendingPhotos.length < MAX_RECEIPT_PHOTOS ? (
+        <Text style={[styles.photoCapHint, { color: colors.textMuted }]}>
+          Add up to {MAX_RECEIPT_PHOTOS} photos for long or folded receipts.
+        </Text>
+      ) : null}
     </Screen>
   );
 }
@@ -360,6 +473,40 @@ const styles = StyleSheet.create({
   },
   photoLabel: {
     ...typography.button,
+  },
+  pendingSection: {
+    marginTop: spacing.lg,
+    gap: spacing.md,
+  },
+  pendingHeading: {
+    ...typography.headline,
+  },
+  thumbRow: {
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  thumbWrap: {
+    position: "relative",
+  },
+  thumb: {
+    width: 88,
+    height: 112,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  thumbRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoCapHint: {
+    ...typography.caption,
+    marginTop: spacing.sm,
   },
   listPad: {
     gap: spacing.md,

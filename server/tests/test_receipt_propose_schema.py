@@ -9,6 +9,12 @@ def test_receipt_propose_accepts_image() -> None:
     assert body.image_base64 is not None
 
 
+def test_receipt_propose_accepts_multiple_images() -> None:
+    body = ReceiptProposeRequest(images_base64=["A" * 64, "B" * 64])
+    assert body.images_base64 is not None
+    assert len(body.images_base64) == 2
+
+
 def test_receipt_propose_accepts_url() -> None:
     body = ReceiptProposeRequest(url="https://example.com/order/123")
     assert body.url == "https://example.com/order/123"
@@ -24,6 +30,8 @@ def test_receipt_propose_requires_exactly_one_source() -> None:
         ReceiptProposeRequest()
     with pytest.raises(ValidationError):
         ReceiptProposeRequest(image_base64="A" * 64, url="https://example.com/invoice")
+    with pytest.raises(ValidationError):
+        ReceiptProposeRequest(image_base64="A" * 64, images_base64=["B" * 64])
 
 
 def test_receipt_propose_text_min_length() -> None:

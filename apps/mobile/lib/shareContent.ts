@@ -1,6 +1,7 @@
 import { Alert, Platform, Share } from "react-native";
 
-import type { GeneratedRecipe, ShoppingListDetail } from "@/lib/schemas";
+import { formatModelDisplayText } from "@/lib/formatModelDisplayText";
+import type { GeneratedRecipe, RecipeChatSessionDetail, ShoppingListDetail } from "@/lib/schemas";
 
 export async function shareText(title: string, message: string): Promise<void> {
   try {
@@ -40,6 +41,20 @@ export function formatRecipeShare(recipe: GeneratedRecipe): string {
     });
   }
   return lines.join("\n");
+}
+
+export function formatRecipeChatShare(detail: RecipeChatSessionDetail): string {
+  const lines: string[] = [];
+  for (const message of detail.messages) {
+    const speaker = message.role === "user" ? "You" : "Chef";
+    lines.push(`${speaker}: ${formatModelDisplayText(message.content)}`);
+    for (const recipe of message.recipes) {
+      lines.push(`  Recipe: ${formatModelDisplayText(recipe.title)}`);
+    }
+    lines.push("");
+  }
+  const body = lines.join("\n").trim();
+  return body.length > 0 ? body : "Chef chat";
 }
 
 export function formatShoppingListShare(list: ShoppingListDetail): string {

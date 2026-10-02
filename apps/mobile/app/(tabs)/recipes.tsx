@@ -515,7 +515,7 @@ export default function RecipesScreen() {
       {/* Search filter */}
       <SearchField
         ref={searchInputRef}
-        placeholder="Search by title or ingredient"
+        placeholder="Search by recipe title or ingredient"
         value={searchQuery}
         onChangeText={setSearchQuery}
         autoCapitalize="none"

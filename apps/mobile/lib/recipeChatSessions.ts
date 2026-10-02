@@ -20,3 +20,10 @@ export async function fetchRecipeChatSession(
   const raw = await apiJson<unknown>(`/recipes/chat/sessions/${sessionId}`, { baseUrl });
   return recipeChatSessionDetailSchema.parse(raw);
 }
+
+export async function deleteRecipeChatSession(baseUrl: string, sessionId: number): Promise<void> {
+  await apiJson<undefined>(`/recipes/chat/sessions/${sessionId}`, {
+    baseUrl,
+    method: "DELETE",
+  });
+}

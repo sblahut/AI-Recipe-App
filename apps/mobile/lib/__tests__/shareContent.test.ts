@@ -1,5 +1,9 @@
-import { formatRecipeShare, formatShoppingListShare } from "@/lib/shareContent";
-import type { GeneratedRecipe, ShoppingListDetail } from "@/lib/schemas";
+import {
+  formatRecipeChatShare,
+  formatRecipeShare,
+  formatShoppingListShare,
+} from "@/lib/shareContent";
+import type { GeneratedRecipe, RecipeChatSessionDetail, ShoppingListDetail } from "@/lib/schemas";
 
 const recipe: GeneratedRecipe = {
   title: "Tomato Soup",
@@ -21,6 +25,35 @@ describe("formatRecipeShare", () => {
     expect(text).toContain("- basil");
     expect(text).toContain("1. Simmer");
     expect(text).toContain("2. Blend");
+  });
+});
+
+describe("formatRecipeChatShare", () => {
+  it("formats user and chef messages", () => {
+    const detail: RecipeChatSessionDetail = {
+      id: 1,
+      updated_at: "2026-01-01T00:00:00Z",
+      messages: [
+        {
+          id: 1,
+          role: "user",
+          content: "Pasta ideas?",
+          recipes: [],
+          created_at: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: 2,
+          role: "assistant",
+          content: "Try cacio e pepe.",
+          recipes: [recipe],
+          created_at: "2026-01-01T00:01:00Z",
+        },
+      ],
+    };
+    const text = formatRecipeChatShare(detail);
+    expect(text).toContain("You: Pasta ideas?");
+    expect(text).toContain("Chef: Try cacio e pepe.");
+    expect(text).toContain("Recipe: Tomato Soup");
   });
 });
 
