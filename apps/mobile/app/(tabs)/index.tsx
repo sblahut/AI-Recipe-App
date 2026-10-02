@@ -461,6 +461,9 @@ export default function IngredientsScreen() {
           </Text>
         </Pressable>
       </View>
+      <Text style={[styles.receiptHint, { color: colors.textMuted }]}>
+        Take or choose multiple photos for long receipts.
+      </Text>
 
       {/* Storage areas */}
       <Pressable style={styles.filterSection} onPress={dismissSearch}>
@@ -616,6 +619,12 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     ...typography.button,
+  },
+  receiptHint: {
+    ...typography.caption,
+    paddingHorizontal: spacing.xl,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.sm,
   },
   filterSection: {
     paddingHorizontal: spacing.xl,

@@ -38,6 +38,7 @@ async def propose_receipt(body: ReceiptProposeRequest) -> ReceiptProposeResponse
     try:
         items = await propose_items_from_purchase_document(
             image_base64=body.image_base64,
+            images_base64=body.images_base64,
             text=body.text,
             url=body.url,
         )
